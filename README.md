@@ -81,6 +81,8 @@ On-demand image scanning:
 
 Start with the public docs set in [docs/README.md](docs/README.md). For a broader map of the published material, see [docs/DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md).
 
+For planned platform improvements grounded in the current OSS codebase, see [ROADMAP.md](ROADMAP.md) or the docs-hosted [product roadmap](docs/ROADMAP.md).
+
 ## Repository Layout
 
 - `backend/` Go services, migrations, workers, and Tekton assets

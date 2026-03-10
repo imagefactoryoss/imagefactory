@@ -10,6 +10,7 @@ Use the docs server sidebar as the primary way to browse the site. The navigatio
 - [overview/SYSTEM_OVERVIEW.md](overview/SYSTEM_OVERVIEW.md)
 - [getting-started/LOCAL_DEV_SETUP.md](getting-started/LOCAL_DEV_SETUP.md)
 - [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+- [ROADMAP.md](ROADMAP.md)
 
 ## Documentation Map
 
