@@ -5,6 +5,7 @@
       "items": [
         { "title": "Documentation Home", "path": "/README.md", "folder": "" },
         { "title": "Documentation Index", "path": "/DOCUMENTATION_INDEX.md", "folder": "" },
+        { "title": "Product Roadmap", "path": "/ROADMAP.md", "folder": "" },
         { "title": "Product Overview", "path": "/overview/PRODUCT_OVERVIEW.md", "folder": "" },
         { "title": "System Overview", "path": "/overview/SYSTEM_OVERVIEW.md", "folder": "" },
         { "title": "Local Development Setup", "path": "/getting-started/LOCAL_DEV_SETUP.md", "folder": "" },
