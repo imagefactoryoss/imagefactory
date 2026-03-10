@@ -17,6 +17,8 @@ FRONTEND_USE_LOCAL_DIST ?= false
 HELM_RELEASE ?= image-factory
 HELM_NAMESPACE ?= image-factory
 HELM_CHART ?= ./deploy/helm/image-factory
+RELEASE_DIST_DIR ?= ./release/dist
+RELEASE_TARGETS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
 # Colors for output
 RED := \033[0;31m
@@ -238,6 +240,19 @@ format: backend-format frontend-format ## Format all code
 
 .PHONY: quality-check
 quality-check: lint test ## Run quality checks
+
+##@ Release
+
+.PHONY: release-binaries
+release-binaries: ## Build release tarballs for runtime binaries
+	@echo "$(GREEN)Building release binaries for $(RELEASE_TARGETS)...$(NC)"
+	VERSION=$(IMAGE_VERSION) TARGETS="$(RELEASE_TARGETS)" DIST_DIR=$(RELEASE_DIST_DIR) ./scripts/release-binaries.sh
+
+.PHONY: release-upload-assets
+release-upload-assets: ## Upload built release tarballs to GitHub release (requires TAG)
+	@echo "$(GREEN)Uploading release assets for $(TAG)...$(NC)"
+	@test -n "$(TAG)" || { echo "$(RED)TAG is required. Example: make release-upload-assets TAG=v0.1.0$(NC)"; exit 1; }
+	TAG=$(TAG) DIST_DIR=$(RELEASE_DIST_DIR) ./scripts/upload-release-assets.sh
 
 ##@ Docker
 

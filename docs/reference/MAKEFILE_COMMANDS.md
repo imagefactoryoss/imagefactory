@@ -33,7 +33,42 @@ make dev-logs
 make dev-stop
 ```
 
-### 2) Build all Image Factory images
+### 2) Build runtime release tarballs
+
+```bash
+make release-binaries IMAGE_VERSION=v0.1.0
+```
+
+This creates `.tar.gz` artifacts and `checksums.txt` under `release/dist/` for:
+- `image-factory-server`
+- `image-factory-dispatcher`
+- `image-factory-notification-worker`
+- `image-factory-email-worker`
+- `image-factory-internal-registry-gc-worker`
+- `image-factory-docs-server`
+- `image-factory-migrate`
+- `image-factory-essential-config-seeder`
+- `image-factory-external-tenant-service`
+
+Default targets:
+- `linux/amd64`
+- `linux/arm64`
+- `darwin/amd64`
+- `darwin/arm64`
+
+Optional overrides:
+
+```bash
+make release-binaries IMAGE_VERSION=v0.1.0 RELEASE_TARGETS="linux/amd64 linux/arm64"
+```
+
+To upload assets to a GitHub release:
+
+```bash
+make release-upload-assets TAG=v0.1.0
+```
+
+### 3) Build all Image Factory images
 
 ```bash
 make build-all-images
@@ -48,7 +83,7 @@ This builds:
 - `image-factory-email-worker:latest`
 - `image-factory-internal-registry-gc-worker:latest`
 
-### 3) Pre-pull runtime service images for Helm
+### 4) Pre-pull runtime service images for Helm
 
 ```bash
 make docker-pull-runtime
@@ -63,7 +98,7 @@ This pulls runtime dependency images used by the Helm chart:
 - `axllent/mailpit:latest`
 - `glauth/glauth:latest`
 
-### 4) Build and push multi-platform images (amd64/arm64)
+### 5) Build and push multi-platform images (amd64/arm64)
 
 ```bash
 make docker-build-all-multiarch IMAGE_REGISTRY=<registry>
@@ -86,7 +121,7 @@ This publishes manifest lists for:
 - email worker
 - internal registry gc worker
 
-### 5) Podman equivalents
+### 6) Podman equivalents
 
 ```bash
 make build-all-images CONTAINER_ENGINE=podman COMPOSE_CMD="podman compose"
@@ -95,7 +130,7 @@ make docker-build-all-multiarch CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry
 make docker-build-all-multiarch CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry> FRONTEND_USE_LOCAL_DIST=true
 ```
 
-### 6) Build + Push + Helm Deploy in one command
+### 7) Build + Push + Helm Deploy in one command
 
 ```bash
 make release-deploy \
