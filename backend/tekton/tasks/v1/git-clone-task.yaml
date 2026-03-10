@@ -1,0 +1,50 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-clone
+spec:
+  params:
+    - name: url
+      type: string
+    - name: revision
+      type: string
+      default: main
+  workspaces:
+    - name: output
+    - name: auth
+      optional: true
+  steps:
+    - name: clone
+      image: docker.io/alpine/git:2.45.2
+      script: |
+        #!/bin/sh
+        set -eu
+        REPO_URL="$(params.url)"
+        if [ -d /workspace/auth ]; then
+          if [ -f /workspace/auth/ssh-privatekey ]; then
+            mkdir -p /tekton/home/.ssh
+            cp /workspace/auth/ssh-privatekey /tekton/home/.ssh/id_rsa
+            chmod 600 /tekton/home/.ssh/id_rsa
+            if [ -f /workspace/auth/known_hosts ]; then
+              cp /workspace/auth/known_hosts /tekton/home/.ssh/known_hosts
+              chmod 600 /tekton/home/.ssh/known_hosts
+              export GIT_SSH_COMMAND="ssh -i /tekton/home/.ssh/id_rsa -o UserKnownHostsFile=/tekton/home/.ssh/known_hosts"
+            else
+              export GIT_SSH_COMMAND="ssh -i /tekton/home/.ssh/id_rsa -o StrictHostKeyChecking=no"
+            fi
+          elif [ -f /workspace/auth/token ] || [ -f /workspace/auth/password ]; then
+            USERNAME="$(cat /workspace/auth/username 2>/dev/null || true)"
+            if [ -z "${USERNAME}" ]; then
+              USERNAME="token"
+            fi
+            TOKEN="$(cat /workspace/auth/token 2>/dev/null || true)"
+            PASSWORD="$(cat /workspace/auth/password 2>/dev/null || true)"
+            SECRET="${TOKEN:-$PASSWORD}"
+            if [ -n "${SECRET}" ] && echo "${REPO_URL}" | grep -q '^https://'; then
+              REPO_URL="$(echo "${REPO_URL}" | sed "s#^https://#https://${USERNAME}:${SECRET}@#")"
+            fi
+          fi
+        fi
+        OUTPUT_PATH="$(workspaces.output.path)"
+        rm -rf "${OUTPUT_PATH:?}"/*
+        git clone --depth=1 --branch "$(params.revision)" "${REPO_URL}" "${OUTPUT_PATH}"

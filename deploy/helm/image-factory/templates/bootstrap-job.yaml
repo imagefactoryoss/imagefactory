@@ -1,0 +1,81 @@
+{{- if and .Values.backend.enabled .Values.bootstrap.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "image-factory.fullname" . }}-bootstrap
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    "helm.sh/hook": {{ ternary "post-install,post-upgrade" "post-install" .Values.bootstrap.runOnUpgrade | quote }}
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": {{ .Values.bootstrap.hookWeight | quote }}
+spec:
+  backoffLimit: {{ .Values.bootstrap.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "image-factory.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: bootstrap
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              export PGPASSWORD="${IF_DATABASE_PASSWORD}"
+              export DB_SCHEMA="${IF_DATABASE_SCHEMA:-public}"
+
+              until pg_isready -h "${IF_DATABASE_HOST}" -p "${IF_DATABASE_PORT}" -U "${IF_DATABASE_USER}"; do
+                echo "Waiting for database to become ready..."
+                sleep 3
+              done
+
+              echo "Running migrations..."
+              /app/migrate up
+
+              echo "Seeding essential SQL data..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "SET search_path TO ${DB_SCHEMA};" \
+                -f /app/bootstrap/seed-essential-data.sql
+
+              {{- if .Values.bootstrap.seedDemoData }}
+              echo "Seeding demo SQL data..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "SET search_path TO ${DB_SCHEMA};" \
+                -f /app/bootstrap/seed-demo-data.sql
+              {{- end }}
+
+              echo "Seeding essential system configuration..."
+              /app/essential-config-seeder --action seed
+
+              echo "Seeding email notification templates..."
+              /app/email-template-seeder --action seed
+
+              echo "Seeding external services..."
+              /app/external-service-seeder --action seed
+
+              echo "Bootstrap complete."
+          envFrom:
+            - configMapRef:
+                name: {{ include "image-factory.fullname" . }}-config
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-secrets
+{{- end }}

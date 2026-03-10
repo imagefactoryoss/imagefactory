@@ -1,0 +1,21 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: packer
+spec:
+  params:
+    - name: TEMPLATE
+      type: string
+    - name: VARS
+      type: array
+      default: []
+  workspaces:
+    - name: source
+  steps:
+    - name: packer-build
+      image: docker.io/hashicorp/packer:1.10.2
+      workingDir: /workspace/source
+      args:
+        - build
+        - "$(params.TEMPLATE)"
+        - "$(params.VARS[*])"

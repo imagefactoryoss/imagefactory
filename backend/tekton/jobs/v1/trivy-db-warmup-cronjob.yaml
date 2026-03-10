@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trivy-db-warmup
+spec:
+  schedule: "17 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: trivy-db-warmup
+              image: quay.io/skopeo/stable:v1.15.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  skopeo copy --all --retry-times 3 --src-tls-verify=true --dest-tls-verify=false \
+                    "docker://${TRIVY_DB_SOURCE}" "docker://${TRIVY_DB_TARGET}"
+                  skopeo copy --all --retry-times 3 --src-tls-verify=true --dest-tls-verify=false \
+                    "docker://${TRIVY_JAVA_DB_SOURCE}" "docker://${TRIVY_JAVA_DB_TARGET}" || true
+              env:
+                - name: TRIVY_DB_SOURCE
+                  value: mirror.gcr.io/aquasec/trivy-db:2
+                - name: TRIVY_DB_TARGET
+                  value: image-factory-registry:5000/security/trivy-db:2
+                - name: TRIVY_JAVA_DB_SOURCE
+                  value: mirror.gcr.io/aquasec/trivy-java-db:1
+                - name: TRIVY_JAVA_DB_TARGET
+                  value: image-factory-registry:5000/security/trivy-java-db:1

@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS idx_project_notification_trigger_prefs_tenant_project;
+DROP INDEX IF EXISTS idx_project_notification_trigger_prefs_project_trigger;
+DROP TABLE IF EXISTS project_notification_trigger_prefs;

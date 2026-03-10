@@ -1,0 +1,1 @@
+-- No-op rollback. This migration only ensures the password_reset_tokens table exists.

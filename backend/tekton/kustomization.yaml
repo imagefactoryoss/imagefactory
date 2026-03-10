@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - tasks/v1/git-clone-task.yaml
+  - tasks/v1/docker-build-task.yaml
+  - tasks/v1/buildx-task.yaml
+  - tasks/v1/kaniko-task.yaml
+  - tasks/v1/kaniko-no-push-task.yaml
+  - tasks/v1/pull-external-image-task.yaml
+  - tasks/v1/scan-image-task.yaml
+  - tasks/v1/generate-sbom-task.yaml
+  - tasks/v1/evaluate-quarantine-policy-task.yaml
+  - tasks/v1/push-image-task.yaml
+  - tasks/v1/sign-image-task.yaml
+  - tasks/v1/packer-task.yaml
+  - jobs/v1/trivy-db-warmup-cronjob.yaml
+  - jobs/v1/internal-registry-pvc.yaml
+  - jobs/v1/internal-registry-deployment.yaml
+  - jobs/v1/internal-registry-service.yaml
+  - jobs/v1/tekton-history-cleanup-cronjob.yaml
+  - pipelines/v1/image-factory-build-docker.yaml
+  - pipelines/v1/image-factory-build-buildx.yaml
+  - pipelines/v1/image-factory-build-kaniko.yaml
+  - pipelines/v1/image-factory-build-packer.yaml
+  - pipelines/v1/image-factory-quarantine-import.yaml
+  - pipelines/v1/image-factory-quarantine-release-promote.yaml

@@ -1,0 +1,213 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: image-factory-build-v1-quarantine-import
+spec:
+  results:
+    - name: decision
+      value: $(tasks.evaluate-policy.results.decision)
+    - name: decision-reasons-json
+      value: $(tasks.evaluate-policy.results.reasons-json)
+    - name: policy-snapshot-json
+      value: $(tasks.evaluate-policy.results.policy-snapshot-json)
+    - name: scan-summary
+      value: $(tasks.scan.results.scan-summary)
+    - name: sbom-summary
+      value: $(tasks.sbom.results.sbom-summary)
+    - name: sbom-evidence
+      value: $(tasks.sbom.results.sbom-evidence)
+    - name: source-image-digest
+      value: $(tasks.pull.results.source-digest)
+  params:
+    - name: git-url
+      type: string
+      default: ""
+    - name: external-image-import-id
+      type: string
+    - name: tenant-id
+      type: string
+    - name: source-image-ref
+      type: string
+    - name: target-published-image
+      type: string
+    - name: target-quarantine-image
+      type: string
+    - name: policy-snapshot-json
+      type: string
+    - name: scan-tool
+      type: string
+      default: trivy
+    - name: sbom-tool
+      type: string
+      default: syft
+    - name: enable-sign
+      type: string
+      default: "true"
+    - name: sign-key-path
+      type: string
+      default: /workspace/signing-key/cosign.key
+    - name: trivy-cache-mode
+      type: string
+      default: shared
+    - name: trivy-db-repository
+      type: string
+      default: image-factory-registry:5000/security/trivy-db:2,mirror.gcr.io/aquasec/trivy-db:2
+    - name: trivy-java-db-repository
+      type: string
+      default: image-factory-registry:5000/security/trivy-java-db:1,mirror.gcr.io/aquasec/trivy-java-db:1
+    - name: temp-scan-trivy-insecure
+      type: string
+      default: "true"
+  workspaces:
+    - name: source
+    - name: dockerconfig
+    - name: trivy-cache
+      optional: true
+    - name: git-auth
+      optional: true
+    - name: signing-key
+      optional: true
+  tasks:
+    - name: clone
+      taskRef:
+        name: git-clone
+      when:
+        - input: "$(params.git-url)"
+          operator: notin
+          values: [""]
+      params:
+        - name: url
+          value: $(params.git-url)
+      workspaces:
+        - name: output
+          workspace: source
+        - name: auth
+          workspace: git-auth
+
+    - name: pull
+      taskRef:
+        name: pull-external-image
+      params:
+        - name: SOURCE_IMAGE
+          value: $(params.source-image-ref)
+        - name: OUTPUT_TAR
+          value: /workspace/source/.image/image.tar
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+
+    - name: scan
+      taskRef:
+        name: scan-image
+      runAfter: [pull]
+      params:
+        - name: IMAGE_TAR
+          value: /workspace/source/.image/image.tar
+        - name: SCAN_TOOL
+          value: $(params.scan-tool)
+        - name: OUTPUT_FILE
+          value: /workspace/source/.image/scan-report.json
+        - name: TRIVY_CACHE_MODE
+          value: $(params.trivy-cache-mode)
+        - name: TRIVY_DB_REPOSITORY
+          value: $(params.trivy-db-repository)
+        - name: TRIVY_JAVA_DB_REPOSITORY
+          value: $(params.trivy-java-db-repository)
+        - name: TRIVY_INSECURE
+          value: $(params.temp-scan-trivy-insecure)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+        - name: trivy-cache
+          workspace: trivy-cache
+
+    - name: sbom
+      taskRef:
+        name: generate-sbom
+      runAfter: [pull]
+      params:
+        - name: IMAGE_TAR
+          value: /workspace/source/.image/image.tar
+        - name: SBOM_TOOL
+          value: $(params.sbom-tool)
+        - name: OUTPUT_FILE
+          value: /workspace/source/.image/sbom.spdx.json
+      workspaces:
+        - name: source
+          workspace: source
+
+    - name: evaluate-policy
+      taskRef:
+        name: evaluate-quarantine-policy
+      runAfter: [scan, sbom]
+      params:
+        - name: POLICY_SNAPSHOT_JSON
+          value: $(params.policy-snapshot-json)
+        - name: SCAN_SUMMARY_JSON
+          value: $(tasks.scan.results.scan-summary)
+
+    - name: push-quarantine
+      taskRef:
+        name: push-image
+      runAfter: [evaluate-policy]
+      when:
+        - input: "$(tasks.evaluate-policy.results.decision)"
+          operator: in
+          values: ["quarantine"]
+      params:
+        - name: IMAGE
+          value: $(params.target-quarantine-image)
+        - name: IMAGE_TAR
+          value: /workspace/source/.image/image.tar
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+
+    - name: push-published
+      taskRef:
+        name: push-image
+      runAfter: [evaluate-policy]
+      when:
+        - input: "$(tasks.evaluate-policy.results.decision)"
+          operator: in
+          values: ["pass"]
+      params:
+        - name: IMAGE
+          value: $(params.target-published-image)
+        - name: IMAGE_TAR
+          value: /workspace/source/.image/image.tar
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+
+    - name: sign-published
+      taskRef:
+        name: sign-image
+      runAfter: [push-published]
+      when:
+        - input: "$(tasks.evaluate-policy.results.decision)"
+          operator: in
+          values: ["pass"]
+        - input: "$(params.enable-sign)"
+          operator: in
+          values: ["true"]
+      params:
+        - name: IMAGE
+          value: $(params.target-published-image)
+        - name: SIGN_KEY_PATH
+          value: $(params.sign-key-path)
+        - name: OUTPUT_FILE
+          value: /workspace/source/.image/signing-report.json
+      workspaces:
+        - name: source
+          workspace: source
+        - name: signing-key
+          workspace: signing-key

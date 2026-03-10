@@ -1,0 +1,127 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: scan-image
+spec:
+  params:
+    - name: IMAGE_TAR
+      type: string
+      default: /workspace/source/.image/image.tar
+    - name: IMAGE_REF
+      type: string
+      default: ""
+    - name: FALLBACK_IMAGE_REF
+      type: string
+      default: ""
+    - name: SCAN_TOOL
+      type: string
+      default: trivy
+    - name: OUTPUT_FILE
+      type: string
+      default: /workspace/source/.image/scan-report.json
+    - name: TRIVY_CACHE_DIR
+      type: string
+      default: /workspace/trivy-cache
+    - name: TRIVY_CACHE_MODE
+      type: string
+      default: shared
+    - name: TRIVY_DB_REPOSITORY
+      type: string
+      default: image-factory-registry:5000/security/trivy-db:2,mirror.gcr.io/aquasec/trivy-db:2
+    - name: TRIVY_JAVA_DB_REPOSITORY
+      type: string
+      default: image-factory-registry:5000/security/trivy-java-db:1,mirror.gcr.io/aquasec/trivy-java-db:1
+    - name: TRIVY_INSECURE
+      type: string
+      default: "false"
+  workspaces:
+    - name: source
+    - name: trivy-cache
+      optional: true
+    - name: dockerconfig
+      optional: true
+      mountPath: /workspace/dockerconfig
+  results:
+    - name: scan-summary
+      description: Compact vulnerability summary JSON for catalog ingestion
+  steps:
+    - name: vulnerability-scan
+      image: docker.io/aquasec/trivy:0.57.1
+      script: |
+        #!/bin/sh
+        set -eu
+        IMAGE_TAR="$(params.IMAGE_TAR)"
+        IMAGE_REF="$(params.IMAGE_REF)"
+        FALLBACK_IMAGE_REF="$(params.FALLBACK_IMAGE_REF)"
+        SCAN_TOOL="$(params.SCAN_TOOL)"
+        OUTPUT_FILE="$(params.OUTPUT_FILE)"
+        TRIVY_CACHE_DIR="$(params.TRIVY_CACHE_DIR)"
+        if [ "$(workspaces.trivy-cache.bound)" = "true" ]; then
+          TRIVY_CACHE_DIR="$(workspaces.trivy-cache.path)"
+        fi
+        TRIVY_CACHE_MODE="$(params.TRIVY_CACHE_MODE)"
+        TRIVY_DB_REPOSITORY="$(params.TRIVY_DB_REPOSITORY)"
+        TRIVY_JAVA_DB_REPOSITORY="$(params.TRIVY_JAVA_DB_REPOSITORY)"
+        TRIVY_INSECURE="$(params.TRIVY_INSECURE)"
+        if [ "$(workspaces.dockerconfig.bound)" = "true" ]; then
+          export DOCKER_CONFIG="$(workspaces.dockerconfig.path)"
+        fi
+        mkdir -p "$(dirname "${OUTPUT_FILE}")"
+        mkdir -p "${TRIVY_CACHE_DIR}"
+        scan_target=""
+        if [ -n "${IMAGE_REF}" ]; then
+          scan_target="${IMAGE_REF}"
+        elif [ -n "${FALLBACK_IMAGE_REF}" ]; then
+          scan_target="${FALLBACK_IMAGE_REF}"
+        else
+          if [ ! -f "${IMAGE_TAR}" ]; then
+            echo "{\"status\":\"error\",\"message\":\"image tar not found: ${IMAGE_TAR}\"}" > "${OUTPUT_FILE}"
+            exit 1
+          fi
+        fi
+        case "${SCAN_TOOL}" in
+          trivy)
+            db_args=""
+            OLDIFS="${IFS}"
+            IFS=','
+            for repo in ${TRIVY_DB_REPOSITORY}; do
+              repo="$(echo "${repo}" | xargs)"
+              [ -z "${repo}" ] && continue
+              db_args="${db_args} --db-repository ${repo}"
+            done
+            for repo in ${TRIVY_JAVA_DB_REPOSITORY}; do
+              repo="$(echo "${repo}" | xargs)"
+              [ -z "${repo}" ] && continue
+              db_args="${db_args} --java-db-repository ${repo}"
+            done
+            IFS="${OLDIFS}"
+            trivy_args="--cache-dir ${TRIVY_CACHE_DIR}${db_args}"
+            if [ -n "${scan_target}" ]; then
+              input_args="--format json --output ${OUTPUT_FILE} ${scan_target}"
+            else
+              input_args="--input ${IMAGE_TAR} --format json --output ${OUTPUT_FILE}"
+            fi
+            insecure_arg=""
+            if [ "${TRIVY_INSECURE}" = "true" ]; then
+              # Needed for HTTP/insecure internal registry mirrors used for Trivy DB artifacts.
+              insecure_arg="--insecure"
+            fi
+            if [ "${TRIVY_CACHE_MODE}" = "direct" ]; then
+              trivy image ${insecure_arg} ${trivy_args} ${input_args}
+            elif [ -f "${TRIVY_CACHE_DIR}/db/metadata.json" ]; then
+              trivy image ${insecure_arg} ${trivy_args} --skip-db-update --skip-java-db-update ${input_args}
+            else
+              trivy image ${insecure_arg} ${trivy_args} ${input_args}
+            fi
+            ;;
+          *)
+            echo "{\"status\":\"skipped\",\"message\":\"scan tool ${SCAN_TOOL} not implemented in Tekton task\"}" > "${OUTPUT_FILE}"
+            ;;
+        esac
+        critical="$( (grep -o '"Severity":"CRITICAL"' "${OUTPUT_FILE}" || true) | wc -l | tr -d ' ' )"
+        high="$( (grep -o '"Severity":"HIGH"' "${OUTPUT_FILE}" || true) | wc -l | tr -d ' ' )"
+        medium="$( (grep -o '"Severity":"MEDIUM"' "${OUTPUT_FILE}" || true) | wc -l | tr -d ' ' )"
+        low="$( (grep -o '"Severity":"LOW"' "${OUTPUT_FILE}" || true) | wc -l | tr -d ' ' )"
+        unknown="$( (grep -o '"Severity":"UNKNOWN"' "${OUTPUT_FILE}" || true) | wc -l | tr -d ' ' )"
+        printf '{"tool":"%s","vulnerabilities":{"critical":%s,"high":%s,"medium":%s,"low":%s,"unknown":%s}}' \
+          "${SCAN_TOOL}" "${critical}" "${high}" "${medium}" "${low}" "${unknown}" > "$(results.scan-summary.path)"

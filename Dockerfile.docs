@@ -1,0 +1,26 @@
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /src
+RUN apk add --no-cache git
+
+COPY backend/go.mod backend/go.sum ./backend/
+WORKDIR /src/backend
+RUN go mod download
+
+COPY backend ./backend
+WORKDIR /src/backend/backend
+RUN CGO_ENABLED=0 go build -o /out/docs-server ./cmd/docs-server
+
+FROM alpine:3.19
+
+WORKDIR /app
+RUN adduser -D -u 10001 appuser
+
+COPY --from=builder /out/docs-server /app/docs-server
+COPY docs /docs
+
+USER appuser
+EXPOSE 8000
+
+ENTRYPOINT ["/app/docs-server"]
+CMD ["--root", "/docs", "--port", "8000"]

@@ -1,0 +1,26 @@
+# Development Dockerfile for React frontend
+FROM node:18-alpine
+
+# Install development tools
+RUN apk add --no-cache git
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm install
+
+# Create necessary directories
+RUN mkdir -p src public
+
+# Set permissions
+RUN chmod -R 755 /app
+
+# Expose port
+EXPOSE 3000
+
+# Command will be overridden in docker-compose
+CMD ["npm", "run", "dev"]

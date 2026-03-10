@@ -1,0 +1,42 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: image-factory-quarantine-release-promote-v1
+spec:
+  params:
+    - name: source-image-ref
+      type: string
+    - name: destination-image-ref
+      type: string
+  workspaces:
+    - name: source
+    - name: dockerconfig
+  tasks:
+    - name: pull-source
+      taskRef:
+        name: pull-external-image
+      params:
+        - name: SOURCE_IMAGE
+          value: $(params.source-image-ref)
+        - name: OUTPUT_TAR
+          value: /workspace/source/.image/image.tar
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+
+    - name: push-destination
+      taskRef:
+        name: push-image
+      runAfter: [pull-source]
+      params:
+        - name: IMAGE
+          value: $(params.destination-image-ref)
+        - name: IMAGE_TAR
+          value: /workspace/source/.image/image.tar
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig

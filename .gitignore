@@ -1,0 +1,324 @@
+# Environment files
+.env
+.env.production
+.env.local
+.env.development.local
+.env.production.local
+
+# Backend
+backend/server
+backend/dispatcher
+backend/migrate
+backend/essential-config-seeder
+backend/backend.log
+backend/backend.pid
+backend/tmp/
+backend/vendor/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.next/
+frontend/.nuxt/
+frontend/.output/
+frontend/.vercel/
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+# .vscode/ (tracked)
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+log/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+dump.rdb
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Tests
+.nyc_output
+playwright-report/
+test-results/
+
+# Database
+*.sqlite
+*.db
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Build artifacts
+dist/
+out/
+
+# Local development
+minio-data/
+postgres-data/
+redis-data/
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# Secrets
+secrets/
+.secrets/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Kubernetes
+*.kubeconfig
+
+# Backup files
+*.bak
+*.backup
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.ico
+
+# Video files
+*.mp4
+*.flv
+*.avi
+*.mov
+*.wmv
+
+# Audio files
+*.mp3
+*.wav
+*.flac
+*.aac
+
+# Documents
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+
+# Allow documentation assets to be committed
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!docs/**/*.png
+!docs/**/*.gif
+!docs/**/*.pdf
+
+# Configuration overrides
+config.local.yaml
+config.local.yml
+config.local.json
+deploy/helm/image-factory/values.local.yaml
+
+# Go specific
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+# Go workspace file
+go.work
+
+# Air (Go live reload)
+.air.toml
+tmp/
+
+# Node.js specific
+yarn.lock
+pnpm-lock.yaml
+!frontend/package-lock.json
+
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+target/
+
+# C/C++
+*.o
+*.a
+*.la
+*.lo
+*.libs
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lai
+*.la
+*.a
+*.lib
+
+# Rust
+target/
+Cargo.lock
+
+# Ruby
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+
+# PHP
+/vendor/
+composer.lock
+
+# Laravel specific
+.env
+.env.backup
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+
+# Symfony specific
+/var/
+/vendor/
+/web/bundles/
+
+# Composer
+composer.phar
+
+# PHPUnit
+.phpunit.result.cache
+
+# PHPCS
+.phpcs-cache
+
+# PHPStan
+.phpstan.cache
+
+# Large files and additional binaries (for pre-commit hook)
+*.bin
+*.dat
+*.dump
+*.img
+*.iso
+*.vdi
+*.vmdk
+*.ova
+*.ovf
+
+# Machine learning models
+*.model
+*.pkl
+*.pickle
+*.h5
+*.pb
+*.onnx
+*.pt
+*.pth
+
+# Database dumps
+*.sql.gz
+*.sql.bz2
+*.dump.gz
+
+# Additional archives not covered above
+*.xz
+*.bz2
+*.lz
+*.lzma
+*.Z
+
+# Game assets
+*.unity3d
+*.unitypackage
+*.asset
+*.mesh
+
+# CAD files
+*.dwg
+*.dxf
+*.step
+*.stp
+
+# Redis dump file (generated)
+dump.rdb
+backend/external-tenant-service

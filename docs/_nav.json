@@ -1,0 +1,113 @@
+{
+  "sections": [
+    {
+      "title": "Start Here",
+      "items": [
+        { "title": "Documentation Home", "path": "/README.md", "folder": "" },
+        { "title": "Documentation Index", "path": "/DOCUMENTATION_INDEX.md", "folder": "" },
+        { "title": "Product Overview", "path": "/overview/PRODUCT_OVERVIEW.md", "folder": "" },
+        { "title": "System Overview", "path": "/overview/SYSTEM_OVERVIEW.md", "folder": "" },
+        { "title": "Local Development Setup", "path": "/getting-started/LOCAL_DEV_SETUP.md", "folder": "" },
+        { "title": "Role Quick Start", "path": "/user-journeys/QUICK_START.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "Platform Overview",
+      "items": [
+        { "title": "Operational Capabilities", "path": "/overview/OPERATIONAL_CAPABILITIES_MATRIX.md", "folder": "" },
+        { "title": "Quarantine Process Guide", "path": "/overview/QUARANTINE_PROCESS_GUIDE.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "Getting Started",
+      "items": [
+        { "title": "Owner And Admin Quick Start", "path": "/authentication/OWNER_ADMIN_QUICK_START.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "Builds And Operations",
+      "items": [
+        { "title": "Build Management Guide", "path": "/build-management/BUILD_MANAGEMENT_GUIDE.md", "folder": "" },
+        { "title": "Build Configuration Deep Dive", "path": "/build-management/BUILD_CONFIGURATION_STEP_DEEP_DIVE.md", "folder": "" },
+        { "title": "Build Management Design", "path": "/build-management/BUILD_MANAGEMENT_DESIGN.md", "folder": "" },
+        { "title": "Build Management UI UX Design", "path": "/build-management/BUILD_MANAGEMENT_UI_UX_DESIGN.md", "folder": "" },
+        { "title": "Build Schema Quick Reference", "path": "/build-management/BUILD_SCHEMA_QUICK_REFERENCE.md", "folder": "" },
+        { "title": "Admin Pages Guide", "path": "/admin/ADMIN_PAGES_COMPLETE_GUIDE.md", "folder": "" },
+        { "title": "Build API Guide", "path": "/api/BUILD_API_GUIDE.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "Kubernetes And Tekton",
+      "items": [
+        { "title": "Kubernetes Integration Overview", "path": "/kubernetes-integration/README.md", "folder": "" },
+        { "title": "Kubernetes Tekton Integration", "path": "/kubernetes-integration/KUBERNETES_TEKTON_INTEGRATION.md", "folder": "" },
+        { "title": "Tekton Readiness Troubleshooting", "path": "/kubernetes-integration/TEKTON_READINESS_TROUBLESHOOTING.md", "folder": "" },
+        { "title": "Tekton Installer Rollback Guide", "path": "/kubernetes-integration/TEKTON_INSTALLER_ROLLBACK_GUIDE.md", "folder": "" },
+        { "title": "Kubernetes Cluster Connectivity Guide", "path": "/kubernetes-integration/KUBERNETES_CLUSTER_CONNECTIVITY_GUIDE.md", "folder": "" },
+        { "title": "Hybrid Infrastructure Strategy", "path": "/kubernetes-integration/HYBRID_INFRASTRUCTURE_STRATEGY.md", "folder": "" },
+        { "title": "Kubernetes Provider Management", "path": "/kubernetes-integration/KUBERNETES_PROVIDER_MANAGEMENT.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "User Roles And Access",
+      "items": [
+        { "title": "Owner And Admin Feature Matrix", "path": "/authentication/OWNER_ADMIN_FEATURE_MATRIX.md", "folder": "" },
+        { "title": "Owner And Admin Role Capabilities", "path": "/authentication/OWNER_ADMIN_ROLE_CAPABILITIES.md", "folder": "" },
+        { "title": "RBAC Quick Reference", "path": "/authentication/RBAC-Quick-Reference.md", "folder": "" },
+        { "title": "RBAC Permissions Model", "path": "/authentication/RBAC-Permissions-Model.md", "folder": "" },
+        { "title": "Complete Permission Matrix", "path": "/reference/COMPLETE_PERMISSION_MATRIX.md", "folder": "" },
+        { "title": "User Management", "path": "/reference/USER_MANAGEMENT.md", "folder": "" },
+        { "title": "LDAP User Seeding", "path": "/reference/LDAP_USER_SEEDING.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "User Journeys",
+      "items": [
+        { "title": "User Journeys Index", "path": "/user-journeys/INDEX.md", "folder": "" },
+        { "title": "Owner Journey", "path": "/user-journeys/OWNER_JOURNEY.md", "folder": "" },
+        { "title": "Admin Journey", "path": "/user-journeys/ADMIN_JOURNEY.md", "folder": "" },
+        { "title": "Member Journey", "path": "/user-journeys/MEMBER_JOURNEY.md", "folder": "" },
+        { "title": "Viewer Journey", "path": "/user-journeys/VIEWER_JOURNEY.md", "folder": "" },
+        { "title": "Build Pipeline Journey", "path": "/user-journeys/BUILD_PIPELINE_JOURNEY.md", "folder": "" },
+        { "title": "Quarantine Capability Journey", "path": "/user-journeys/QUARANTINE_CAPABILITY_JOURNEY.md", "folder": "" },
+        { "title": "Unified Messaging Journey", "path": "/user-journeys/UNIFIED_MESSAGING_JOURNEY.md", "folder": "" },
+        { "title": "Dispatcher Journey Testing", "path": "/user-journeys/DISPATCHER_JOURNEY_TESTING.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "Architecture Reference",
+      "items": [
+        { "title": "Reference Architecture", "path": "/architecture/REFERENCE_ARCHITECTURE.md", "folder": "" },
+        { "title": "Workflow Engine Architecture", "path": "/architecture/WORKFLOW_ENGINE_ARCHITECTURE.md", "folder": "" },
+        { "title": "Hexagonal Architecture", "path": "/architecture/design/HEXAGONAL_ARCHITECTURE.md", "folder": "" },
+        { "title": "Unified Messaging Event Catalog", "path": "/architecture/design/UNIFIED_MESSAGING_EVENT_CATALOG.md", "folder": "" },
+        { "title": "Build Dispatcher Design", "path": "/architecture/build/BUILD_DISPATCHER_DESIGN.md", "folder": "" },
+        { "title": "Build Domain Models Architecture", "path": "/architecture/build/BUILD_DOMAIN_MODELS_ARCHITECTURE.md", "folder": "" },
+        { "title": "Build Methods Execution Architecture", "path": "/architecture/build/BUILD_METHODS_EXECUTION_ARCHITECTURE.md", "folder": "" },
+        { "title": "Build Tables Overview", "path": "/architecture/build/BUILD_TABLES_OVERVIEW.md", "folder": "" },
+        { "title": "Role Based UI Architecture", "path": "/architecture/security/ROLE_BASED_UI_ARCHITECTURE.md", "folder": "" },
+        { "title": "Role Consolidation Architecture", "path": "/architecture/security/ROLE_CONSOLIDATION_ARCHITECTURE.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "Implementation Reference",
+      "items": [
+        { "title": "Environment File Loading", "path": "/reference/Environment-File-Loading.md", "folder": "" },
+        { "title": "System Configuration Opportunities", "path": "/reference/SYSTEM_CONFIGURATION_OPPORTUNITIES.md", "folder": "" },
+        { "title": "Email Template Seeder", "path": "/reference/EMAIL_TEMPLATE_SEEDER.md", "folder": "" },
+        { "title": "Domain Availability", "path": "/reference/domain_availability.md", "folder": "" },
+        { "title": "Makefile Commands", "path": "/reference/MAKEFILE_COMMANDS.md", "folder": "" },
+        { "title": "OKE Shortname Enforcement Script", "path": "/reference/OKE_SHORTNAME_ENFORCEMENT_SCRIPT.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "Contributor And Process",
+      "items": [
+        { "title": "Owner And Admin Testing Guide", "path": "/authentication/OWNER_ADMIN_TESTING_GUIDE.md", "folder": "" },
+        { "title": "Owner And Admin Testing Checklist", "path": "/authentication/OWNER_ADMIN_TESTING_CHECKLIST.md", "folder": "" },
+        { "title": "Pre Commit Hook Guide", "path": "/reference/Pre-commit-Hook-Guide.md", "folder": "" },
+        { "title": "Pull Request Guide", "path": "/reference/PULL_REQUEST.md", "folder": "" }
+      ]
+    }
+  ]
+}

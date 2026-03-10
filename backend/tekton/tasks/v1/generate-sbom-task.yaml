@@ -1,0 +1,141 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: generate-sbom
+spec:
+  params:
+    - name: SOURCE
+      type: string
+      default: docker-archive:/workspace/source/.image/image.tar
+    - name: FALLBACK_SOURCE
+      type: string
+      default: ""
+    - name: SBOM_TOOL
+      type: string
+      default: syft
+    - name: OUTPUT_FILE
+      type: string
+      default: /workspace/source/.image/sbom.spdx.json
+    - name: REGISTRY_INSECURE_USE_HTTP
+      type: string
+      default: "false"
+    - name: REGISTRY_INSECURE_SKIP_TLS_VERIFY
+      type: string
+      default: "false"
+  workspaces:
+    - name: source
+    - name: dockerconfig
+      optional: true
+      mountPath: /tekton/home/.docker
+  results:
+    - name: sbom-summary
+      description: Compact SBOM summary JSON for catalog ingestion
+    - name: sbom-evidence
+      description: Compact SBOM evidence JSON with package list for catalog ingestion
+  steps:
+    - name: ensure-output-dir
+      image: docker.io/library/alpine:3.20
+      script: |
+        #!/bin/sh
+        set -eu
+        mkdir -p "$(dirname "$(params.OUTPUT_FILE)")"
+    - name: sbom
+      image: docker.io/anchore/syft:v1.18.1
+      env:
+        - name: SYFT_REGISTRY_INSECURE_USE_HTTP
+          value: $(params.REGISTRY_INSECURE_USE_HTTP)
+        - name: SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY
+          value: $(params.REGISTRY_INSECURE_SKIP_TLS_VERIFY)
+      command:
+        - /syft
+      args:
+        - --quiet
+        - --output=spdx-json=$(params.OUTPUT_FILE)
+        - --output=syft-table
+        - $(params.SOURCE)
+    - name: summarize-sbom
+      image: docker.io/library/python:3.12-alpine
+      script: |
+        #!/usr/bin/env python3
+        import json
+        import os
+
+        output_file = os.environ.get("OUTPUT_FILE", "$(params.OUTPUT_FILE)")
+        sbom_tool = os.environ.get("SBOM_TOOL", "$(params.SBOM_TOOL)")
+        summary_path = "$(results.sbom-summary.path)"
+        evidence_path = "$(results.sbom-evidence.path)"
+        # Tekton extracts task results from termination message with a strict size limit.
+        # Keep sbom-evidence compact so both sbom-summary and sbom-evidence results fit.
+        max_bytes = 1200
+
+        payload = {
+            "format": "spdx",
+            "generator": sbom_tool,
+            "package_count": 0,
+            "packages": [],
+        }
+
+        raw = None
+        if os.path.isfile(output_file):
+            try:
+                with open(output_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+            except Exception:
+                raw = None
+
+        if isinstance(raw, dict):
+            payload["format"] = raw.get("spdxVersion") or raw.get("bomFormat") or raw.get("format") or "spdx"
+            payload["version"] = raw.get("specVersion") or raw.get("version")
+            payload["generator"] = raw.get("generator") or sbom_tool
+            pkgs = raw.get("packages")
+            if not isinstance(pkgs, list):
+                pkgs = raw.get("components")
+            if not isinstance(pkgs, list):
+                pkgs = []
+            payload["package_count"] = len(pkgs)
+
+            compact_packages = []
+            for pkg in pkgs:
+                if not isinstance(pkg, dict):
+                    continue
+                name = pkg.get("name") or pkg.get("purl")
+                if not name:
+                    continue
+                compact_packages.append(
+                    {
+                        "name": name,
+                        "version": pkg.get("version"),
+                        "type": pkg.get("type"),
+                        "purl": pkg.get("purl"),
+                        "package_path": pkg.get("package_path") or pkg.get("path") or pkg.get("filePath"),
+                        "layer_digest": pkg.get("layer_digest") or pkg.get("layerID") or pkg.get("layerId"),
+                        "source_command": pkg.get("source_command") or pkg.get("sourceCommand"),
+                    }
+                )
+
+            selected = []
+            truncated = False
+            for item in compact_packages:
+                candidate = payload.copy()
+                candidate["packages"] = selected + [item]
+                encoded = json.dumps(candidate, separators=(",", ":"), ensure_ascii=False)
+                if len(encoded.encode("utf-8")) > max_bytes:
+                    truncated = True
+                    break
+                selected.append(item)
+
+            payload["packages"] = selected
+            if truncated:
+                payload["packages_truncated"] = True
+
+        summary = {
+            "format": payload.get("format", "spdx"),
+            "generator": payload.get("generator", sbom_tool),
+            "package_count": int(payload.get("package_count", 0)),
+        }
+
+        with open(summary_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(summary, separators=(",", ":"), ensure_ascii=False))
+
+        with open(evidence_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(payload, separators=(",", ":"), ensure_ascii=False))

@@ -1,0 +1,41 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kaniko-no-push
+spec:
+  params:
+    - name: DOCKERFILE
+      type: string
+      default: Dockerfile
+    - name: BUILD_CONTEXT
+      type: string
+      default: "."
+    - name: IMAGE
+      type: string
+    - name: PUSH
+      type: string
+      default: "false"
+    - name: OUTPUT_TAR
+      type: string
+      default: "/workspace/source/.image/image.tar"
+  workspaces:
+    - name: source
+    - name: dockerconfig
+      mountPath: /kaniko/.docker
+  steps:
+    - name: ensure-output-dir
+      image: docker.io/library/alpine:3.20
+      script: |
+        #!/bin/sh
+        set -eu
+        mkdir -p "$(dirname "$(params.OUTPUT_TAR)")"
+    - name: build-image
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      command:
+        - /kaniko/executor
+      args:
+        - --dockerfile=$(workspaces.source.path)/$(params.DOCKERFILE)
+        - --context=$(workspaces.source.path)/$(params.BUILD_CONTEXT)
+        - --no-push
+        - --tarPath=$(params.OUTPUT_TAR)
+        - --destination=$(params.IMAGE)

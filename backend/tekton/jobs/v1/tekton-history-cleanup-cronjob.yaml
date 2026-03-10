@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-history-cleanup
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-history-cleanup
+rules:
+  - apiGroups: ["tekton.dev"]
+    resources: ["pipelineruns", "taskruns"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-history-cleanup
+subjects:
+  - kind: ServiceAccount
+    name: tekton-history-cleanup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tekton-history-cleanup
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tekton-history-cleanup
+spec:
+  # Run daily at 02:30 UTC to avoid peak build windows.
+  schedule: "30 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: tekton-history-cleanup
+          restartPolicy: Never
+          containers:
+            - name: prune
+              image: docker.io/bitnami/kubectl:latest
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: KEEP_PIPELINERUNS
+                  value: "120"
+                - name: KEEP_TASKRUNS
+                  value: "240"
+                - name: KEEP_PODS
+                  value: "240"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  set -eu
+
+                  prune() {
+                    resource="$1"
+                    keep="$2"
+                    selector="${3:-}"
+
+                    if [ -n "$selector" ]; then
+                      names="$(kubectl get "$resource" -l "$selector" --sort-by=.metadata.creationTimestamp -o name 2>/dev/null || true)"
+                    else
+                      names="$(kubectl get "$resource" --sort-by=.metadata.creationTimestamp -o name 2>/dev/null || true)"
+                    fi
+
+                    count="$(printf "%s\n" "$names" | sed '/^$/d' | wc -l | tr -d ' ')"
+                    if [ "$count" -le "$keep" ]; then
+                      echo "cleanup: $resource count=$count keep=$keep nothing to prune"
+                      return 0
+                    fi
+
+                    delete_count=$((count - keep))
+                    to_delete="$(printf "%s\n" "$names" | sed '/^$/d' | head -n "$delete_count" || true)"
+                    if [ -z "$to_delete" ]; then
+                      echo "cleanup: $resource no deletions computed"
+                      return 0
+                    fi
+
+                    echo "cleanup: pruning $delete_count $resource objects (keep=$keep)"
+                    printf "%s\n" "$to_delete" | xargs -r kubectl delete --wait=false
+                  }
+
+                  prune "pipelineruns.tekton.dev" "${KEEP_PIPELINERUNS}"
+                  prune "taskruns.tekton.dev" "${KEEP_TASKRUNS}"
+                  prune "pods" "${KEEP_PODS}" "tekton.dev/pipelineRun"

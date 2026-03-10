@@ -1,0 +1,37 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: sign-image
+spec:
+  params:
+    - name: IMAGE
+      type: string
+    - name: SIGN_KEY_PATH
+      type: string
+      default: /workspace/signing-key/cosign.key
+    - name: OUTPUT_FILE
+      type: string
+      default: /workspace/source/.image/signing-report.json
+  workspaces:
+    - name: source
+    - name: signing-key
+      optional: true
+  steps:
+    - name: sign
+      image: gcr.io/projectsigstore/cosign:v2.4.1
+      script: |
+        #!/bin/sh
+        set -eu
+        IMAGE="$(params.IMAGE)"
+        KEY_PATH="$(params.SIGN_KEY_PATH)"
+        OUTPUT_FILE="$(params.OUTPUT_FILE)"
+        mkdir -p "$(dirname "${OUTPUT_FILE}")"
+
+        if [ -f "${KEY_PATH}" ]; then
+          COSIGN_PASSWORD="${COSIGN_PASSWORD:-}" cosign sign --yes --key "${KEY_PATH}" "${IMAGE}"
+          printf '{"status":"signed","image":"%s","mode":"key"}\n' "${IMAGE}" > "${OUTPUT_FILE}"
+          exit 0
+        fi
+
+        # Keep stage deterministic in prototype flows where signing key is not yet provisioned.
+        printf '{"status":"skipped","image":"%s","reason":"signing key not found"}\n' "${IMAGE}" > "${OUTPUT_FILE}"

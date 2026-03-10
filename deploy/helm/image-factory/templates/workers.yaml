@@ -1,0 +1,288 @@
+{{- if and .Values.backend.enabled .Values.workers.dispatcher.enabled }}
+{{- include "image-factory.validateChartConfig" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-dispatcher
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dispatcher
+spec:
+  replicas: {{ .Values.workers.dispatcher.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "image-factory.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: dispatcher
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: dispatcher
+    spec:
+      serviceAccountName: {{ include "image-factory.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: dispatcher
+          image: "{{ .Values.workers.dispatcher.image.repository }}:{{ .Values.workers.dispatcher.image.tag }}"
+          imagePullPolicy: {{ .Values.workers.dispatcher.image.pullPolicy }}
+          command: ["/app/dispatcher"]
+          args: ["--health-port", "{{ .Values.workers.dispatcher.port }}"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.workers.dispatcher.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "image-factory.fullname" . }}-config
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.workers.dispatcher.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-dispatcher
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dispatcher
+spec:
+  selector:
+    {{- include "image-factory.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: dispatcher
+  ports:
+    - name: http
+      port: {{ .Values.workers.dispatcher.port }}
+      targetPort: http
+{{- end }}
+
+{{- if and .Values.backend.enabled .Values.workers.notification.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-notification-worker
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notification-worker
+spec:
+  replicas: {{ .Values.workers.notification.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "image-factory.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: notification-worker
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: notification-worker
+    spec:
+      serviceAccountName: {{ include "image-factory.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: notification-worker
+          image: "{{ .Values.workers.notification.image.repository }}:{{ .Values.workers.notification.image.tag }}"
+          imagePullPolicy: {{ .Values.workers.notification.image.pullPolicy }}
+          command: ["/app/notification-worker"]
+          args: ["--health-port", "{{ .Values.workers.notification.port }}"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.workers.notification.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "image-factory.fullname" . }}-config
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.workers.notification.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-notification-worker
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notification-worker
+spec:
+  selector:
+    {{- include "image-factory.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: notification-worker
+  ports:
+    - name: http
+      port: {{ .Values.workers.notification.port }}
+      targetPort: http
+{{- end }}
+
+{{- if and .Values.backend.enabled .Values.workers.email.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-email-worker
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: email-worker
+spec:
+  replicas: {{ .Values.workers.email.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "image-factory.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: email-worker
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: email-worker
+    spec:
+      serviceAccountName: {{ include "image-factory.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: email-worker
+          image: "{{ .Values.workers.email.image.repository }}:{{ .Values.workers.email.image.tag }}"
+          imagePullPolicy: {{ .Values.workers.email.image.pullPolicy }}
+          command: ["/app/email-worker"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.workers.email.port }}
+          env:
+            - name: HEALTH_CHECK_PORT
+              value: {{ .Values.workers.email.port | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "image-factory.fullname" . }}-config
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.workers.email.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-email-worker
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: email-worker
+spec:
+  selector:
+    {{- include "image-factory.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: email-worker
+  ports:
+    - name: http
+      port: {{ .Values.workers.email.port }}
+      targetPort: http
+{{- end }}
+
+{{- if and .Values.backend.enabled .Values.workers.internalRegistryGc.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-internal-registry-gc-worker
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: internal-registry-gc-worker
+spec:
+  replicas: {{ .Values.workers.internalRegistryGc.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "image-factory.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: internal-registry-gc-worker
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: internal-registry-gc-worker
+    spec:
+      serviceAccountName: {{ include "image-factory.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: internal-registry-gc-worker
+          image: "{{ .Values.workers.internalRegistryGc.image.repository }}:{{ .Values.workers.internalRegistryGc.image.tag }}"
+          imagePullPolicy: {{ .Values.workers.internalRegistryGc.image.pullPolicy }}
+          command: ["/app/internal-registry-gc-worker"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.workers.internalRegistryGc.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "image-factory.fullname" . }}-config
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.workers.internalRegistryGc.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-internal-registry-gc-worker
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: internal-registry-gc-worker
+spec:
+  selector:
+    {{- include "image-factory.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: internal-registry-gc-worker
+  ports:
+    - name: http
+      port: {{ .Values.workers.internalRegistryGc.port }}
+      targetPort: http
+{{- end }}

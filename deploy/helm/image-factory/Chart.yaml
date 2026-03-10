@@ -1,0 +1,13 @@
+apiVersion: v2
+name: image-factory
+description: Helm chart for Image Factory and its runtime dependencies
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - image-factory
+  - ci
+  - containers
+home: https://github.com/<your-org>/image-factory
+sources:
+  - https://github.com/<your-org>/image-factory

@@ -1,0 +1,16 @@
+
+# Playwright test artifacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# E2E test screenshots and videos
+e2e/screenshots/
+e2e/videos/
+
+# Playwright temporary files
+.playwright/
+
+# Test node_modules (if any)
+e2e/node_modules/

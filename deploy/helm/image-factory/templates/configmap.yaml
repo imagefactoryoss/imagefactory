@@ -1,0 +1,156 @@
+{{- include "image-factory.validateChartConfig" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "image-factory.fullname" . }}-config
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+data:
+  {{- $inClusterDB := eq .Values.database.mode "incluster" }}
+  {{- $dbHost := ternary (printf "%s-postgres" (include "image-factory.fullname" .)) .Values.database.host $inClusterDB }}
+  {{- $dbName := ternary .Values.postgres.database .Values.database.name $inClusterDB }}
+  {{- $backendTag := .Values.backend.image.tag }}
+  {{- $buildCommitFromTag := regexFind "[0-9a-f]{7,40}" $backendTag }}
+  {{- $dispatcherRepo := .Values.workers.dispatcher.image.repository }}
+  {{- $dispatcherTag := .Values.workers.dispatcher.image.tag }}
+  {{- $notificationRepo := .Values.workers.notification.image.repository }}
+  {{- $notificationTag := .Values.workers.notification.image.tag }}
+  {{- $emailRepo := .Values.workers.email.image.repository }}
+  {{- $emailTag := .Values.workers.email.image.tag }}
+  {{- $internalRegistryGCRepo := .Values.workers.internalRegistryGc.image.repository }}
+  {{- $internalRegistryGCTag := .Values.workers.internalRegistryGc.image.tag }}
+  {{- $externalTenantRepo := .Values.externalTenantService.image.repository }}
+  {{- $externalTenantTag := .Values.externalTenantService.image.tag }}
+  {{- $dispatcherURL := printf "http://%s-dispatcher" (include "image-factory.fullname" .) }}
+  {{- $emailWorkerURL := printf "http://%s-email-worker" (include "image-factory.fullname" .) }}
+  {{- $notificationWorkerURL := printf "http://%s-notification-worker" (include "image-factory.fullname" .) }}
+  IF_HELM_RELEASE_NAME: {{ .Release.Name | quote }}
+  IF_HELM_RELEASE_NAMESPACE: {{ .Release.Namespace | quote }}
+  IF_SERVER_ENVIRONMENT: {{ .Values.app.environment | quote }}
+  IF_SERVER_HOST: "0.0.0.0"
+  IF_SERVER_PORT: "8080"
+  IF_DATABASE_HOST: {{ $dbHost | quote }}
+  IF_DATABASE_PORT: {{ .Values.database.port | quote }}
+  IF_DATABASE_NAME: {{ $dbName | quote }}
+  IF_DATABASE_SSL_MODE: {{ .Values.database.sslMode | quote }}
+  IF_DATABASE_SCHEMA: {{ .Values.database.schema | quote }}
+  IF_DATABASE_MAX_OPEN_CONNS: {{ .Values.database.maxOpenConns | quote }}
+  IF_DATABASE_MAX_IDLE_CONNS: {{ .Values.database.maxIdleConns | quote }}
+  IF_DATABASE_CONN_MAX_LIFETIME: {{ .Values.database.connMaxLifetime | quote }}
+  IF_REDIS_HOST: {{ printf "%s-redis" (include "image-factory.fullname" .) | quote }}
+  IF_REDIS_PORT: "6379"
+  IF_NATS_URLS: {{ printf "nats://%s-nats:4222" (include "image-factory.fullname" .) | quote }}
+  IF_MESSAGING_ENABLE_NATS: "true"
+  IF_SMTP_HOST: {{ printf "%s-mailpit" (include "image-factory.fullname" .) | quote }}
+  IF_SMTP_PORT: "1025"
+  EXTERNAL_TENANT_SERVICE_URL: {{ printf "http://%s-external-tenant-service:%d" (include "image-factory.fullname" .) (.Values.externalTenantService.port | int) | quote }}
+  IF_BUILD_REGISTRY_URL: {{ printf "%s-registry:5000" (include "image-factory.fullname" .) | quote }}
+  IF_INTERNAL_TEMP_SCAN_REGISTRY: {{ printf "%s-registry:5000" (include "image-factory.fullname" .) | quote }}
+  IF_INTERNAL_TEMP_SCAN_REPOSITORY: "quarantine-temp"
+  IF_INTERNAL_REGISTRY_TEMP_CLEANUP_ENABLED: "true"
+  IF_INTERNAL_REGISTRY_TEMP_CLEANUP_RETENTION_HOURS: "72"
+  IF_INTERNAL_REGISTRY_TEMP_CLEANUP_INTERVAL_MINUTES: "60"
+  IF_INTERNAL_REGISTRY_TEMP_CLEANUP_BATCH_SIZE: "100"
+  IF_INTERNAL_REGISTRY_TEMP_CLEANUP_DRY_RUN: "false"
+  IF_INTERNAL_REGISTRY_GC_WORKER_PORT: {{ .Values.workers.internalRegistryGc.port | quote }}
+  IF_INTERNAL_REGISTRY_GC_WORKER_HEALTH_URL: {{ printf "http://%s-internal-registry-gc-worker:%d/health" (include "image-factory.fullname" .) (.Values.workers.internalRegistryGc.port | int) | quote }}
+  IF_BACKEND_IMAGE_REPOSITORY: {{ .Values.backend.image.repository | quote }}
+  IF_BACKEND_IMAGE_TAG: {{ $backendTag | quote }}
+  IF_BUILD_VERSION: {{ $backendTag | quote }}
+  IF_BUILD_COMMIT: {{ default "unknown" $buildCommitFromTag | quote }}
+  IF_BUILD_TIME: {{ .Release.Time | date "2006-01-02T15:04:05Z07:00" | quote }}
+  IF_BUILD_DIRTY: "false"
+  IF_FRONTEND_IMAGE_REPOSITORY: {{ .Values.frontend.image.repository | quote }}
+  IF_FRONTEND_IMAGE_TAG: {{ .Values.frontend.image.tag | quote }}
+  IF_DISPATCHER_IMAGE_REPOSITORY: {{ $dispatcherRepo | quote }}
+  IF_DISPATCHER_IMAGE_TAG: {{ $dispatcherTag | quote }}
+  IF_NOTIFICATION_WORKER_IMAGE_REPOSITORY: {{ $notificationRepo | quote }}
+  IF_NOTIFICATION_WORKER_IMAGE_TAG: {{ $notificationTag | quote }}
+  IF_EMAIL_WORKER_IMAGE_REPOSITORY: {{ $emailRepo | quote }}
+  IF_EMAIL_WORKER_IMAGE_TAG: {{ $emailTag | quote }}
+  IF_INTERNAL_REGISTRY_GC_WORKER_IMAGE_REPOSITORY: {{ $internalRegistryGCRepo | quote }}
+  IF_INTERNAL_REGISTRY_GC_WORKER_IMAGE_TAG: {{ $internalRegistryGCTag | quote }}
+  IF_EXTERNAL_TENANT_SERVICE_IMAGE_REPOSITORY: {{ $externalTenantRepo | quote }}
+  IF_EXTERNAL_TENANT_SERVICE_IMAGE_TAG: {{ $externalTenantTag | quote }}
+  IF_DISPATCHER_URL: {{ $dispatcherURL | quote }}
+  IF_DISPATCHER_PORT: {{ .Values.workers.dispatcher.port | quote }}
+  IF_EMAIL_WORKER_URL: {{ $emailWorkerURL | quote }}
+  IF_EMAIL_WORKER_PORT: {{ .Values.workers.email.port | quote }}
+  IF_NOTIFICATION_WORKER_URL: {{ $notificationWorkerURL | quote }}
+  IF_NOTIFICATION_WORKER_PORT: {{ .Values.workers.notification.port | quote }}
+  IF_BUILD_TEKTON_ENABLED: {{ .Values.build.tektonEnabled | quote }}
+  IF_BUILD_TEKTON_KUBECONFIG: {{ .Values.build.tektonKubeconfig | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "image-factory.fullname" . }}-frontend-nginx
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /tmp/nginx.pid;
+
+    events {
+      worker_connections 1024;
+    }
+
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+
+      sendfile on;
+      tcp_nopush on;
+      tcp_nodelay on;
+      keepalive_timeout 65;
+      types_hash_max_size 2048;
+
+      gzip on;
+      gzip_vary on;
+      gzip_min_length 1000;
+      gzip_proxied any;
+      gzip_comp_level 6;
+      gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/atom+xml image/svg+xml;
+
+      server {
+        listen 80;
+        server_name localhost;
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+
+        location / {
+          try_files $uri $uri/ /index.html;
+        }
+
+        location /api/ {
+          proxy_pass http://{{ include "image-factory.backendServiceName" . }}:8080/;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /ws/ {
+          proxy_pass http://{{ include "image-factory.backendServiceName" . }}/ws/;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /health {
+          access_log off;
+          return 200 "healthy\n";
+          add_header Content-Type text/plain;
+        }
+      }
+    }
