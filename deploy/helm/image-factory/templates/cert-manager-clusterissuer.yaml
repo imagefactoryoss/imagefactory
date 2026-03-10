@@ -1,0 +1,18 @@
+{{- if and .Values.ingress.enabled .Values.ingress.certManager.enabled .Values.ingress.certManager.clusterIssuer.create (.Capabilities.APIVersions.Has "cert-manager.io/v1/ClusterIssuer") }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.ingress.certManager.clusterIssuer.name }}
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+spec:
+  acme:
+    email: {{ .Values.ingress.certManager.clusterIssuer.email | quote }}
+    server: {{ .Values.ingress.certManager.clusterIssuer.server | quote }}
+    privateKeySecretRef:
+      name: {{ .Values.ingress.certManager.clusterIssuer.privateKeySecretRef | quote }}
+    solvers:
+      - http01:
+          ingress:
+            class: {{ .Values.ingress.className | quote }}
+{{- end }}

@@ -1,0 +1,55 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: evaluate-quarantine-policy
+spec:
+  params:
+    - name: POLICY_SNAPSHOT_JSON
+      type: string
+    - name: SCAN_SUMMARY_JSON
+      type: string
+  results:
+    - name: decision
+      description: pass or quarantine
+    - name: reasons-json
+      description: JSON array of violated policy rules
+    - name: policy-snapshot-json
+      description: Echo of evaluated policy snapshot
+  steps:
+    - name: evaluate
+      image: docker.io/library/python:3.12-alpine
+      script: |
+        #!/usr/bin/env python3
+        import json
+
+        policy = json.loads(r'''$(params.POLICY_SNAPSHOT_JSON)''')
+        summary = json.loads(r'''$(params.SCAN_SUMMARY_JSON)''')
+
+        thresholds = policy.get("thresholds", {}) if isinstance(policy, dict) else {}
+        mode = str(policy.get("mode", "enforce")).strip().lower() if isinstance(policy, dict) else "enforce"
+
+        vulns = summary.get("vulnerabilities", {}) if isinstance(summary, dict) else {}
+        critical = int(vulns.get("critical", 0) or 0)
+        high = int(vulns.get("high", 0) or 0)
+        medium = int(vulns.get("medium", 0) or 0)
+
+        max_critical = int(thresholds.get("max_critical", 0) or 0)
+        max_p2 = int(thresholds.get("max_p2", 999999) or 999999)
+        max_p3 = int(thresholds.get("max_p3", 999999) or 999999)
+
+        reasons = []
+        if critical > max_critical:
+            reasons.append(f"critical_count({critical}) > max_critical({max_critical})")
+        if high > max_p2:
+            reasons.append(f"p2_count({high}) > max_p2({max_p2})")
+        if medium > max_p3:
+            reasons.append(f"p3_count({medium}) > max_p3({max_p3})")
+
+        decision = "quarantine" if reasons and mode == "enforce" else "pass"
+
+        with open("$(results.decision.path)", "w", encoding="utf-8") as f:
+            f.write(decision)
+        with open("$(results.reasons-json.path)", "w", encoding="utf-8") as f:
+            f.write(json.dumps(reasons, separators=(",", ":"), ensure_ascii=False))
+        with open("$(results.policy-snapshot-json.path)", "w", encoding="utf-8") as f:
+            f.write(json.dumps(policy, separators=(",", ":"), ensure_ascii=False))

@@ -1,0 +1,42 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: image-factory-build-v1-packer
+spec:
+  params:
+    - name: git-url
+      type: string
+    - name: packer-template
+      type: string
+    - name: vars
+      type: array
+      default: []
+  workspaces:
+    - name: source
+    - name: git-auth
+      optional: true
+  tasks:
+    - name: clone
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.git-url)
+      workspaces:
+        - name: output
+          workspace: source
+        - name: auth
+          workspace: git-auth
+    - name: build
+      taskRef:
+        name: packer
+      runAfter: [clone]
+      params:
+        - name: TEMPLATE
+          value: $(params.packer-template)
+        - name: VARS
+          value:
+            - "$(params.vars[*])"
+      workspaces:
+        - name: source
+          workspace: source

@@ -1,0 +1,81 @@
+{{- if .Values.glauth.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "image-factory.fullname" . }}-glauth-config
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: glauth
+data:
+  glauth.cfg: |
+{{ .Values.glauth.config | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-glauth
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: glauth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "image-factory.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: glauth
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: glauth
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: glauth
+          image: "{{ .Values.glauth.image.repository }}:{{ .Values.glauth.image.tag }}"
+          imagePullPolicy: {{ .Values.glauth.image.pullPolicy }}
+          command:
+            - /app/glauth
+          args:
+            {{- toYaml .Values.glauth.args | nindent 12 }}
+          ports:
+            - name: ldap
+              containerPort: {{ .Values.glauth.service.port }}
+          volumeMounts:
+            - name: glauth-config
+              mountPath: /etc/glauth/glauth.cfg
+              subPath: glauth.cfg
+          readinessProbe:
+            tcpSocket:
+              port: ldap
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: ldap
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: glauth-config
+          configMap:
+            name: {{ include "image-factory.fullname" . }}-glauth-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-glauth
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: glauth
+spec:
+  selector:
+    {{- include "image-factory.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: glauth
+  ports:
+    - name: ldap
+      port: {{ .Values.glauth.service.port }}
+      targetPort: ldap
+{{- end }}

@@ -1,0 +1,148 @@
+{{- if and .Values.backend.enabled .Values.dbReset.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "image-factory.fullname" . }}-db-reset
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: db-reset
+  annotations:
+    "helm.sh/hook": {{ ternary "pre-install,pre-upgrade" "pre-install" .Values.dbReset.runOnUpgrade | quote }}
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": {{ .Values.dbReset.hookWeight | quote }}
+spec:
+  backoffLimit: {{ .Values.dbReset.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: db-reset
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "image-factory.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: db-reset
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              export PGPASSWORD="${IF_DATABASE_PASSWORD}"
+              export DB_SCHEMA="${IF_DATABASE_SCHEMA:-public}"
+
+              if [ "{{ .Values.dbReset.confirmation }}" != "RESET_IMAGE_FACTORY" ]; then
+                echo "Refusing db reset: set dbReset.confirmation=RESET_IMAGE_FACTORY"
+                exit 1
+              fi
+
+              if [ -z "${DB_SCHEMA}" ]; then
+                echo "Refusing db reset: IF_DATABASE_SCHEMA is empty"
+                exit 1
+              fi
+
+              case "${DB_SCHEMA}" in
+                *[!a-zA-Z0-9_]*)
+                  echo "Refusing db reset: IF_DATABASE_SCHEMA must be alphanumeric/underscore only"
+                  exit 1
+                  ;;
+              esac
+
+              if [ "${DB_SCHEMA}" = "public" ] && [ "{{ .Values.dbReset.allowPublicSchemaReset }}" != "true" ]; then
+                echo "Refusing db reset: public schema reset blocked. Set dbReset.allowPublicSchemaReset=true explicitly."
+                exit 1
+              fi
+
+              until pg_isready -h "${IF_DATABASE_HOST}" -p "${IF_DATABASE_PORT}" -U "${IF_DATABASE_USER}"; do
+                echo "Waiting for database to become ready..."
+                sleep 3
+              done
+
+              echo "Terminating active sessions before schema reset..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND usename = current_user;"
+
+              echo "Resetting schema ${DB_SCHEMA}..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "DROP SCHEMA IF EXISTS ${DB_SCHEMA} CASCADE; CREATE SCHEMA ${DB_SCHEMA};"
+
+              echo "Ensuring UUID extension exists..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"; CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+
+              echo "Creating schema-local uuid_generate_v4() compatibility shim..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "CREATE OR REPLACE FUNCTION ${DB_SCHEMA}.uuid_generate_v4() RETURNS uuid LANGUAGE SQL AS \$\$ SELECT gen_random_uuid(); \$\$;"
+
+              # Ensure legacy uuid_generate_v4() and Supabase extension schemas are resolvable.
+              export PGOPTIONS="-c search_path=${DB_SCHEMA},public,extensions"
+
+              echo "Running migrations..."
+              /app/migrate up
+
+              echo "Seeding essential SQL data..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "SET search_path TO ${DB_SCHEMA};" \
+                -f /app/bootstrap/seed-essential-data.sql
+
+              {{- if .Values.dbReset.seedDemoData }}
+              echo "Seeding demo SQL data..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "SET search_path TO ${DB_SCHEMA};" \
+                -f /app/bootstrap/seed-demo-data.sql
+              {{- end }}
+
+              echo "Seeding essential system configuration..."
+              /app/essential-config-seeder --action seed
+
+              echo "Seeding email notification templates..."
+              /app/email-template-seeder --action seed
+
+              echo "Seeding external services..."
+              /app/external-service-seeder --action seed
+
+              {{- if .Values.dbReset.runValidationChecks }}
+              echo "Running reset sanity checks..."
+              psql -v ON_ERROR_STOP=1 \
+                -h "${IF_DATABASE_HOST}" \
+                -p "${IF_DATABASE_PORT}" \
+                -U "${IF_DATABASE_USER}" \
+                -d "${IF_DATABASE_NAME}" \
+                -c "SET search_path TO ${DB_SCHEMA}; SELECT count(*) AS users FROM users; SELECT count(*) AS tenants FROM tenants; SELECT count(*) AS roles FROM rbac_roles; SELECT count(*) AS assignments FROM user_role_assignments;"
+              {{- end }}
+
+              echo "Database reset completed."
+          envFrom:
+            - configMapRef:
+                name: {{ include "image-factory.fullname" . }}-config
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-secrets
+{{- end }}

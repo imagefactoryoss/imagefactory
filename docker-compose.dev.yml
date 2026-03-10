@@ -1,0 +1,83 @@
+# Development docker-compose override
+version: '3.8'
+
+services:
+  # Backend development
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: image-factory-backend-dev
+    ports:
+      - "8080:8080"
+      - "2345:2345" # Delve debugger port
+    volumes:
+      - ./backend:/app
+      - /app/vendor
+    environment:
+      - IF_SERVER_ENVIRONMENT=development
+      - IF_DATABASE_URL=postgres://postgres:postgres@postgres:5432/image_factory_dev?sslmode=disable
+      - IF_REDIS_HOST=redis
+      - IF_NATS_URLS=nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - image-factory-network
+    command: |
+      sh -c "
+        echo 'Waiting for dependencies...' &&
+        sleep 10 &&
+        echo 'Running migrations...' &&
+        go run cmd/migrate/main.go up &&
+        echo 'Starting development server...' &&
+        air -c .air.toml
+      "
+
+  # Frontend development
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: image-factory-frontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080
+      - VITE_WS_URL=ws://localhost:8080
+    depends_on:
+      - backend
+    networks:
+      - image-factory-network
+    command: npm run dev
+
+  # Add development tools
+  adminer:
+    image: adminer:latest
+    container_name: image-factory-adminer
+    ports:
+      - "8081:8080"
+    networks:
+      - image-factory-network
+    depends_on:
+      - postgres
+
+  # Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: image-factory-redis-commander
+    ports:
+      - "8082:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    networks:
+      - image-factory-network
+    depends_on:
+      - redis

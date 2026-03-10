@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_image_import_notification_receipts_created_at;
+DROP TABLE IF EXISTS image_import_notification_receipts;

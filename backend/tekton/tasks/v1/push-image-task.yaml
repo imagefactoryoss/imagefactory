@@ -1,0 +1,95 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: push-image
+spec:
+  params:
+    - name: SOURCE_IMAGE
+      type: string
+      default: ""
+    - name: SOURCE_TLS_VERIFY
+      type: string
+      default: "true"
+    - name: IMAGE
+      type: string
+    - name: IMAGE_TAR
+      type: string
+      default: /workspace/source/.image/image.tar
+    - name: DEST_TLS_VERIFY
+      type: string
+      default: "true"
+  workspaces:
+    - name: source
+    - name: dockerconfig
+      mountPath: /workspace/dockerconfig
+  results:
+    - name: image-digest
+      description: Pushed image digest
+    - name: layers-json
+      description: JSON array of pushed image layers
+  steps:
+    - name: push
+      image: quay.io/skopeo/stable:v1.15.0
+      script: |
+        #!/bin/sh
+        set -eu
+        registry_host() {
+          printf '%s' "$1" | cut -d/ -f1
+        }
+        is_local_registry() {
+          case "$1" in
+            image-factory-registry|image-factory-registry:5000|localhost|localhost:5000|127.0.0.1|127.0.0.1:5000)
+              return 0
+              ;;
+            *)
+              return 1
+              ;;
+          esac
+        }
+        IMAGE="$(params.IMAGE)"
+        SOURCE_IMAGE="$(params.SOURCE_IMAGE)"
+        SOURCE_TLS_VERIFY="$(params.SOURCE_TLS_VERIFY)"
+        IMAGE_TAR="$(params.IMAGE_TAR)"
+        DEST_TLS_VERIFY="$(params.DEST_TLS_VERIFY)"
+        if is_local_registry "$(registry_host "${IMAGE}")"; then
+          DEST_TLS_VERIFY="false"
+        fi
+        if [ -n "${SOURCE_IMAGE}" ] && is_local_registry "$(registry_host "${SOURCE_IMAGE}")"; then
+          SOURCE_TLS_VERIFY="false"
+        fi
+        AUTHFILE="/workspace/dockerconfig/config.json"
+        if [ ! -f "${AUTHFILE}" ]; then
+          echo "docker auth config missing: ${AUTHFILE}" >&2
+          exit 1
+        fi
+        if [ -f "${IMAGE_TAR}" ]; then
+          skopeo copy --insecure-policy --dest-tls-verify="${DEST_TLS_VERIFY}" --authfile "${AUTHFILE}" \
+            "docker-archive:${IMAGE_TAR}" "docker://${IMAGE}"
+        elif [ -n "${SOURCE_IMAGE}" ]; then
+          skopeo copy --insecure-policy --src-tls-verify="${SOURCE_TLS_VERIFY}" --dest-tls-verify="${DEST_TLS_VERIFY}" --authfile "${AUTHFILE}" \
+            "docker://${SOURCE_IMAGE}" "docker://${IMAGE}"
+        else
+          echo "image tar not found: ${IMAGE_TAR}; assuming image already exists at destination ${IMAGE}"
+        fi
+        DIGEST="$(skopeo inspect --tls-verify="${DEST_TLS_VERIFY}" --authfile "${AUTHFILE}" --format '{{.Digest}}' "docker://${IMAGE}" 2>/dev/null || true)"
+        if [ -n "${DIGEST}" ]; then
+          printf '%s' "${DIGEST}" > "$(results.image-digest.path)"
+        else
+          echo "failed to inspect destination image digest for ${IMAGE}" >&2
+          exit 1
+        fi
+        layer_file="$(mktemp)"
+        skopeo inspect --tls-verify="${DEST_TLS_VERIFY}" --authfile "${AUTHFILE}" --format '{{range .Layers}}{{printf "%s\n" .}}{{end}}' "docker://${IMAGE}" > "${layer_file}" 2>/dev/null || true
+        out_file="$(mktemp)"
+        printf '[' > "${out_file}"
+        first=1
+        while IFS= read -r layer; do
+          [ -z "${layer}" ] && continue
+          if [ "${first}" -eq 0 ]; then
+            printf ',' >> "${out_file}"
+          fi
+          first=0
+          printf '{"digest":"%s"}' "${layer}" >> "${out_file}"
+        done < "${layer_file}"
+        printf ']' >> "${out_file}"
+        cat "${out_file}" > "$(results.layers-json.path)"

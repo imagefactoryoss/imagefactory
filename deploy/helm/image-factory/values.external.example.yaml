@@ -1,0 +1,15 @@
+database:
+  mode: external
+  host: db.example.com
+  port: 5432
+  name: image_factory
+  user: postgres
+  password: "REPLACE_ME"
+  sslMode: require
+  schema: image_factory
+  maxOpenConns: 5
+  maxIdleConns: 2
+  connMaxLifetime: "2m"
+
+postgres:
+  enabled: false

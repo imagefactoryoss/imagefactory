@@ -1,0 +1,14 @@
+1. Get release resources:
+   kubectl get all -l app.kubernetes.io/instance={{ .Release.Name }} -n {{ .Release.Namespace }}
+
+2. Access Image Factory UI:
+{{- if .Values.ingress.enabled }}
+   http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+   kubectl port-forward svc/{{ include "image-factory.fullname" . }}-frontend 3000:{{ .Values.frontend.service.port }} -n {{ .Release.Namespace }}
+   open http://localhost:3000
+{{- end }}
+
+3. Backend health check:
+   kubectl port-forward svc/{{ include "image-factory.backendServiceName" . }} 8080:{{ .Values.backend.service.port }} -n {{ .Release.Namespace }}
+   curl http://localhost:8080/health

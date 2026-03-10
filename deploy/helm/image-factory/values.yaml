@@ -1,0 +1,395 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+# Set imagePullSecrets in an override file if your registry requires authentication.
+
+commonLabels: {}
+
+serviceAccount:
+  create: true
+  name: ""
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  appHost: "app.imagefactory.dev"
+  docsHost: "docs.imagefactory.dev"
+  appAnnotations:
+    nginx.ingress.kubernetes.io/app-root: "/login"
+  docsAnnotations: {}
+  backendPaths:
+    - path: /api
+      pathType: Prefix
+    - path: /healthz
+      pathType: Exact
+    - path: /health
+      pathType: Exact
+    - path: /ready
+      pathType: Exact
+    - path: /alive
+      pathType: Exact
+  certManager:
+    enabled: false
+    clusterIssuer:
+      create: false
+      name: "letsencrypt-prod"
+      email: ""
+      server: "https://acme-v02.api.letsencrypt.org/directory"
+      privateKeySecretRef: "letsencrypt-prod-account-key"
+  hosts:
+    - host: www.imagefactory.dev
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: imagefactory-dev-tls
+      hosts:
+        - www.imagefactory.dev
+        - app.imagefactory.dev
+        - docs.imagefactory.dev
+
+app:
+  environment: production
+  jwtSecret: "__SET_BEFORE_DEPLOYMENT__"
+  # Required in production. Set a long random secret before deployment.
+  # Optional. Leave empty to auto-generate on first install and preserve on upgrades.
+  encryptionKey: ""
+
+build:
+  tektonEnabled: true
+  tektonKubeconfig: ""
+
+database:
+  # Required. One of: incluster, external
+  mode: "incluster"
+  host: ""
+  port: 5432
+  name: ""
+  user: ""
+  password: ""
+  sslMode: "disable"
+  schema: "image_factory"
+  maxOpenConns: 5
+  maxIdleConns: 2
+  connMaxLifetime: "2m"
+
+backend:
+  enabled: true
+  image:
+    repository: docker.io/imagefactoryoss/image-factory-backend
+    tag: v0.1.0-6c42ac0-hz20260302104749
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8080
+  resources: {}
+  podAnnotations: {}
+  extraEnv: []
+
+frontend:
+  enabled: true
+  apiBaseUrl: ""
+  image:
+    repository: docker.io/imagefactoryoss/image-factory-frontend
+    tag: v0.1.0-6c42ac0
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 80
+  resources: {}
+  podAnnotations: {}
+  extraEnv: []
+
+docs:
+  enabled: true
+  image:
+    repository: docker.io/imagefactoryoss/image-factory-docs
+    tag: v0.1.0-6c42ac0
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8000
+  resources: {}
+  podAnnotations: {}
+  extraArgs: []
+
+migrations:
+  enabled: false
+  hookWeight: "0"
+
+bootstrap:
+  enabled: false
+  runOnUpgrade: false
+  hookWeight: "5"
+  backoffLimit: 3
+  seedDemoData: false
+
+dbReset:
+  enabled: false
+  runOnUpgrade: false
+  hookWeight: "-10"
+  backoffLimit: 1
+  confirmation: ""
+  allowPublicSchemaReset: false
+  seedDemoData: false
+  runValidationChecks: true
+
+workers:
+  dispatcher:
+    enabled: true
+    replicaCount: 1
+    port: 8084
+    image:
+      repository: docker.io/imagefactoryoss/image-factory-dispatcher
+      tag: v0.1.0-21057fe
+      pullPolicy: IfNotPresent
+    resources: {}
+  notification:
+    enabled: true
+    replicaCount: 1
+    port: 8083
+    image:
+      repository: docker.io/imagefactoryoss/image-factory-notification-worker
+      tag: v0.1.0-21057fe
+      pullPolicy: IfNotPresent
+    resources: {}
+  email:
+    enabled: true
+    replicaCount: 1
+    port: 8081
+    image:
+      repository: docker.io/imagefactoryoss/image-factory-email-worker
+      tag: v0.1.0-21057fe
+      pullPolicy: IfNotPresent
+    resources: {}
+  internalRegistryGc:
+    enabled: true
+    replicaCount: 1
+    port: 8085
+    image:
+      repository: docker.io/imagefactoryoss/image-factory-internal-registry-gc-worker
+      tag: v0.1.0-21057fe
+      pullPolicy: IfNotPresent
+    resources: {}
+
+externalTenantService:
+  enabled: true
+  replicaCount: 1
+  port: 8082
+  apiKey: "__SET_BEFORE_DEPLOYMENT__"
+  # Required when externalTenantService is enabled. Set before deployment.
+  image:
+    repository: docker.io/imagefactoryoss/image-factory-backend
+    tag: v0.1.0-6c42ac0-hz20260302104749
+    pullPolicy: IfNotPresent
+  resources: {}
+
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "17-alpine"
+    pullPolicy: IfNotPresent
+  storage:
+    type: "hostPath" # one of: emptyDir, pvc, hostPath
+    hostPath:
+      path: "/var/lib/image-factory/postgres"
+      type: "DirectoryOrCreate"
+  database: image_factory
+  username: postgres
+  password: "__SET_BEFORE_DEPLOYMENT__"
+  # Set before deployment when bundled Postgres is enabled.
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  resources: {}
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  storage:
+    type: "hostPath" # one of: emptyDir, pvc, hostPath
+    hostPath:
+      path: "/var/lib/image-factory/redis"
+      type: "DirectoryOrCreate"
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources: {}
+
+nats:
+  enabled: true
+  image:
+    repository: nats
+    tag: "2.10-alpine"
+    pullPolicy: IfNotPresent
+  storage:
+    type: "hostPath" # one of: emptyDir, pvc, hostPath
+    hostPath:
+      path: "/var/lib/image-factory/nats"
+      type: "DirectoryOrCreate"
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources: {}
+
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: latest
+    pullPolicy: IfNotPresent
+  rootUser: "__SET_BEFORE_DEPLOYMENT__"
+  # Set before deployment when bundled MinIO is enabled.
+  rootPassword: "__SET_BEFORE_DEPLOYMENT__"
+  # Set before deployment when bundled MinIO is enabled.
+  storage:
+    type: "hostPath" # one of: emptyDir, pvc, hostPath
+    hostPath:
+      path: "/var/lib/image-factory/minio"
+      type: "DirectoryOrCreate"
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: ""
+  resources: {}
+
+registry:
+  enabled: true
+  image:
+    repository: registry
+    tag: "2"
+    pullPolicy: IfNotPresent
+  storage:
+    type: "hostPath" # one of: emptyDir, pvc, hostPath
+    hostPath:
+      path: "/var/lib/image-factory/registry"
+      type: "DirectoryOrCreate"
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: ""
+  resources: {}
+
+mailpit:
+  enabled: true
+  image:
+    repository: axllent/mailpit
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources: {}
+
+glauth:
+  enabled: true
+  image:
+    repository: glauth/glauth
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 3893
+  args:
+    - -c
+    - /etc/glauth/glauth.cfg
+  config: |
+    debug = true
+    watchconfig = true
+
+    [ldap]
+      enabled = true
+      listen = "0.0.0.0:3893"
+
+    [ldaps]
+      enabled = false
+      listen = "0.0.0.0:6636"
+
+    [backend]
+      datastore = "config"
+      baseDN = "dc=imagefactory,dc=local"
+
+    [[groups]]
+      name = "svcaccts"
+      gidnumber = 5501
+
+    [[groups]]
+      name = "people"
+      gidnumber = 5502
+
+    [[ous]]
+      name = "svcaccts"
+
+    [[ous]]
+      name = "people"
+
+    [[users]]
+      name = "ldap_search"
+      ou = "svcaccts"
+      uidnumber = 6001
+      primarygroup = 5501
+      givenname = "LDAP"
+      sn = "Search Service"
+      mail = "ldap-search@imagefactory.local"
+      disabled = false
+      pass = "__SET_BEFORE_DEPLOYMENT__"
+      [[users.capabilities]]
+        action = "search"
+        object = "*"
+
+    [[users]]
+      name = "admin"
+      ou = "people"
+      uidnumber = 5001
+      primarygroup = 5502
+      givenname = "Image"
+      sn = "Factory Admin"
+      mail = "admin@imagefactory.local"
+      disabled = false
+      pass = "__SET_BEFORE_DEPLOYMENT__"
+
+    [[users]]
+      name = "alice.johnson"
+      ou = "people"
+      uidnumber = 5002
+      primarygroup = 5502
+      givenname = "Alice"
+      sn = "Johnson"
+      mail = "alice.johnson@imagefactory.local"
+      disabled = false
+      pass = "__SET_BEFORE_DEPLOYMENT__"
+
+    [[users]]
+      name = "carol.davis"
+      ou = "people"
+      uidnumber = 5003
+      primarygroup = 5502
+      givenname = "Carol"
+      sn = "Davis"
+      mail = "carol.davis@imagefactory.local"
+      disabled = false
+      pass = "__SET_BEFORE_DEPLOYMENT__"
+
+    [[users]]
+      name = "emily.chen"
+      ou = "people"
+      uidnumber = 5004
+      primarygroup = 5502
+      givenname = "Emily"
+      sn = "Chen"
+      mail = "emily.chen@imagefactory.local"
+      disabled = false
+      pass = "__SET_BEFORE_DEPLOYMENT__"
+
+networkPolicy:
+  enabled: false

@@ -1,0 +1,263 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: image-factory-build-v1-kaniko
+spec:
+  results:
+    - name: image-digest
+      value: $(tasks.push.results.image-digest)
+    - name: layers-json
+      value: $(tasks.push.results.layers-json)
+    - name: scan-summary
+      value: $(tasks.scan.results.scan-summary)
+    - name: sbom-summary
+      value: $(tasks.sbom.results.sbom-summary)
+  params:
+    - name: git-url
+      type: string
+    - name: dockerfile-path
+      type: string
+      default: Dockerfile
+    - name: build-context
+      type: string
+      default: "."
+    - name: image-name
+      type: string
+    - name: scan-tool
+      type: string
+      default: trivy
+    - name: sbom-tool
+      type: string
+      default: syft
+    - name: dockerfile-inline-base64
+      type: string
+      default: ""
+    - name: enable-scan
+      type: string
+      default: "true"
+    - name: enable-sbom
+      type: string
+      default: "true"
+    - name: enable-sign
+      type: string
+      default: "false"
+    - name: sign-key-path
+      type: string
+      default: /workspace/signing-key/cosign.key
+    - name: trivy-cache-mode
+      type: string
+      default: shared
+    - name: trivy-db-repository
+      type: string
+      default: image-factory-registry:5000/security/trivy-db:2,mirror.gcr.io/aquasec/trivy-db:2
+    - name: trivy-java-db-repository
+      type: string
+      default: image-factory-registry:5000/security/trivy-java-db:1,mirror.gcr.io/aquasec/trivy-java-db:1
+    - name: enable-temp-scan-stage
+      type: string
+      default: "false"
+    - name: temp-scan-image-name
+      type: string
+      default: ""
+    - name: scan-source-image-ref
+      type: string
+      default: ""
+    - name: sbom-source
+      type: string
+      default: docker-archive:/workspace/source/.image/image.tar
+    - name: temp-scan-dest-tls-verify
+      type: string
+      default: "false"
+    - name: temp-scan-trivy-insecure
+      type: string
+      default: "true"
+  workspaces:
+    - name: source
+    - name: dockerconfig
+    - name: trivy-cache
+      optional: true
+    - name: git-auth
+      optional: true
+    - name: signing-key
+      optional: true
+  tasks:
+    - name: clone
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.git-url)
+      workspaces:
+        - name: output
+          workspace: source
+        - name: auth
+          workspace: git-auth
+    - name: build
+      taskRef:
+        name: kaniko-no-push
+      runAfter: [materialize-dockerfile]
+      params:
+        - name: DOCKERFILE
+          value: $(params.dockerfile-path)
+        - name: BUILD_CONTEXT
+          value: $(params.build-context)
+        - name: IMAGE
+          value: $(params.image-name)
+        - name: PUSH
+          value: "false"
+        - name: OUTPUT_TAR
+          value: /workspace/source/.image/image.tar
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+    - name: push-temp-scan
+      taskRef:
+        name: push-image
+      runAfter: [build]
+      when:
+        - input: "$(params.enable-temp-scan-stage)"
+          operator: in
+          values: ["true"]
+      params:
+        - name: IMAGE
+          value: $(params.temp-scan-image-name)
+        - name: IMAGE_TAR
+          value: /workspace/source/.image/image.tar
+        - name: DEST_TLS_VERIFY
+          value: $(params.temp-scan-dest-tls-verify)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+    - name: scan
+      taskRef:
+        name: scan-image
+      runAfter: [build, push-temp-scan]
+      when:
+        - input: "$(params.enable-scan)"
+          operator: in
+          values: ["true"]
+      params:
+        - name: IMAGE_TAR
+          value: /workspace/source/.image/image.tar
+        - name: IMAGE_REF
+          value: $(params.scan-source-image-ref)
+        - name: SCAN_TOOL
+          value: $(params.scan-tool)
+        - name: OUTPUT_FILE
+          value: /workspace/source/.image/scan-report.json
+        - name: TRIVY_CACHE_MODE
+          value: $(params.trivy-cache-mode)
+        - name: TRIVY_DB_REPOSITORY
+          value: $(params.trivy-db-repository)
+        - name: TRIVY_JAVA_DB_REPOSITORY
+          value: $(params.trivy-java-db-repository)
+        - name: TRIVY_INSECURE
+          value: $(params.temp-scan-trivy-insecure)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+        - name: trivy-cache
+          workspace: trivy-cache
+    - name: sbom
+      taskRef:
+        name: generate-sbom
+      runAfter: [build, push-temp-scan]
+      when:
+        - input: "$(params.enable-sbom)"
+          operator: in
+          values: ["true"]
+      params:
+        - name: SOURCE
+          value: $(params.sbom-source)
+        - name: SBOM_TOOL
+          value: $(params.sbom-tool)
+        - name: OUTPUT_FILE
+          value: /workspace/source/.image/sbom.spdx.json
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+    - name: push
+      taskRef:
+        name: push-image
+      runAfter: [build, scan, sbom]
+      params:
+        - name: IMAGE
+          value: $(params.image-name)
+        - name: IMAGE_TAR
+          value: /workspace/source/.image/image.tar
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+    - name: sign
+      taskRef:
+        name: sign-image
+      runAfter: [push]
+      when:
+        - input: "$(params.enable-sign)"
+          operator: in
+          values: ["true"]
+      params:
+        - name: IMAGE
+          value: $(params.image-name)
+        - name: SIGN_KEY_PATH
+          value: $(params.sign-key-path)
+        - name: OUTPUT_FILE
+          value: /workspace/source/.image/signing-report.json
+      workspaces:
+        - name: source
+          workspace: source
+        - name: signing-key
+          workspace: signing-key
+    - name: materialize-dockerfile
+      runAfter: [clone]
+      taskSpec:
+        params:
+          - name: dockerfile-path
+            type: string
+          - name: build-context
+            type: string
+          - name: dockerfile-inline-base64
+            type: string
+        workspaces:
+          - name: source
+        steps:
+          - name: write-inline-dockerfile
+            image: docker.io/library/alpine:3.20
+            script: |
+              #!/bin/sh
+              set -eu
+              inline="$(params.dockerfile-inline-base64)"
+              if [ -z "$inline" ]; then
+                exit 0
+              fi
+              build_context="$(params.build-context)"
+              case "${build_context}" in
+                ""|".") context_dir="/workspace/source" ;;
+                *)
+                  build_context="${build_context#./}"
+                  context_dir="/workspace/source/${build_context}"
+                  ;;
+              esac
+              target="${context_dir}/$(params.dockerfile-path)"
+              mkdir -p "$(dirname "$target")"
+              printf '%s' "$inline" | base64 -d > "$target"
+      params:
+        - name: dockerfile-path
+          value: $(params.dockerfile-path)
+        - name: build-context
+          value: $(params.build-context)
+        - name: dockerfile-inline-base64
+          value: $(params.dockerfile-inline-base64)
+      workspaces:
+        - name: source
+          workspace: source

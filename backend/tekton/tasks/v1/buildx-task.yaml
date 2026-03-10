@@ -1,0 +1,74 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: buildx
+spec:
+  params:
+    - name: FALLBACK_IMAGE
+      type: string
+      default: ""
+    - name: PLATFORMS
+      type: string
+      default: linux/amd64
+    - name: BUILD_CONTEXT
+      type: string
+      default: "."
+    - name: IMAGE
+      type: string
+    - name: DOCKERFILE
+      type: string
+      default: Dockerfile
+    - name: PUSH
+      type: string
+      default: "true"
+    - name: OUTPUT_TAR
+      type: string
+      default: /workspace/source/.image/image.tar
+  workspaces:
+    - name: source
+  steps:
+    - name: build-image
+      image: docker.io/moby/buildkit:v0.13.2
+      securityContext:
+        privileged: true
+        runAsUser: 0
+        allowPrivilegeEscalation: true
+      script: |
+        #!/bin/sh
+        set -eu
+        IMAGE="$(params.IMAGE)"
+        if [ -z "${IMAGE}" ]; then
+          IMAGE="$(params.FALLBACK_IMAGE)"
+        fi
+        if [ -z "${IMAGE}" ]; then
+          echo "image reference is required for buildx task" >&2
+          exit 1
+        fi
+        SOURCE_DIR="/workspace/source"
+        BUILD_CONTEXT="$(params.BUILD_CONTEXT)"
+        case "${BUILD_CONTEXT}" in
+          ""|".") CONTEXT_DIR="${SOURCE_DIR}" ;;
+          *)
+            BUILD_CONTEXT="${BUILD_CONTEXT#./}"
+            CONTEXT_DIR="${SOURCE_DIR}/${BUILD_CONTEXT}"
+            ;;
+        esac
+        OUTPUT_ARG="type=image,name=${IMAGE},push=true"
+        IMAGE_REGISTRY="${IMAGE%%/*}"
+        case "${IMAGE_REGISTRY}" in
+          image-factory-registry|image-factory-registry:5000|localhost|localhost:5000|127.0.0.1|127.0.0.1:5000)
+            OUTPUT_ARG="${OUTPUT_ARG},registry.insecure=true,registry.http=true"
+            ;;
+        esac
+        if [ "$(params.PUSH)" != "true" ]; then
+          TAR_PATH="$(params.OUTPUT_TAR)"
+          mkdir -p "$(dirname "${TAR_PATH}")"
+          OUTPUT_ARG="type=docker,dest=${TAR_PATH}"
+        fi
+        buildctl-daemonless.sh build \
+          --frontend=dockerfile.v0 \
+          --local context="${CONTEXT_DIR}" \
+          --local dockerfile="${CONTEXT_DIR}" \
+          --opt filename="$(params.DOCKERFILE)" \
+          --opt platform="$(params.PLATFORMS)" \
+          --output "${OUTPUT_ARG}"

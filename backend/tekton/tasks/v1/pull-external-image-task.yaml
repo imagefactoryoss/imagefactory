@@ -1,0 +1,82 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: pull-external-image
+spec:
+  params:
+    - name: SOURCE_IMAGE
+      type: string
+    - name: SOURCE_TLS_VERIFY
+      type: string
+      default: "true"
+    - name: OUTPUT_TAR
+      type: string
+      default: /workspace/source/.image/image.tar
+  workspaces:
+    - name: source
+    - name: dockerconfig
+      mountPath: /workspace/dockerconfig
+  results:
+    - name: source-digest
+      description: Digest for source image after pull
+    - name: source-layers-json
+      description: JSON array of source image layers
+  steps:
+    - name: pull
+      image: quay.io/skopeo/stable:v1.15.0
+      script: |
+        #!/bin/sh
+        set -eu
+        registry_host() {
+          printf '%s' "$1" | cut -d/ -f1
+        }
+        is_local_registry() {
+          case "$1" in
+            image-factory-registry|image-factory-registry:5000|localhost|localhost:5000|127.0.0.1|127.0.0.1:5000)
+              return 0
+              ;;
+            *)
+              return 1
+              ;;
+          esac
+        }
+        SOURCE_IMAGE="$(params.SOURCE_IMAGE)"
+        SOURCE_TLS_VERIFY="$(params.SOURCE_TLS_VERIFY)"
+        OUTPUT_TAR="$(params.OUTPUT_TAR)"
+        AUTHFILE="/workspace/dockerconfig/config.json"
+        if is_local_registry "$(registry_host "${SOURCE_IMAGE}")"; then
+          SOURCE_TLS_VERIFY="false"
+        fi
+
+        if [ ! -f "${AUTHFILE}" ]; then
+          echo "docker auth config missing: ${AUTHFILE}" >&2
+          exit 1
+        fi
+
+        mkdir -p "$(dirname "${OUTPUT_TAR}")"
+
+        skopeo copy --insecure-policy --src-tls-verify="${SOURCE_TLS_VERIFY}" --authfile "${AUTHFILE}" \
+          "docker://${SOURCE_IMAGE}" "docker-archive:${OUTPUT_TAR}"
+
+        DIGEST="$(skopeo inspect --tls-verify="${SOURCE_TLS_VERIFY}" --authfile "${AUTHFILE}" --format '{{.Digest}}' "docker://${SOURCE_IMAGE}" 2>/dev/null || true)"
+        if [ -n "${DIGEST}" ]; then
+          printf '%s' "${DIGEST}" > "$(results.source-digest.path)"
+        fi
+
+        layer_file="$(mktemp)"
+        skopeo inspect --tls-verify="${SOURCE_TLS_VERIFY}" --authfile "${AUTHFILE}" --format '{{range .Layers}}{{printf "%s\n" .}}{{end}}' "docker://${SOURCE_IMAGE}" > "${layer_file}" 2>/dev/null || true
+
+        out_file="$(mktemp)"
+        printf '[' > "${out_file}"
+        first=1
+        while IFS= read -r layer; do
+          [ -z "${layer}" ] && continue
+          if [ "${first}" -eq 0 ]; then
+            printf ',' >> "${out_file}"
+          fi
+          first=0
+          printf '{"digest":"%s"}' "${layer}" >> "${out_file}"
+        done < "${layer_file}"
+        printf ']' >> "${out_file}"
+
+        cat "${out_file}" > "$(results.source-layers-json.path)"
