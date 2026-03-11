@@ -88,23 +88,23 @@ export IMAGE_TAG=v0.1.0-$(git rev-parse --short HEAD)
 
 helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factory \
   --set imagePullSecrets[0].name=registry-credentials \
-  --set backend.image.repository=docker.io/imagefactoryoss/image-factory-backend \
+  --set backend.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend \
   --set backend.image.tag=$IMAGE_TAG \
   --set backend.image.pullPolicy=Always \
-  --set frontend.image.repository=docker.io/imagefactoryoss/image-factory-frontend \
+  --set frontend.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-frontend \
   --set frontend.image.tag=$IMAGE_TAG \
   --set frontend.image.pullPolicy=Always \
-  --set docs.image.repository=docker.io/imagefactoryoss/image-factory-docs \
+  --set docs.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-docs \
   --set docs.image.tag=$IMAGE_TAG \
   --set docs.image.pullPolicy=Always \
   --set frontend.service.type=LoadBalancer \
-  --set workers.dispatcher.image.repository=docker.io/imagefactoryoss/image-factory-dispatcher \
+  --set workers.dispatcher.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-dispatcher \
   --set workers.dispatcher.image.tag=$IMAGE_TAG \
-  --set workers.notification.image.repository=docker.io/imagefactoryoss/image-factory-notification-worker \
+  --set workers.notification.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-notification-worker \
   --set workers.notification.image.tag=$IMAGE_TAG \
-  --set workers.email.image.repository=docker.io/imagefactoryoss/image-factory-email-worker \
+  --set workers.email.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-email-worker \
   --set workers.email.image.tag=$IMAGE_TAG \
-  --set workers.internalRegistryGc.image.repository=docker.io/imagefactoryoss/image-factory-internal-registry-gc-worker \
+  --set workers.internalRegistryGc.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-internal-registry-gc-worker \
   --set workers.internalRegistryGc.image.tag=$IMAGE_TAG
 ```
 

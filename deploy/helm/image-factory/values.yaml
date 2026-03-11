@@ -80,8 +80,8 @@ database:
 backend:
   enabled: true
   image:
-    repository: docker.io/imagefactoryoss/image-factory-backend
-    tag: v0.1.0-6c42ac0-hz20260302104749
+    repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend
+    tag: v0.1.0-e7dc4ea
     pullPolicy: IfNotPresent
   replicaCount: 1
   service:
@@ -95,8 +95,8 @@ frontend:
   enabled: true
   apiBaseUrl: ""
   image:
-    repository: docker.io/imagefactoryoss/image-factory-frontend
-    tag: v0.1.0-6c42ac0
+    repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-frontend
+    tag: v0.1.0-e7dc4ea
     pullPolicy: IfNotPresent
   replicaCount: 1
   service:
@@ -109,8 +109,8 @@ frontend:
 docs:
   enabled: true
   image:
-    repository: docker.io/imagefactoryoss/image-factory-docs
-    tag: v0.1.0-6c42ac0
+    repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-docs
+    tag: v0.1.0-e7dc4ea
     pullPolicy: IfNotPresent
   replicaCount: 1
   service:
@@ -147,8 +147,8 @@ workers:
     replicaCount: 1
     port: 8084
     image:
-      repository: docker.io/imagefactoryoss/image-factory-dispatcher
-      tag: v0.1.0-21057fe
+      repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-dispatcher
+      tag: v0.1.0-e7dc4ea
       pullPolicy: IfNotPresent
     resources: {}
   notification:
@@ -156,8 +156,8 @@ workers:
     replicaCount: 1
     port: 8083
     image:
-      repository: docker.io/imagefactoryoss/image-factory-notification-worker
-      tag: v0.1.0-21057fe
+      repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-notification-worker
+      tag: v0.1.0-e7dc4ea
       pullPolicy: IfNotPresent
     resources: {}
   email:
@@ -165,8 +165,8 @@ workers:
     replicaCount: 1
     port: 8081
     image:
-      repository: docker.io/imagefactoryoss/image-factory-email-worker
-      tag: v0.1.0-21057fe
+      repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-email-worker
+      tag: v0.1.0-e7dc4ea
       pullPolicy: IfNotPresent
     resources: {}
   internalRegistryGc:
@@ -174,8 +174,8 @@ workers:
     replicaCount: 1
     port: 8085
     image:
-      repository: docker.io/imagefactoryoss/image-factory-internal-registry-gc-worker
-      tag: v0.1.0-21057fe
+      repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-internal-registry-gc-worker
+      tag: v0.1.0-e7dc4ea
       pullPolicy: IfNotPresent
     resources: {}
 
@@ -186,8 +186,8 @@ externalTenantService:
   apiKey: "__SET_BEFORE_DEPLOYMENT__"
   # Required when externalTenantService is enabled. Set before deployment.
   image:
-    repository: docker.io/imagefactoryoss/image-factory-backend
-    tag: v0.1.0-6c42ac0-hz20260302104749
+    repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend
+    tag: v0.1.0-e7dc4ea
     pullPolicy: IfNotPresent
   resources: {}
 

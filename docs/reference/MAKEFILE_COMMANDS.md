@@ -134,12 +134,12 @@ make docker-build-all-multiarch CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry
 
 ```bash
 make release-deploy \
-  IMAGE_REGISTRY=docker.io/imagefactoryoss \
+  IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory \
   CONTAINER_ENGINE=podman
 
 # Optional: package frontend using local dist output
 make release-deploy \
-  IMAGE_REGISTRY=docker.io/imagefactoryoss \
+  IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory \
   CONTAINER_ENGINE=podman \
   FRONTEND_USE_LOCAL_DIST=true
 ```
