@@ -156,6 +156,45 @@ Optional overrides:
 - `HELM_NAMESPACE` (default `image-factory`)
 - `HELM_CHART` (default `./deploy/helm/image-factory`)
 
+### 8) GitLab Registry vs Docker Hub Naming
+
+GitLab Container Registry supports nested image paths such as:
+
+```bash
+registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend:<tag>
+```
+
+Docker Hub does not support the extra project path segment. Use flattened repository names instead:
+
+```bash
+docker.io/imagefactoryoss/image-factory-backend:<tag>
+```
+
+Examples:
+
+```bash
+# GitLab Container Registry
+make docker-build-all-multiarch \
+  CONTAINER_ENGINE=podman \
+  IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory \
+  IMAGE_TAG=<tag>
+
+# Docker Hub
+make docker-build-all-multiarch \
+  CONTAINER_ENGINE=podman \
+  IMAGE_REGISTRY=docker.io/imagefactoryoss \
+  IMAGE_TAG=<tag>
+```
+
+The same flattening applies to the rest of the published images:
+
+- `image-factory-frontend`
+- `image-factory-docs`
+- `image-factory-dispatcher`
+- `image-factory-notification-worker`
+- `image-factory-email-worker`
+- `image-factory-internal-registry-gc-worker`
+
 ## Docker/Image Targets
 
  - `make docker-build` builds backend, frontend, and docs images.

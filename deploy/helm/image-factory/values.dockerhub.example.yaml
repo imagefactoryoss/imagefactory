@@ -1,0 +1,46 @@
+# Example override for deploying Image Factory from Docker Hub.
+# Usage:
+#   helm upgrade --install image-factory ./deploy/helm/image-factory \
+#     -n image-factory \
+#     -f deploy/helm/image-factory/values.yaml \
+#     -f deploy/helm/image-factory/values.dockerhub.example.yaml
+
+imagePullSecrets: []
+
+app:
+  image:
+    repository: docker.io/srikarm/image-factory-backend
+    tag: v0.1.0-e7dc4ea
+
+frontend:
+  image:
+    repository: docker.io/srikarm/image-factory-frontend
+    tag: v0.1.0-e7dc4ea
+
+docs:
+  image:
+    repository: docker.io/srikarm/image-factory-docs
+    tag: v0.1.0-e7dc4ea
+
+workers:
+  dispatcher:
+    image:
+      repository: docker.io/srikarm/image-factory-dispatcher
+      tag: v0.1.0-e7dc4ea
+  notification:
+    image:
+      repository: docker.io/srikarm/image-factory-notification-worker
+      tag: v0.1.0-e7dc4ea
+  email:
+    image:
+      repository: docker.io/srikarm/image-factory-email-worker
+      tag: v0.1.0-e7dc4ea
+  internalRegistryGC:
+    image:
+      repository: docker.io/srikarm/image-factory-internal-registry-gc-worker
+      tag: v0.1.0-e7dc4ea
+
+externalTenantService:
+  image:
+    repository: docker.io/srikarm/image-factory-backend
+    tag: v0.1.0-e7dc4ea
