@@ -2,6 +2,9 @@
 
 This guide documents the repository `Makefile` commands used for local development, image builds, and container runtime workflows.
 
+Current stable OSS release: `v0.2.1`.
+Current published Docker image examples in this guide use the `v0.2.1` tag.
+
 ## Container Engine Support
 
 The Makefile supports both Docker and Podman.
@@ -36,7 +39,7 @@ make dev-stop
 ### 2) Build runtime release tarballs
 
 ```bash
-make release-binaries IMAGE_VERSION=v0.1.0
+make release-binaries IMAGE_VERSION=v0.2.1
 ```
 
 This creates `.tar.gz` artifacts and `checksums.txt` under `release/dist/` for:
@@ -59,13 +62,13 @@ Default targets:
 Optional overrides:
 
 ```bash
-make release-binaries IMAGE_VERSION=v0.1.0 RELEASE_TARGETS="linux/amd64 linux/arm64"
+make release-binaries IMAGE_VERSION=v0.2.1 RELEASE_TARGETS="linux/amd64 linux/arm64"
 ```
 
 To upload assets to a GitHub release:
 
 ```bash
-make release-upload-assets TAG=v0.1.0
+make release-upload-assets TAG=v0.2.1
 ```
 
 ### 3) Build all Image Factory images
@@ -103,13 +106,13 @@ This pulls runtime dependency images used by the Helm chart:
 ```bash
 make docker-build-all-multiarch IMAGE_REGISTRY=<registry>
 # optional overrides:
-# make docker-build-all-multiarch IMAGE_REGISTRY=<registry> IMAGE_VERSION=v0.1.0 IMAGE_ID=$(git rev-parse --short HEAD)
-# make docker-build-all-multiarch IMAGE_REGISTRY=<registry> IMAGE_TAG=v0.1.0-a1b2c3d
+# make docker-build-all-multiarch IMAGE_REGISTRY=<registry> IMAGE_VERSION=v0.2.1 IMAGE_ID=$(git rev-parse --short HEAD)
+# make docker-build-all-multiarch IMAGE_REGISTRY=<registry> IMAGE_TAG=v0.2.1-a1b2c3d
 ```
 
 Default pushed tag format:
 - `IMAGE_TAG=$(IMAGE_VERSION)-$(IMAGE_ID)`
-- default `IMAGE_VERSION=v0.1.0`
+- default `IMAGE_VERSION=v0.2.1`
 - default `IMAGE_ID=$(git rev-parse --short HEAD)`
 
 This publishes manifest lists for:
@@ -168,6 +171,15 @@ Docker Hub does not support the extra project path segment. Use flattened reposi
 
 ```bash
 docker.io/imagefactoryoss/image-factory-backend:<tag>
+```
+
+Current published personal-namespace examples for the `v0.2.1` release:
+
+```bash
+docker.io/srikarm/image-factory-source:v0.2.1
+docker.io/srikarm/image-factory-backend:v0.2.1
+docker.io/srikarm/image-factory-frontend:v0.2.1
+docker.io/srikarm/image-factory-docs:v0.2.1
 ```
 
 Examples:
