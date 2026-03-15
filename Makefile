@@ -19,6 +19,9 @@ HELM_NAMESPACE ?= image-factory
 HELM_CHART ?= ./deploy/helm/image-factory
 RELEASE_DIST_DIR ?= ./release/dist
 RELEASE_TARGETS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
+SOURCE_IMAGE ?= image-factory-source
+SOURCE_EXTRACT_DIR ?= ./dist/image-factory-source
+SOURCE_BUILD_CONTEXT ?= ./dist/source-context
 
 # Colors for output
 RED := \033[0;31m
@@ -277,6 +280,23 @@ docker-build-workers: ## Build worker Docker images
 	$(CONTAINER_ENGINE) build -f $(BACKEND_DIR)/Dockerfile.email-worker -t image-factory-email-worker:latest $(BACKEND_DIR)
 	$(CONTAINER_ENGINE) build -f $(BACKEND_DIR)/Dockerfile.internal-registry-gc-worker -t image-factory-internal-registry-gc-worker:latest $(BACKEND_DIR)
 
+.PHONY: docker-build-source
+docker-build-source: ## Build source distribution image from tracked files at HEAD
+	@echo "$(GREEN)Building source distribution image with $(CONTAINER_ENGINE)...$(NC)"
+	@mkdir -p $(dir $(SOURCE_BUILD_CONTEXT))
+	@rm -rf $(SOURCE_BUILD_CONTEXT)
+	@mkdir -p $(SOURCE_BUILD_CONTEXT)
+	@git archive --format=tar HEAD | tar -xf - -C $(SOURCE_BUILD_CONTEXT)
+	$(CONTAINER_ENGINE) build -f Dockerfile.source -t $(SOURCE_IMAGE):$(IMAGE_TAG) $(SOURCE_BUILD_CONTEXT)
+
+.PHONY: docker-extract-source
+docker-extract-source: ## Extract source tree from source distribution image
+	@echo "$(GREEN)Extracting source from $(SOURCE_IMAGE):$(IMAGE_TAG) to $(SOURCE_EXTRACT_DIR)...$(NC)"
+	@mkdir -p $(SOURCE_EXTRACT_DIR)
+	@CONTAINER_ID=$$($(CONTAINER_ENGINE) create $(SOURCE_IMAGE):$(IMAGE_TAG)); \
+	$(CONTAINER_ENGINE) cp $$CONTAINER_ID:/src/. $(SOURCE_EXTRACT_DIR); \
+	$(CONTAINER_ENGINE) rm $$CONTAINER_ID >/dev/null
+
 .PHONY: build-all-images docker-build-all
 build-all-images: docker-build docker-build-workers ## Build app and worker container images
 docker-build-all: build-all-images
@@ -322,7 +342,7 @@ docker-build-all-multiarch: ## Build amd64/arm64 images and push manifest list (
 .PHONY: release-deploy
 release-deploy: ## Build+push multiarch images and helm upgrade release with IMAGE_TAG
 	@echo "$(GREEN)Release deploy with tag $(IMAGE_TAG)$(NC)"
-	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory$(NC)"; exit 1; }
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory$(NC)"; exit 1; }
 	@$(MAKE) docker-build-all-multiarch IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) PLATFORMS=$(PLATFORMS) FRONTEND_USE_LOCAL_DIST=$(FRONTEND_USE_LOCAL_DIST)
 	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(HELM_NAMESPACE) --reuse-values \
 		--set backend.image.repository=$(IMAGE_REGISTRY)/image-factory-backend \

@@ -23,6 +23,21 @@ import {
     SystemComponentsStatusResponse,
     TektonTaskImagesConfig,
     ReleaseGovernancePolicyConfig,
+    SREIncidentDetailResponse,
+    SREIncidentListResponse,
+    SREIncidentWorkspaceResponse,
+    SREAgentDraftResponse,
+    SREAgentInterpretationResponse,
+    SREAgentRuntimeProbeResponse,
+    SREMCPToolInvocationRequest,
+    SREMCPToolInvocationResponse,
+    SREMCPToolListResponse,
+    SREApprovalListResponse,
+    SREDetectorRuleSuggestion,
+    SREDetectorRuleSuggestionListResponse,
+    SREDemoScenarioListResponse,
+    SRESmartBotMutationResponse,
+    SRESmartBotPolicyConfig,
 } from '@/types'
 import { useTenantStore } from '@/store/tenant'
 import { NIL_TENANT_ID } from '@/constants/tenant'
@@ -95,6 +110,293 @@ export const adminService = {
     async getReleaseGovernancePolicy(): Promise<ReleaseGovernancePolicyConfig> {
         try {
             const response = await api.get('/admin/settings/release-governance-policy', {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSRESmartBotPolicy(): Promise<SRESmartBotPolicyConfig> {
+        try {
+            const response = await api.get('/admin/settings/robot-sre', {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSRESmartBotPolicyDefaults(): Promise<SRESmartBotPolicyConfig> {
+        try {
+            const response = await api.get('/admin/settings/robot-sre/defaults', {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async updateSRESmartBotPolicy(payload: SRESmartBotPolicyConfig): Promise<SRESmartBotPolicyConfig> {
+        try {
+            const response = await api.put('/admin/settings/robot-sre', payload, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidents(params?: {
+        domain?: string
+        status?: string
+        severity?: string
+        search?: string
+        limit?: number
+        offset?: number
+        tenantId?: string
+    }): Promise<SREIncidentListResponse> {
+        try {
+            const query = new URLSearchParams()
+            if (params?.domain) query.append('domain', params.domain)
+            if (params?.status) query.append('status', params.status)
+            if (params?.severity) query.append('severity', params.severity)
+            if (params?.search) query.append('search', params.search)
+            if (params?.limit) query.append('limit', String(params.limit))
+            if (params?.offset) query.append('offset', String(params.offset))
+            if (params?.tenantId) query.append('tenant_id', params.tenantId)
+
+            const response = await api.get(`/admin/sre/incidents${query.toString() ? `?${query.toString()}` : ''}`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncident(id: string): Promise<SREIncidentDetailResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentWorkspace(id: string): Promise<SREIncidentWorkspaceResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/workspace`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentMCPTools(id: string): Promise<SREMCPToolListResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/mcp/tools`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async invokeSREIncidentMCPTool(id: string, payload: SREMCPToolInvocationRequest): Promise<SREMCPToolInvocationResponse> {
+        try {
+            const response = await api.post(`/admin/sre/incidents/${id}/mcp/invoke`, payload, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREDemoScenarios(): Promise<SREDemoScenarioListResponse> {
+        try {
+            const response = await api.get('/admin/sre/demo/scenarios', {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async generateSREDemoIncident(scenarioId: string): Promise<SRESmartBotMutationResponse> {
+        try {
+            const response = await api.post('/admin/sre/demo/incidents', { scenario_id: scenarioId }, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentAgentDraft(id: string): Promise<SREAgentDraftResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/agent/draft`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentAgentInterpretation(id: string): Promise<SREAgentInterpretationResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/agent/interpretation`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async probeSREAgentRuntime(payload: { agent_runtime: SRESmartBotPolicyConfig['agent_runtime'] }): Promise<SREAgentRuntimeProbeResponse> {
+        try {
+            const response = await api.post('/admin/sre/agent/probe', payload, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async emailSREIncidentSummary(incidentId: string): Promise<SRESmartBotMutationResponse> {
+        try {
+            const response = await api.post(`/admin/sre/incidents/${incidentId}/email-summary`, {}, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREDetectorRuleSuggestions(params?: {
+        status?: string
+        search?: string
+        limit?: number
+        offset?: number
+        tenantId?: string
+    }): Promise<SREDetectorRuleSuggestionListResponse> {
+        try {
+            const query = new URLSearchParams()
+            if (params?.status) query.append('status', params.status)
+            if (params?.search) query.append('search', params.search)
+            if (params?.limit) query.append('limit', String(params.limit))
+            if (params?.offset) query.append('offset', String(params.offset))
+            if (params?.tenantId) query.append('tenant_id', params.tenantId)
+
+            const response = await api.get(`/admin/sre/detector-rule-suggestions${query.toString() ? `?${query.toString()}` : ''}`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async proposeSREDetectorRuleSuggestion(incidentId: string): Promise<SREDetectorRuleSuggestion> {
+        try {
+            const response = await api.post(`/admin/sre/incidents/${incidentId}/detector-rule-suggestions`, {}, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async acceptSREDetectorRuleSuggestion(suggestionId: string): Promise<SREDetectorRuleSuggestion> {
+        try {
+            const response = await api.post(`/admin/sre/detector-rule-suggestions/${suggestionId}/accept`, {}, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async rejectSREDetectorRuleSuggestion(suggestionId: string, reason?: string): Promise<SREDetectorRuleSuggestion> {
+        try {
+            const response = await api.post(`/admin/sre/detector-rule-suggestions/${suggestionId}/reject`, { reason }, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREApprovals(params?: {
+        status?: string
+        channelProviderId?: string
+        search?: string
+        limit?: number
+        offset?: number
+        tenantId?: string
+    }): Promise<SREApprovalListResponse> {
+        try {
+            const query = new URLSearchParams()
+            if (params?.status) query.append('status', params.status)
+            if (params?.channelProviderId) query.append('channel_provider_id', params.channelProviderId)
+            if (params?.search) query.append('search', params.search)
+            if (params?.limit) query.append('limit', String(params.limit))
+            if (params?.offset) query.append('offset', String(params.offset))
+            if (params?.tenantId) query.append('tenant_id', params.tenantId)
+
+            const response = await api.get(`/admin/sre/approvals${query.toString() ? `?${query.toString()}` : ''}`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async requestSREActionApproval(incidentId: string, actionId: string, payload?: { channel_provider_id?: string; request_message?: string }): Promise<SRESmartBotMutationResponse> {
+        try {
+            const response = await api.post(`/admin/sre/incidents/${incidentId}/actions/${actionId}/request-approval`, payload || {}, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async decideSREApproval(incidentId: string, approvalId: string, payload: { decision: 'approved' | 'rejected'; comment?: string }): Promise<SRESmartBotMutationResponse> {
+        try {
+            const response = await api.post(`/admin/sre/incidents/${incidentId}/approvals/${approvalId}/decide`, payload, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async executeSREAction(incidentId: string, actionId: string): Promise<SRESmartBotMutationResponse> {
+        try {
+            const response = await api.post(`/admin/sre/incidents/${incidentId}/actions/${actionId}/execute`, {}, {
                 headers: getTenantHeader(),
             })
             return response.data

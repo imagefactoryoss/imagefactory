@@ -14,7 +14,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
-	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -26,16 +25,15 @@ import (
 	"github.com/srikarm/image-factory/internal/adapters/primary/rest"
 	"github.com/srikarm/image-factory/internal/adapters/secondary/email"
 	"github.com/srikarm/image-factory/internal/adapters/secondary/postgres"
-	quarantineimportadapter "github.com/srikarm/image-factory/internal/adapters/secondary/quarantineimport"
+	"github.com/srikarm/image-factory/internal/application/appsignals"
+	"github.com/srikarm/image-factory/internal/application/asyncsignals"
 	appbootstrap "github.com/srikarm/image-factory/internal/application/bootstrap"
 	buildsteps "github.com/srikarm/image-factory/internal/application/build/steps"
 	buildnotifications "github.com/srikarm/image-factory/internal/application/buildnotifications"
-	appdispatcher "github.com/srikarm/image-factory/internal/application/dispatcher"
-	imageimportsteps "github.com/srikarm/image-factory/internal/application/imageimport/steps"
+	"github.com/srikarm/image-factory/internal/application/clustermetrics"
 	imageimportnotifications "github.com/srikarm/image-factory/internal/application/imageimportnotifications"
-	appinfrastructure "github.com/srikarm/image-factory/internal/application/infrastructure"
 	"github.com/srikarm/image-factory/internal/application/runtimehealth"
-	appworkflow "github.com/srikarm/image-factory/internal/application/workflow"
+	appsresmartbot "github.com/srikarm/image-factory/internal/application/sresmartbot"
 	"github.com/srikarm/image-factory/internal/domain/build"
 	"github.com/srikarm/image-factory/internal/domain/buildnotification"
 	domainEmail "github.com/srikarm/image-factory/internal/domain/email"
@@ -56,6 +54,7 @@ import (
 	"github.com/srikarm/image-factory/internal/infrastructure/database"
 	k8sinfra "github.com/srikarm/image-factory/internal/infrastructure/kubernetes"
 	"github.com/srikarm/image-factory/internal/infrastructure/ldap"
+	"github.com/srikarm/image-factory/internal/infrastructure/logdetector"
 	"github.com/srikarm/image-factory/internal/infrastructure/logger"
 	"github.com/srikarm/image-factory/internal/infrastructure/messaging"
 	"github.com/srikarm/image-factory/internal/infrastructure/releasecompliance"
@@ -65,6 +64,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	k8srest "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
 var (
@@ -488,122 +488,6 @@ func newWorkflowInfrastructurePreflight(
 	}
 }
 
-type staleBuildRecoveryResult struct {
-	BuildID     uuid.UUID
-	TenantID    uuid.UUID
-	ProjectID   uuid.UUID
-	BuildNumber int
-}
-
-func recoverStaleExecutionLeases(
-	ctx context.Context,
-	db interface {
-		QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
-	},
-	logger *zap.Logger,
-	eventBus messaging.EventBus,
-	eventSource string,
-	schemaVersion string,
-	limit int,
-	reason string,
-) (int, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-
-	const query = `
-WITH stale AS (
-	SELECT be.id AS execution_id, be.build_id
-	FROM build_executions be
-	WHERE be.status IN ('pending', 'running')
-	  AND be.monitor_lease_expires_at IS NOT NULL
-	  AND be.monitor_lease_expires_at < NOW()
-	ORDER BY be.monitor_lease_expires_at ASC
-	LIMIT $1
-),
-updated_exec AS (
-	UPDATE build_executions be
-	SET status = 'failed',
-	    completed_at = COALESCE(be.completed_at, NOW()),
-	    error_message = $2,
-	    monitor_owner = NULL,
-	    monitor_lease_expires_at = NULL,
-	    updated_at = NOW()
-	FROM stale s
-	WHERE be.id = s.execution_id
-	  AND be.status IN ('pending', 'running')
-	RETURNING be.id, be.build_id
-),
-updated_build AS (
-	UPDATE builds b
-	SET status = 'failed',
-	    error_message = $2,
-	    completed_at = COALESCE(b.completed_at, NOW()),
-	    updated_at = NOW()
-	FROM updated_exec ue
-	WHERE b.id = ue.build_id
-	  AND b.status IN ('pending', 'queued', 'running')
-	RETURNING b.id AS build_id, b.tenant_id, b.project_id, b.build_number
-),
-insert_logs AS (
-	INSERT INTO build_execution_logs (id, execution_id, timestamp, level, message, metadata)
-	SELECT gen_random_uuid(), ue.id, NOW(), 'error', $2, '{}'::jsonb
-	FROM updated_exec ue
-	RETURNING 1
-)
-SELECT ub.build_id, ub.tenant_id, ub.project_id, ub.build_number
-FROM updated_build ub;
-`
-
-	rows, err := db.QueryContext(ctx, query, limit, reason)
-	if err != nil {
-		return 0, fmt.Errorf("failed to recover stale execution leases: %w", err)
-	}
-	defer rows.Close()
-
-	results := make([]staleBuildRecoveryResult, 0)
-	for rows.Next() {
-		var rec staleBuildRecoveryResult
-		if scanErr := rows.Scan(&rec.BuildID, &rec.TenantID, &rec.ProjectID, &rec.BuildNumber); scanErr != nil {
-			return 0, fmt.Errorf("failed to scan stale recovery result: %w", scanErr)
-		}
-		results = append(results, rec)
-	}
-	if rowsErr := rows.Err(); rowsErr != nil {
-		return 0, fmt.Errorf("failed iterating stale recovery rows: %w", rowsErr)
-	}
-
-	for _, rec := range results {
-		if eventBus == nil {
-			continue
-		}
-		// Best-effort event for realtime UI consumers.
-		_ = eventBus.Publish(ctx, messaging.Event{
-			Type:          messaging.EventTypeBuildExecutionFailed,
-			Source:        eventSource,
-			SchemaVersion: schemaVersion,
-			TenantID:      rec.TenantID.String(),
-			OccurredAt:    time.Now().UTC(),
-			Payload: map[string]interface{}{
-				"build_id":     rec.BuildID.String(),
-				"build_number": fmt.Sprintf("%d", rec.BuildNumber),
-				"project_id":   rec.ProjectID.String(),
-				"status":       "failed",
-				"message":      reason,
-				"metadata": map[string]interface{}{
-					"failure_type": "stale_execution_lease",
-				},
-			},
-		})
-	}
-
-	if len(results) > 0 {
-		logger.Warn("Recovered stale build executions after lease expiry", zap.Int("count", len(results)))
-	}
-
-	return len(results), nil
-}
-
 type buildMonitorSweepCandidate struct {
 	InstanceID        uuid.UUID      `db:"instance_id"`
 	BuildID           uuid.UUID      `db:"build_id"`
@@ -696,35 +580,9 @@ func runBuildMonitorSweeperTick(
 	return attempted, reconciled, failed, nil
 }
 
-type runtimeDependencyIssue struct {
-	Key      string
-	Severity string
-	Message  string
-}
-
 type runtimeDependencyAlertRecipient struct {
 	TenantID uuid.UUID `db:"tenant_id"`
 	UserID   uuid.UUID `db:"user_id"`
-}
-
-func runtimeDependencyIssuesSignature(issues []runtimeDependencyIssue) string {
-	if len(issues) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(issues))
-	for _, issue := range issues {
-		key := strings.TrimSpace(strings.ToLower(issue.Key))
-		severity := strings.TrimSpace(strings.ToLower(issue.Severity))
-		if key == "" {
-			continue
-		}
-		if severity == "" {
-			severity = "degraded"
-		}
-		parts = append(parts, key+":"+severity)
-	}
-	sort.Strings(parts)
-	return strings.Join(parts, "|")
 }
 
 func listRuntimeDependencyAlertRecipients(ctx context.Context, db *sqlx.DB) ([]runtimeDependencyAlertRecipient, error) {
@@ -907,13 +765,13 @@ func main() {
 
 	// Initialize first-run bootstrap state and initial local admin credentials (idempotent).
 	bootstrapService := appbootstrap.NewService(db, logger)
-	state, generatedPassword, bootstrapErr := bootstrapService.EnsureInitialized(context.Background(), "admin@imagefactory.local")
+	state, generatedPassword, bootstrapErr := bootstrapService.EnsureInitialized(context.Background(), "admin@imgfactory.com")
 	if bootstrapErr != nil {
 		logger.Fatal("Failed to initialize bootstrap state", zap.Error(bootstrapErr))
 	}
 	if generatedPassword != "" {
 		logger.Warn("Initial local admin credentials generated for first run",
-			zap.String("email", "admin@imagefactory.local"),
+			zap.String("email", "admin@imgfactory.com"),
 			zap.String("password", generatedPassword),
 		)
 	}
@@ -926,22 +784,22 @@ func main() {
 	// Always rotate and print a fresh bootstrap admin password while setup is incomplete.
 	// This avoids one-time password loss across restarts in containerized environments.
 	if state != nil && state.SetupRequired && generatedPassword == "" {
-		reissuedPassword, reissueErr := bootstrapService.ReissueInitialAdminPassword(context.Background(), "admin@imagefactory.local")
+		reissuedPassword, reissueErr := bootstrapService.ReissueInitialAdminPassword(context.Background(), "admin@imgfactory.com")
 		if reissueErr != nil {
 			logger.Fatal("Failed to auto-reissue bootstrap admin password", zap.Error(reissueErr))
 		}
 		logger.Warn("Bootstrap admin password reissued because setup is still required",
-			zap.String("email", "admin@imagefactory.local"),
+			zap.String("email", "admin@imgfactory.com"),
 			zap.String("password", reissuedPassword),
 		)
 	}
 	if *reissueBootstrapAdminPassword {
-		reissuedPassword, reissueErr := bootstrapService.ReissueInitialAdminPassword(context.Background(), "admin@imagefactory.local")
+		reissuedPassword, reissueErr := bootstrapService.ReissueInitialAdminPassword(context.Background(), "admin@imgfactory.com")
 		if reissueErr != nil {
 			logger.Fatal("Failed to reissue bootstrap admin password", zap.Error(reissueErr))
 		}
 		logger.Warn("Bootstrap admin password reissued via startup flag",
-			zap.String("email", "admin@imagefactory.local"),
+			zap.String("email", "admin@imgfactory.com"),
 			zap.String("password", reissuedPassword),
 		)
 	}
@@ -1329,6 +1187,14 @@ func main() {
 	projectNotificationTriggerRepo := postgres.NewProjectNotificationTriggerRepository(db, logger)
 	projectNotificationTriggerService := buildnotification.NewService(projectNotificationTriggerRepo)
 	buildNotificationDeliveryRepo := postgres.NewBuildNotificationDeliveryRepository(db, logger)
+	sreSmartBotRepo := postgres.NewSRESmartBotRepository(db, logger)
+	sreEventPublisher := messaging.NewSREEventPublisher(eventBus, eventSource, cfg.Messaging.SchemaVersion)
+	sreSmartBotService := appsresmartbot.NewService(sreSmartBotRepo, sreEventPublisher, logger)
+	sreDetectorSuggestionService := appsresmartbot.NewDetectorRuleSuggestionService(sreSmartBotRepo, systemConfigService, logger)
+	sreSmartBotService.SetDetectorSuggestionObserver(sreDetectorSuggestionService)
+	sreDetectorSubscriber := appsresmartbot.NewDetectorEventSubscriber(sreSmartBotService, logger)
+	sreDetectorUnsubscribe := appsresmartbot.RegisterDetectorEventSubscriber(eventBus, sreDetectorSubscriber)
+	defer sreDetectorUnsubscribe()
 
 	triggerRepo := postgres.NewTriggerRepository(db, logger)
 	buildExecutionRepo := postgres.NewBuildExecutionRepository(db, logger)
@@ -1336,6 +1202,7 @@ func main() {
 	buildExecutionService := build.NewBuildExecutionServiceWithWebSocket(buildExecutionRepo, buildStatusBroadcaster)
 	var (
 		k8sClient             kubernetes.Interface
+		clusterMetricsClient  metricsclient.Interface
 		tektonClient          tektonclient.Interface
 		namespaceMgr          build.NamespaceManager
 		pipelineMgr           build.PipelineManager
@@ -1357,6 +1224,10 @@ func main() {
 				k8sClient, err = kubernetes.NewForConfig(kubeConfig)
 				if err != nil {
 					logger.Warn("Failed to initialize Kubernetes client", zap.Error(err))
+				}
+				clusterMetricsClient, err = metricsclient.NewForConfig(kubeConfig)
+				if err != nil {
+					logger.Warn("Failed to initialize Kubernetes metrics client", zap.Error(err))
 				}
 				tektonClient, err = tektonclient.NewForConfig(kubeConfig)
 				if err != nil {
@@ -1411,6 +1282,37 @@ func main() {
 	dispatcherRuntimeStore := postgres.NewDispatcherRuntimeRepository(db, logger)
 	processHealthStore := runtimehealth.NewStore()
 	releaseComplianceMetrics := releasecompliance.NewMetrics()
+	sreLogDetectorBaseURL := strings.TrimSpace(os.Getenv("IF_SRE_LOG_DETECTOR_LOKI_BASE_URL"))
+	sreLogDetectorTimeout := time.Duration(getIntEnv("IF_SRE_LOG_DETECTOR_TIMEOUT_SECONDS", 15)) * time.Second
+	sreLogDetectorClient := logdetector.NewLokiClient(sreLogDetectorBaseURL, &http.Client{Timeout: sreLogDetectorTimeout})
+	appsresmartbot.StartNATSTransportSignalRunner(
+		logger,
+		processHealthStore,
+		natsBus,
+		sreSmartBotService,
+		appsresmartbot.NATSTransportRunnerConfig{
+			Enabled:            getBoolEnv("IF_NATS_TRANSPORT_SIGNAL_RUNNER_ENABLED", true),
+			Interval:           time.Duration(getIntEnv("IF_NATS_TRANSPORT_SIGNAL_INTERVAL_SECONDS", 30)) * time.Second,
+			ReconnectThreshold: int64(getIntEnv("IF_NATS_TRANSPORT_RECONNECT_THRESHOLD", 3)),
+		},
+	)
+	appsresmartbot.StartLogDetectorRunner(
+		logger,
+		processHealthStore,
+		sreLogDetectorClient,
+		eventBus,
+		systemConfigService,
+		appsresmartbot.LogDetectorRunnerConfig{
+			Enabled:       getBoolEnv("IF_SRE_LOG_DETECTOR_ENABLED", false),
+			BaseURL:       sreLogDetectorBaseURL,
+			Interval:      time.Duration(getIntEnv("IF_SRE_LOG_DETECTOR_INTERVAL_SECONDS", 120)) * time.Second,
+			Timeout:       sreLogDetectorTimeout,
+			Lookback:      time.Duration(getIntEnv("IF_SRE_LOG_DETECTOR_LOOKBACK_MINUTES", 5)) * time.Minute,
+			MaxMatches:    getIntEnv("IF_SRE_LOG_DETECTOR_MAX_MATCHES", 5),
+			EventSource:   eventSource,
+			SchemaVersion: cfg.Messaging.SchemaVersion,
+		},
+	)
 
 	if relay != nil {
 		processHealthStore.Upsert("messaging_outbox_relay", runtimehealth.ProcessStatus{
@@ -1544,135 +1446,44 @@ func main() {
 	var dispatcherMetricsProvider rest.DispatcherMetricsProvider
 	var dispatcherController rest.DispatcherController
 	var orchestratorController rest.WorkflowOrchestratorController
-	if cfg.Dispatcher.Enabled {
-		processHealthStore.Upsert("dispatcher", runtimehealth.ProcessStatus{
-			Enabled:      true,
-			Running:      false,
-			LastActivity: time.Now().UTC(),
-			Message:      "dispatcher is starting",
-		})
-		logger.Info("Background process starting",
-			zap.String("component", "queued_build_dispatcher"),
-			zap.Duration("poll_interval", cfg.Dispatcher.PollInterval),
-			zap.Int("max_dispatch_per_tick", cfg.Dispatcher.MaxDispatchPerTick),
-			zap.Int("max_retries", cfg.Dispatcher.MaxRetries),
-		)
-		dispatcherConfig := appdispatcher.QueueDispatcherConfig{
+	embeddedDispatcherController, embeddedDispatcherMetricsProvider := appbootstrap.StartDispatcherRunner(
+		appbootstrap.DispatcherRunnerDeps{
+			ProcessHealthStore:  processHealthStore,
+			BuildRepo:           buildRepo,
+			BuildService:        buildService,
+			SystemConfigService: systemConfigService,
+			DispatcherRuntime:   dispatcherRuntimeStore,
+			Infrastructure:      infrastructureService,
+			Logger:              logger,
+		},
+		appbootstrap.DispatcherRunnerConfig{
+			Enabled:            cfg.Dispatcher.Enabled,
 			PollInterval:       cfg.Dispatcher.PollInterval,
 			MaxDispatchPerTick: cfg.Dispatcher.MaxDispatchPerTick,
 			MaxRetries:         cfg.Dispatcher.MaxRetries,
 			RetryBackoff:       cfg.Dispatcher.RetryBackoff,
 			RetryBackoffMax:    cfg.Dispatcher.RetryBackoffMax,
-		}
-		queuedDispatcher := appdispatcher.NewQueuedBuildDispatcher(buildRepo, buildService, systemConfigService, logger, dispatcherConfig)
-		dispatcherController = appdispatcher.NewController(queuedDispatcher)
-		dispatcherMetricsProvider = queuedDispatcher
-		dispatcherController.Start(context.Background())
-		processHealthStore.Upsert("dispatcher", runtimehealth.ProcessStatus{
-			Enabled:      true,
-			Running:      dispatcherController.Status(),
-			LastActivity: time.Now().UTC(),
-			Message:      "embedded dispatcher running",
-		})
-		instanceID := "embedded"
-		if hostname, hostErr := os.Hostname(); hostErr == nil && hostname != "" {
-			instanceID = "embedded-" + hostname
-		}
-		logger.Info("Background process starting",
-			zap.String("component", "dispatcher_runtime_heartbeat"),
-			zap.Duration("interval", 10*time.Second),
-			zap.String("instance_id", instanceID),
-		)
-		go func() {
-			ticker := time.NewTicker(10 * time.Second)
-			defer ticker.Stop()
-			for {
-				snapshot := appdispatcher.RuntimeStatus{
-					InstanceID:    instanceID,
-					Mode:          appdispatcher.DispatcherModeEmbedded,
-					Running:       dispatcherController.Status(),
-					LastHeartbeat: time.Now().UTC(),
-					Metrics:       queuedDispatcher.DispatcherMetrics(),
-				}
-				if err := dispatcherRuntimeStore.UpsertRuntimeStatus(context.Background(), snapshot); err != nil {
-					logger.Warn("Failed to persist embedded dispatcher runtime status", zap.Error(err))
-				}
-				processHealthStore.Upsert("dispatcher", runtimehealth.ProcessStatus{
-					Enabled:      true,
-					Running:      snapshot.Running,
-					LastActivity: snapshot.LastHeartbeat,
-					Message:      "embedded dispatcher heartbeat",
-				})
-				<-ticker.C
-			}
-		}()
-
-		tektonInstallerDispatcher := appinfrastructure.NewTektonInstallerDispatcher(
-			infrastructureService,
-			logger,
-			appinfrastructure.TektonInstallerDispatcherConfig{
-				PollInterval:   cfg.Dispatcher.PollInterval,
-				MaxJobsPerTick: cfg.Dispatcher.MaxDispatchPerTick,
-			},
-		)
-		logger.Info("Background process starting",
-			zap.String("component", "tekton_installer_dispatcher"),
-			zap.Duration("poll_interval", cfg.Dispatcher.PollInterval),
-			zap.Int("max_jobs_per_tick", cfg.Dispatcher.MaxDispatchPerTick),
-		)
-		go tektonInstallerDispatcher.Run(context.Background())
-	} else {
-		processHealthStore.Upsert("dispatcher", runtimehealth.ProcessStatus{
-			Enabled:      false,
-			Running:      false,
-			LastActivity: time.Now().UTC(),
-			Message:      "dispatcher disabled",
-		})
-		logger.Warn("Dispatcher is disabled; queued builds will not execute unless an external dispatcher is running",
-			zap.Bool("dispatcher_enabled", cfg.Dispatcher.Enabled),
-			zap.Duration("poll_interval", cfg.Dispatcher.PollInterval),
-		)
+		},
+	)
+	if embeddedDispatcherController != nil {
+		dispatcherController = embeddedDispatcherController
+	}
+	if embeddedDispatcherMetricsProvider != nil {
+		dispatcherMetricsProvider = embeddedDispatcherMetricsProvider
 	}
 
-	// Recover stale build executions whose monitoring lease expired (e.g. crashed monitor process).
-	go func() {
-		const (
-			staleRecoveryInterval = 30 * time.Second
-			staleRecoveryBatch    = 100
-		)
-		processHealthStore.Upsert("stale_execution_watchdog", runtimehealth.ProcessStatus{
-			Enabled:      true,
-			Running:      true,
-			LastActivity: time.Now().UTC(),
-			Message:      "watchdog started",
-		})
-		reason := "Build execution monitor lease expired; marking execution as failed"
-		ticker := time.NewTicker(staleRecoveryInterval)
-		defer ticker.Stop()
-
-		logger.Info("Background process starting",
-			zap.String("component", "stale_execution_lease_watchdog"),
-			zap.Duration("interval", staleRecoveryInterval),
-			zap.Int("batch_limit", staleRecoveryBatch),
-		)
-
-		for {
-			if _, err := recoverStaleExecutionLeases(
-				context.Background(),
-				db,
-				logger,
-				eventBus,
-				eventSource,
-				cfg.Messaging.SchemaVersion,
-				staleRecoveryBatch,
-				reason,
-			); err != nil {
-				logger.Warn("Stale execution lease recovery failed", zap.Error(err))
-			}
-			processHealthStore.Touch("stale_execution_watchdog")
-			<-ticker.C
-		}
-	}()
+	appbootstrap.StartStaleExecutionWatchdog(
+		logger,
+		processHealthStore,
+		db,
+		eventBus,
+		appbootstrap.StaleExecutionWatchdogConfig{
+			Interval:      30 * time.Second,
+			BatchSize:     100,
+			EventSource:   eventSource,
+			SchemaVersion: cfg.Messaging.SchemaVersion,
+		},
+	)
 
 	buildMonitorSweeperEnabled := getBoolEnv("IF_BUILD_MONITOR_SWEEPER_ENABLED", true)
 	buildMonitorSweeperIntervalSeconds := getIntEnv("IF_BUILD_MONITOR_SWEEPER_INTERVAL_SECONDS", 30)
@@ -1847,315 +1658,37 @@ func main() {
 		defaultProviderReadinessWatcherBatchSize = 200
 	}
 
-	type providerReadinessWatcherRuntimeConfig struct {
-		enabled  bool
-		interval time.Duration
-		timeout  time.Duration
-		batch    int
-		source   string
-	}
-
-	loadProviderReadinessWatcherConfig := func(ctx context.Context) providerReadinessWatcherRuntimeConfig {
-		out := providerReadinessWatcherRuntimeConfig{
-			enabled:  defaultProviderReadinessWatcherEnabled,
-			interval: time.Duration(defaultProviderReadinessWatcherIntervalSeconds) * time.Second,
-			timeout:  time.Duration(defaultProviderReadinessWatcherTimeoutSeconds) * time.Second,
-			batch:    defaultProviderReadinessWatcherBatchSize,
-			source:   "env",
-		}
-
-		cfg, err := systemConfigService.GetConfigByTypeAndKey(ctx, nil, systemconfig.ConfigTypeRuntimeServices, "runtime_services")
-		if err != nil || cfg == nil {
-			return out
-		}
-		runtimeCfg, cfgErr := cfg.GetRuntimeServicesConfig()
-		if cfgErr != nil || runtimeCfg == nil {
-			return out
-		}
-
-		if runtimeCfg.ProviderReadinessWatcherEnabled != nil {
-			out.enabled = *runtimeCfg.ProviderReadinessWatcherEnabled
-			out.source = "system_config"
-		}
-		if runtimeCfg.ProviderReadinessWatcherIntervalSeconds >= 30 {
-			out.interval = time.Duration(runtimeCfg.ProviderReadinessWatcherIntervalSeconds) * time.Second
-			out.source = "system_config"
-		}
-		if runtimeCfg.ProviderReadinessWatcherTimeoutSeconds >= 10 {
-			timeout := time.Duration(runtimeCfg.ProviderReadinessWatcherTimeoutSeconds) * time.Second
-			if timeout < out.interval {
-				out.timeout = timeout
-				out.source = "system_config"
-			}
-		}
-		if runtimeCfg.ProviderReadinessWatcherBatchSize >= 1 && runtimeCfg.ProviderReadinessWatcherBatchSize <= 1000 {
-			out.batch = runtimeCfg.ProviderReadinessWatcherBatchSize
-			out.source = "system_config"
-		}
-
-		if out.timeout >= out.interval {
-			out.timeout = out.interval - time.Second
-			if out.timeout < 10*time.Second {
-				out.timeout = 10 * time.Second
-			}
-		}
-		return out
-	}
-
-	initialProviderReadinessWatcherCfg := loadProviderReadinessWatcherConfig(context.Background())
-	processHealthStore.Upsert("provider_readiness_watcher", runtimehealth.ProcessStatus{
-		Enabled:      initialProviderReadinessWatcherCfg.enabled,
-		Running:      initialProviderReadinessWatcherCfg.enabled,
-		LastActivity: time.Now().UTC(),
-		Message:      "provider readiness watcher initialized",
-	})
-	logger.Info("Background process starting",
-		zap.String("component", "provider_readiness_watcher"),
-		zap.Duration("interval", initialProviderReadinessWatcherCfg.interval),
-		zap.Duration("timeout", initialProviderReadinessWatcherCfg.timeout),
-		zap.Int("batch_size", initialProviderReadinessWatcherCfg.batch),
-		zap.String("config_source", initialProviderReadinessWatcherCfg.source),
-		zap.Bool("enabled", initialProviderReadinessWatcherCfg.enabled),
+	appbootstrap.StartProviderReadinessWatcher(
+		logger,
+		processHealthStore,
+		systemConfigService,
+		infrastructureService,
+		appbootstrap.ProviderReadinessWatcherConfig{
+			DefaultEnabled:         defaultProviderReadinessWatcherEnabled,
+			DefaultIntervalSeconds: defaultProviderReadinessWatcherIntervalSeconds,
+			DefaultTimeoutSeconds:  defaultProviderReadinessWatcherTimeoutSeconds,
+			DefaultBatchSize:       defaultProviderReadinessWatcherBatchSize,
+			OnTick: func(ctx context.Context, result *infrastructure.ProviderReadinessWatchTickResult, err error, observedAt time.Time) {
+				appsresmartbot.ObserveProviderReadinessTick(ctx, sreSmartBotService, logger, result, err, observedAt)
+			},
+		},
 	)
-	go func() {
-		ticker := time.NewTicker(initialProviderReadinessWatcherCfg.interval)
-		defer ticker.Stop()
-		currentInterval := initialProviderReadinessWatcherCfg.interval
 
-		runTick := func() {
-			cfg := loadProviderReadinessWatcherConfig(context.Background())
-			if !cfg.enabled {
-				processHealthStore.Upsert("provider_readiness_watcher", runtimehealth.ProcessStatus{
-					Enabled:      false,
-					Running:      false,
-					LastActivity: time.Now().UTC(),
-					Message:      "provider readiness watcher disabled via runtime_services config",
-				})
-				return
-			}
-			if cfg.interval != currentInterval {
-				ticker.Reset(cfg.interval)
-				currentInterval = cfg.interval
-				logger.Info("Provider readiness watcher interval updated",
-					zap.Duration("interval", cfg.interval),
-					zap.String("config_source", cfg.source),
-				)
-			}
-
-			tickCtx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
-			defer cancel()
-
-			result, err := infrastructureService.RunProviderReadinessWatchTick(tickCtx, cfg.batch)
-			if err != nil {
-				logger.Warn("Provider readiness watcher tick failed", zap.Error(err))
-				processHealthStore.Upsert("provider_readiness_watcher", runtimehealth.ProcessStatus{
-					Enabled:      true,
-					Running:      true,
-					LastActivity: time.Now().UTC(),
-					Message:      "watch tick failed",
-				})
-				return
-			}
-			processHealthStore.Upsert("provider_readiness_watcher", runtimehealth.ProcessStatus{
-				Enabled:      true,
-				Running:      true,
-				LastActivity: time.Now().UTC(),
-				Message:      fmt.Sprintf("tick completed attempted=%d refresh_succeeded=%d failed=%d skipped=%d ready=%d not_ready=%d", result.Attempted, result.Succeeded, result.Failed, result.Skipped, result.Ready, result.NotReady),
-			})
-			if result.Attempted > 0 || result.Failed > 0 {
-				logger.Info("Provider readiness watcher tick completed",
-					zap.Int("total_providers", result.TotalProviders),
-					zap.Int("attempted", result.Attempted),
-					zap.Int("refresh_succeeded", result.Succeeded),
-					zap.Int("failed", result.Failed),
-					zap.Int("skipped", result.Skipped),
-					zap.Int("ready", result.Ready),
-					zap.Int("not_ready", result.NotReady),
-					zap.Duration("interval", cfg.interval),
-					zap.Duration("timeout", cfg.timeout),
-					zap.Int("batch_size", cfg.batch),
-					zap.String("config_source", cfg.source),
-				)
-			}
-		}
-
-		runTick()
-		for {
-			<-ticker.C
-			runTick()
-		}
-	}()
-
-	type tenantAssetDriftWatcherConfig struct {
-		enabled  bool
-		interval time.Duration
-		timeout  time.Duration
-		source   string
-		batch    int
-	}
-
-	loadTenantAssetDriftWatcherConfig := func(ctx context.Context) tenantAssetDriftWatcherConfig {
-		out := tenantAssetDriftWatcherConfig{
-			enabled:  getBoolEnv("IF_TENANT_ASSET_DRIFT_WATCHER_ENABLED", true),
-			interval: time.Duration(getIntEnv("IF_TENANT_ASSET_DRIFT_WATCHER_INTERVAL_SECONDS", 300)) * time.Second,
-			timeout:  time.Duration(getIntEnv("IF_TENANT_ASSET_DRIFT_WATCHER_TIMEOUT_SECONDS", 90)) * time.Second,
-			batch:    getIntEnv("IF_TENANT_ASSET_DRIFT_WATCHER_BATCH_SIZE", 200),
-			source:   "env",
-		}
-		if out.interval < 30*time.Second {
-			out.interval = 30 * time.Second
-		}
-		if out.timeout < 10*time.Second {
-			out.timeout = 10 * time.Second
-		}
-		if out.timeout >= out.interval {
-			out.timeout = out.interval - time.Second
-			if out.timeout < 10*time.Second {
-				out.timeout = 10 * time.Second
-			}
-		}
-		if out.batch < 1 {
-			out.batch = 200
-		}
-
-		cfg, err := systemConfigService.GetConfigByTypeAndKey(ctx, nil, systemconfig.ConfigTypeRuntimeServices, "runtime_services")
-		if err != nil || cfg == nil {
-			return out
-		}
-		runtimeCfg, cfgErr := cfg.GetRuntimeServicesConfig()
-		if cfgErr != nil || runtimeCfg == nil {
-			return out
-		}
-		if runtimeCfg.TenantAssetDriftWatcherEnabled != nil {
-			out.enabled = *runtimeCfg.TenantAssetDriftWatcherEnabled
-			out.source = "system_config"
-		}
-		if runtimeCfg.TenantAssetDriftWatcherIntervalSeconds >= 30 {
-			out.interval = time.Duration(runtimeCfg.TenantAssetDriftWatcherIntervalSeconds) * time.Second
-			out.source = "system_config"
-		}
-		if out.timeout >= out.interval {
-			out.timeout = out.interval - time.Second
-			if out.timeout < 10*time.Second {
-				out.timeout = 10 * time.Second
-			}
-		}
-		return out
-	}
-
-	initialTenantAssetDriftWatcherCfg := loadTenantAssetDriftWatcherConfig(context.Background())
-	processHealthStore.Upsert("tenant_asset_drift_watcher", runtimehealth.ProcessStatus{
-		Enabled:      initialTenantAssetDriftWatcherCfg.enabled,
-		Running:      initialTenantAssetDriftWatcherCfg.enabled,
-		LastActivity: time.Now().UTC(),
-		Message:      "tenant asset drift watcher initialized",
-	})
-	logger.Info("Background process starting",
-		zap.String("component", "tenant_asset_drift_watcher"),
-		zap.Duration("interval", initialTenantAssetDriftWatcherCfg.interval),
-		zap.Duration("timeout", initialTenantAssetDriftWatcherCfg.timeout),
-		zap.Int("batch_size", initialTenantAssetDriftWatcherCfg.batch),
-		zap.String("config_source", initialTenantAssetDriftWatcherCfg.source),
-		zap.Bool("enabled", initialTenantAssetDriftWatcherCfg.enabled),
+	appbootstrap.StartTenantAssetDriftWatcher(
+		logger,
+		processHealthStore,
+		systemConfigService,
+		infrastructureService,
+		appbootstrap.TenantAssetDriftWatcherConfig{
+			DefaultEnabled:         getBoolEnv("IF_TENANT_ASSET_DRIFT_WATCHER_ENABLED", true),
+			DefaultIntervalSeconds: getIntEnv("IF_TENANT_ASSET_DRIFT_WATCHER_INTERVAL_SECONDS", 300),
+			DefaultTimeoutSeconds:  getIntEnv("IF_TENANT_ASSET_DRIFT_WATCHER_TIMEOUT_SECONDS", 90),
+			DefaultBatchSize:       getIntEnv("IF_TENANT_ASSET_DRIFT_WATCHER_BATCH_SIZE", 200),
+			OnTick: func(ctx context.Context, result *infrastructure.TenantAssetDriftWatchTickResult, metrics infrastructure.TenantAssetDriftMetricsSnapshot, err error, observedAt time.Time) {
+				appsresmartbot.ObserveTenantAssetDriftTick(ctx, sreSmartBotService, logger, result, metrics, err, observedAt)
+			},
+		},
 	)
-	go func() {
-		ticker := time.NewTicker(initialTenantAssetDriftWatcherCfg.interval)
-		defer ticker.Stop()
-		currentInterval := initialTenantAssetDriftWatcherCfg.interval
-
-		runTick := func() {
-			cfg := loadTenantAssetDriftWatcherConfig(context.Background())
-			if !cfg.enabled {
-				processHealthStore.Upsert("tenant_asset_drift_watcher", runtimehealth.ProcessStatus{
-					Enabled:      false,
-					Running:      false,
-					LastActivity: time.Now().UTC(),
-					Message:      "tenant asset drift watcher disabled via runtime_services config",
-				})
-				return
-			}
-			if cfg.interval != currentInterval {
-				ticker.Reset(cfg.interval)
-				currentInterval = cfg.interval
-				logger.Info("Tenant asset drift watcher interval updated",
-					zap.Duration("interval", cfg.interval),
-					zap.String("config_source", cfg.source),
-				)
-			}
-
-			tickCtx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
-			defer cancel()
-
-			result, err := infrastructureService.RunTenantAssetDriftWatchTick(tickCtx, cfg.batch)
-			if err != nil {
-				logger.Warn("Tenant asset drift watcher tick failed", zap.Error(err))
-				driftMetrics := infrastructureService.GetTenantAssetDriftMetrics()
-				processHealthStore.Upsert("tenant_asset_drift_watcher", runtimehealth.ProcessStatus{
-					Enabled:      true,
-					Running:      true,
-					LastActivity: time.Now().UTC(),
-					Message:      "watch tick failed",
-					Metrics: map[string]int64{
-						"tenant_asset_drift_watch_ticks_total":           driftMetrics.WatchTicksTotal,
-						"tenant_asset_drift_watch_failures_total":        driftMetrics.WatchFailuresTotal,
-						"tenant_asset_drift_namespaces_current":          driftMetrics.WatchCurrentNamespaces,
-						"tenant_asset_drift_namespaces_stale":            driftMetrics.WatchStaleNamespaces,
-						"tenant_asset_drift_namespaces_unknown":          driftMetrics.WatchUnknownNamespaces,
-						"tenant_asset_reconcile_requests_total":          driftMetrics.ReconcileRequestsTotal,
-						"tenant_asset_reconcile_requests_success_total":  driftMetrics.ReconcileRequestsSuccess,
-						"tenant_asset_reconcile_requests_failures_total": driftMetrics.ReconcileRequestsFailures,
-						"tenant_asset_drift_watch_duration_count":        driftMetrics.WatchDurationCount,
-						"tenant_asset_drift_watch_duration_total_ms":     driftMetrics.WatchDurationTotalMs,
-						"tenant_asset_drift_watch_duration_max_ms":       driftMetrics.WatchDurationMaxMs,
-					},
-				})
-				return
-			}
-			driftMetrics := infrastructureService.GetTenantAssetDriftMetrics()
-			processHealthStore.Upsert("tenant_asset_drift_watcher", runtimehealth.ProcessStatus{
-				Enabled:      true,
-				Running:      true,
-				LastActivity: time.Now().UTC(),
-				Message:      fmt.Sprintf("tick completed namespaces=%d current=%d stale=%d unknown=%d failed=%d", result.TotalNamespaces, result.Current, result.Stale, result.Unknown, result.Failed),
-				Metrics: map[string]int64{
-					"tenant_asset_drift_watch_ticks_total":           driftMetrics.WatchTicksTotal,
-					"tenant_asset_drift_watch_failures_total":        driftMetrics.WatchFailuresTotal,
-					"tenant_asset_drift_namespaces_current":          driftMetrics.WatchCurrentNamespaces,
-					"tenant_asset_drift_namespaces_stale":            driftMetrics.WatchStaleNamespaces,
-					"tenant_asset_drift_namespaces_unknown":          driftMetrics.WatchUnknownNamespaces,
-					"tenant_asset_reconcile_requests_total":          driftMetrics.ReconcileRequestsTotal,
-					"tenant_asset_reconcile_requests_success_total":  driftMetrics.ReconcileRequestsSuccess,
-					"tenant_asset_reconcile_requests_failures_total": driftMetrics.ReconcileRequestsFailures,
-					"tenant_asset_drift_watch_duration_count":        driftMetrics.WatchDurationCount,
-					"tenant_asset_drift_watch_duration_total_ms":     driftMetrics.WatchDurationTotalMs,
-					"tenant_asset_drift_watch_duration_max_ms":       driftMetrics.WatchDurationMaxMs,
-				},
-			})
-			if result.TotalNamespaces > 0 || result.Failed > 0 || result.Stale > 0 {
-				logger.Info("Tenant asset drift watcher tick completed",
-					zap.Int("total_providers", result.TotalProviders),
-					zap.Int("attempted", result.Attempted),
-					zap.Int("succeeded", result.Succeeded),
-					zap.Int("failed", result.Failed),
-					zap.Int("skipped", result.Skipped),
-					zap.Int("total_namespaces", result.TotalNamespaces),
-					zap.Int("current", result.Current),
-					zap.Int("stale", result.Stale),
-					zap.Int("unknown", result.Unknown),
-					zap.Duration("interval", cfg.interval),
-					zap.Duration("timeout", cfg.timeout),
-					zap.Int("batch_size", cfg.batch),
-					zap.String("config_source", cfg.source),
-				)
-			}
-		}
-
-		runTick()
-		for {
-			<-ticker.C
-			runTick()
-		}
-	}()
 
 	releaseComplianceWatcherEnabled := getBoolEnv("IF_QUARANTINE_RELEASE_COMPLIANCE_WATCHER_ENABLED", true)
 	releaseComplianceWatcherIntervalSeconds := getIntEnv("IF_QUARANTINE_RELEASE_COMPLIANCE_WATCHER_INTERVAL_SECONDS", 180)
@@ -2176,259 +1709,63 @@ func main() {
 	if releaseComplianceWatcherBatchSize < 1 {
 		releaseComplianceWatcherBatchSize = 500
 	}
-
-	processHealthStore.Upsert("quarantine_release_compliance_watcher", runtimehealth.ProcessStatus{
-		Enabled:      releaseComplianceWatcherEnabled,
-		Running:      releaseComplianceWatcherEnabled,
-		LastActivity: time.Now().UTC(),
-		Message:      "quarantine release compliance watcher initialized",
-		Metrics: map[string]int64{
-			"quarantine_release_compliance_watch_ticks_total":     0,
-			"quarantine_release_compliance_watch_failures_total":  0,
-			"quarantine_release_compliance_drift_detected_total":  0,
-			"quarantine_release_compliance_drift_recovered_total": 0,
-			"quarantine_release_compliance_active_drift_count":    0,
-			"quarantine_release_compliance_released_count":        0,
+	appbootstrap.StartReleaseComplianceWatcher(
+		logger,
+		processHealthStore,
+		releaseComplianceMetrics,
+		func(ctx context.Context, limit int) ([]releasecompliance.DriftRecord, error) {
+			return listReleaseComplianceDriftCandidates(ctx, db, limit)
 		},
-	})
-
-	if releaseComplianceWatcherEnabled {
-		logger.Info("Background process starting",
-			zap.String("component", "quarantine_release_compliance_watcher"),
-			zap.Duration("interval", time.Duration(releaseComplianceWatcherIntervalSeconds)*time.Second),
-			zap.Duration("timeout", time.Duration(releaseComplianceWatcherTimeoutSeconds)*time.Second),
-			zap.Int("batch_size", releaseComplianceWatcherBatchSize),
-		)
-		go func() {
-			ticker := time.NewTicker(time.Duration(releaseComplianceWatcherIntervalSeconds) * time.Second)
-			defer ticker.Stop()
-			manager := releasecompliance.NewManager()
-
-			runTick := func() {
-				tickCtx, cancel := context.WithTimeout(context.Background(), time.Duration(releaseComplianceWatcherTimeoutSeconds)*time.Second)
-				defer cancel()
-
-				candidates, err := listReleaseComplianceDriftCandidates(tickCtx, db, releaseComplianceWatcherBatchSize)
-				if err != nil {
-					releaseComplianceMetrics.RecordFailure()
-					snapshot := releaseComplianceMetrics.Snapshot()
-					processHealthStore.Upsert("quarantine_release_compliance_watcher", runtimehealth.ProcessStatus{
-						Enabled:      true,
-						Running:      true,
-						LastActivity: time.Now().UTC(),
-						Message:      "watch tick failed",
-						Metrics: map[string]int64{
-							"quarantine_release_compliance_watch_ticks_total":     snapshot.WatchTicksTotal,
-							"quarantine_release_compliance_watch_failures_total":  snapshot.WatchFailuresTotal,
-							"quarantine_release_compliance_drift_detected_total":  snapshot.DriftDetectedTotal,
-							"quarantine_release_compliance_drift_recovered_total": snapshot.DriftRecoveredTotal,
-							"quarantine_release_compliance_active_drift_count":    snapshot.ActiveDriftCount,
-							"quarantine_release_compliance_released_count":        snapshot.ReleasedCount,
-						},
-					})
-					logger.Warn("Quarantine release compliance watcher tick failed", zap.Error(err))
-					return
-				}
-
-				releasedCount, err := countReleaseComplianceReleasedArtifacts(tickCtx, db)
-				if err != nil {
-					releaseComplianceMetrics.RecordFailure()
-					logger.Warn("Quarantine release compliance watcher failed to count released artifacts", zap.Error(err))
-					return
-				}
-
-				detected, recovered := manager.Evaluate(candidates)
-				releaseComplianceMetrics.AddDetected(int64(len(detected)))
-				releaseComplianceMetrics.AddRecovered(int64(len(recovered)))
-				releaseComplianceMetrics.RecordTick(int64(manager.ActiveCount()), releasedCount)
-				snapshot := releaseComplianceMetrics.Snapshot()
-
-				for _, rec := range detected {
-					if err := publishReleaseComplianceEvent(
-						context.Background(),
-						eventBus,
-						eventSource,
-						cfg.Messaging.SchemaVersion,
-						messaging.EventTypeQuarantineReleaseDriftDetected,
-						rec,
-						"release_state",
-						rec.ReleaseState,
-					); err != nil {
-						logger.Warn("Failed to publish quarantine release drift detected event",
-							zap.Error(err),
-							zap.String("external_image_import_id", rec.ExternalImageImportID.String()),
-						)
-					}
-				}
-				for _, rec := range recovered {
-					if err := publishReleaseComplianceEvent(
-						context.Background(),
-						eventBus,
-						eventSource,
-						cfg.Messaging.SchemaVersion,
-						messaging.EventTypeQuarantineReleaseDriftRecovered,
-						rec,
-						"previous_release_state",
-						rec.ReleaseState,
-					); err != nil {
-						logger.Warn("Failed to publish quarantine release drift recovered event",
-							zap.Error(err),
-							zap.String("external_image_import_id", rec.ExternalImageImportID.String()),
-						)
-					}
-				}
-
-				processHealthStore.Upsert("quarantine_release_compliance_watcher", runtimehealth.ProcessStatus{
-					Enabled:      true,
-					Running:      true,
-					LastActivity: time.Now().UTC(),
-					Message:      fmt.Sprintf("tick completed active_drift=%d detected=%d recovered=%d", snapshot.ActiveDriftCount, len(detected), len(recovered)),
-					Metrics: map[string]int64{
-						"quarantine_release_compliance_watch_ticks_total":     snapshot.WatchTicksTotal,
-						"quarantine_release_compliance_watch_failures_total":  snapshot.WatchFailuresTotal,
-						"quarantine_release_compliance_drift_detected_total":  snapshot.DriftDetectedTotal,
-						"quarantine_release_compliance_drift_recovered_total": snapshot.DriftRecoveredTotal,
-						"quarantine_release_compliance_active_drift_count":    snapshot.ActiveDriftCount,
-						"quarantine_release_compliance_released_count":        snapshot.ReleasedCount,
-					},
-				})
-
-				if len(detected) > 0 || len(recovered) > 0 || snapshot.ActiveDriftCount > 0 {
-					logger.Info("Quarantine release compliance watcher tick completed",
-						zap.Int("detected", len(detected)),
-						zap.Int("recovered", len(recovered)),
-						zap.Int64("active_drift", snapshot.ActiveDriftCount),
-						zap.Int64("released_count", snapshot.ReleasedCount),
-					)
-				}
-			}
-
-			runTick()
-			for {
-				<-ticker.C
-				runTick()
-			}
-		}()
-	} else {
-		releaseComplianceMetrics.RecordTick(0, 0)
-		snapshot := releaseComplianceMetrics.Snapshot()
-		processHealthStore.Upsert("quarantine_release_compliance_watcher", runtimehealth.ProcessStatus{
-			Enabled:      false,
-			Running:      false,
-			LastActivity: time.Now().UTC(),
-			Message:      "quarantine release compliance watcher disabled",
-			Metrics: map[string]int64{
-				"quarantine_release_compliance_watch_ticks_total":     snapshot.WatchTicksTotal,
-				"quarantine_release_compliance_watch_failures_total":  snapshot.WatchFailuresTotal,
-				"quarantine_release_compliance_drift_detected_total":  snapshot.DriftDetectedTotal,
-				"quarantine_release_compliance_drift_recovered_total": snapshot.DriftRecoveredTotal,
-				"quarantine_release_compliance_active_drift_count":    snapshot.ActiveDriftCount,
-				"quarantine_release_compliance_released_count":        snapshot.ReleasedCount,
+		func(ctx context.Context) (int64, error) {
+			return countReleaseComplianceReleasedArtifacts(ctx, db)
+		},
+		func(ctx context.Context, eventType string, record releasecompliance.DriftRecord, stateField string, stateValue string) error {
+			return publishReleaseComplianceEvent(
+				ctx,
+				eventBus,
+				eventSource,
+				cfg.Messaging.SchemaVersion,
+				eventType,
+				record,
+				stateField,
+				stateValue,
+			)
+		},
+		appbootstrap.ReleaseComplianceWatcherConfig{
+			Enabled:       releaseComplianceWatcherEnabled,
+			Interval:      time.Duration(releaseComplianceWatcherIntervalSeconds) * time.Second,
+			Timeout:       time.Duration(releaseComplianceWatcherTimeoutSeconds) * time.Second,
+			BatchSize:     releaseComplianceWatcherBatchSize,
+			SchemaVersion: cfg.Messaging.SchemaVersion,
+			EventSource:   eventSource,
+			OnTick: func(ctx context.Context, detected []releasecompliance.DriftRecord, recovered []releasecompliance.DriftRecord, snapshot releasecompliance.Snapshot, err error, observedAt time.Time) {
+				appsresmartbot.ObserveReleaseComplianceTick(ctx, sreSmartBotService, logger, detected, recovered, snapshot, err, observedAt)
 			},
-		})
-	}
+		},
+	)
 
 	if cfg.Workflow.Enabled {
-		processHealthStore.Upsert("workflow_orchestrator", runtimehealth.ProcessStatus{
-			Enabled:      true,
-			Running:      false,
-			LastActivity: time.Now().UTC(),
-			Message:      "workflow orchestrator is starting",
-		})
-		handlers := buildsteps.NewPhase2ControlPlaneHandlers(
-			buildService,
-			newWorkflowInfrastructurePreflight(infrastructureService, logger),
-			logger,
-		)
 		imageImportRepo := postgres.NewImageImportRepository(db, logger)
-		imageImportDispatcher := quarantineimportadapter.NewTektonDispatcher(
-			pipelineMgr,
-			os.Getenv("IF_QUARANTINE_IMPORT_NAMESPACE"),
-			os.Getenv("IF_QUARANTINE_IMPORT_PIPELINE_NAME"),
-			os.Getenv("IF_QUARANTINE_IMPORT_TARGET_REGISTRY"),
-			os.Getenv("IF_QUARANTINE_IMPORT_DOCKERCONFIG_SECRET"),
-			logger,
-		)
-		if infrastructureService != nil {
-			imageImportDispatcher.SetInfrastructureService(infrastructureService)
-		}
-		logger.Info("Quarantine dispatcher selection mode",
-			zap.String("mode", "provider_detect"),
-			zap.Bool("tekton_config_enabled", cfg.Build.TektonEnabled),
-			zap.Bool("startup_pipeline_manager_configured", pipelineMgr != nil),
-			zap.String("required_provider_flags", "tekton_enabled=true, quarantine_dispatch_enabled=true"),
-		)
-		importPolicyProvider := imageimportsteps.QuarantinePolicyProviderFunc(func(ctx context.Context, tenantID uuid.UUID) (*imageimportsteps.QuarantinePolicy, error) {
-			cfg, err := systemConfigService.GetQuarantinePolicyConfig(ctx, &tenantID)
-			if err != nil {
-				return nil, err
-			}
-			if cfg == nil {
-				return nil, nil
-			}
-			return &imageimportsteps.QuarantinePolicy{
-				Mode:        cfg.Mode,
-				MaxCritical: cfg.MaxCritical,
-				MaxP2:       cfg.MaxP2,
-				MaxP3:       cfg.MaxP3,
-				MaxCVSS:     cfg.MaxCVSS,
-				Thresholds: map[string]int{
-					"max_critical": cfg.MaxCritical,
-					"max_p2":       cfg.MaxP2,
-					"max_p3":       cfg.MaxP3,
-				},
-				Metadata: map[string]string{
-					"source": "system_config.quarantine_policy",
-				},
-			}, nil
-		})
-		handlers = append(handlers, imageimportsteps.NewExternalImageImportWorkflowHandlersWithPolicyAndEvents(
-			imageImportRepo,
-			workflowRepo,
-			imageImportDispatcher,
-			imageImportDispatcher,
-			importPolicyProvider,
-			eventBus,
-			logger,
-		)...)
-
-		logger.Info("Background process starting",
-			zap.String("component", "workflow_orchestrator"),
-			zap.Duration("poll_interval", cfg.Workflow.PollInterval),
-			zap.Int("max_steps_per_tick", cfg.Workflow.MaxStepsPerTick),
-			zap.String("mode", "phase2_build_control_plane"),
-		)
-		orchestrator := appworkflow.NewOrchestrator(workflowRepo, handlers, logger)
-		orchestratorController = appworkflow.NewController(
-			orchestrator,
-			appworkflow.ControllerConfig{
+		orchestratorController = appbootstrap.StartWorkflowRunner(
+			appbootstrap.WorkflowRunnerDeps{
+				ProcessHealthStore:  processHealthStore,
+				BuildService:        buildService,
+				Preflight:           newWorkflowInfrastructurePreflight(infrastructureService, logger),
+				WorkflowRepo:        workflowRepo,
+				ImageImportRepo:     imageImportRepo,
+				PipelineManager:     pipelineMgr,
+				Infrastructure:      infrastructureService,
+				SystemConfigService: systemConfigService,
+				EventBus:            eventBus,
+				Logger:              logger,
+			},
+			appbootstrap.WorkflowRunnerConfig{
+				Enabled:         cfg.Workflow.Enabled,
 				PollInterval:    cfg.Workflow.PollInterval,
 				MaxStepsPerTick: cfg.Workflow.MaxStepsPerTick,
+				BuildTektonMode: cfg.Build.TektonEnabled,
 			},
-			appworkflow.ControllerHooks{
-				OnStart: func() {
-					processHealthStore.Upsert("workflow_orchestrator", runtimehealth.ProcessStatus{
-						Enabled:      true,
-						Running:      true,
-						LastActivity: time.Now().UTC(),
-						Message:      "workflow orchestrator running",
-					})
-				},
-				OnTick: func() {
-					processHealthStore.Touch("workflow_orchestrator")
-				},
-				OnStop: func() {
-					processHealthStore.Upsert("workflow_orchestrator", runtimehealth.ProcessStatus{
-						Enabled:      true,
-						Running:      false,
-						LastActivity: time.Now().UTC(),
-						Message:      "workflow orchestrator stopped",
-					})
-				},
-			},
-			logger,
 		)
-		orchestratorController.Start(context.Background())
 	} else {
 		processHealthStore.Upsert("workflow_orchestrator", runtimehealth.ProcessStatus{
 			Enabled:      false,
@@ -2469,49 +1806,7 @@ func main() {
 	imageImportNotificationSubscriber.SetRealtimePublisher(wsHub)
 	imageImportNotificationEventUnsubscribe := imageimportnotifications.RegisterEventSubscriber(eventBus, imageImportNotificationSubscriber)
 	defer imageImportNotificationEventUnsubscribe()
-	if buildNotificationEventSubscriber != nil {
-		processHealthStore.Upsert("build_notification_event_subscriber", runtimehealth.ProcessStatus{
-			Enabled:      true,
-			Running:      true,
-			LastActivity: time.Now().UTC(),
-			Message:      "build notification event subscriber started",
-			Metrics: map[string]int64{
-				"build_notification_events_received_total":  0,
-				"build_notification_mapped_events_total":    0,
-				"build_notification_in_app_delivered_total": 0,
-				"build_notification_email_queued_total":     0,
-				"build_notification_failures_total":         0,
-			},
-		})
-		go func() {
-			ticker := time.NewTicker(15 * time.Second)
-			defer ticker.Stop()
-			for {
-				snapshot := buildNotificationEventSubscriber.Snapshot()
-				processHealthStore.Upsert("build_notification_event_subscriber", runtimehealth.ProcessStatus{
-					Enabled:      true,
-					Running:      true,
-					LastActivity: time.Now().UTC(),
-					Message: fmt.Sprintf(
-						"events=%d mapped=%d in_app=%d email=%d failures=%d",
-						snapshot.EventsReceived,
-						snapshot.MappedEvents,
-						snapshot.InAppDelivered,
-						snapshot.EmailQueued,
-						snapshot.Failures,
-					),
-					Metrics: map[string]int64{
-						"build_notification_events_received_total":  snapshot.EventsReceived,
-						"build_notification_mapped_events_total":    snapshot.MappedEvents,
-						"build_notification_in_app_delivered_total": snapshot.InAppDelivered,
-						"build_notification_email_queued_total":     snapshot.EmailQueued,
-						"build_notification_failures_total":         snapshot.Failures,
-					},
-				})
-				<-ticker.C
-			}
-		}()
-	}
+	buildnotifications.StartHealthReporter(logger, processHealthStore, buildNotificationEventSubscriber)
 
 	runtimeDependencyWatcherEnabled := getBoolEnv("IF_RUNTIME_DEPENDENCY_WATCHER_ENABLED", true)
 	runtimeDependencyWatcherIntervalSeconds := getIntEnv("IF_RUNTIME_DEPENDENCY_WATCHER_INTERVAL_SECONDS", 60)
@@ -2536,384 +1831,87 @@ func main() {
 	if internalRegistryGCWorkerHealthTimeoutSeconds < 1 {
 		internalRegistryGCWorkerHealthTimeoutSeconds = runtimeDependencyCheckTimeoutSeconds
 	}
-
-	processHealthStore.Upsert("internal_registry_gc_worker", runtimehealth.ProcessStatus{
-		Enabled:      internalRegistryGCWorkerEnabled,
-		Running:      false,
-		LastActivity: time.Now().UTC(),
-		Message:      "internal registry gc worker status pending",
-		Metrics: map[string]int64{
-			"last_run_candidates":      0,
-			"last_run_deleted":         0,
-			"last_run_errors":          0,
-			"last_run_reclaimed_bytes": 0,
-			"total_deleted":            0,
-			"total_reclaimed_bytes":    0,
+	appsresmartbot.StartRuntimeDependencyWatcher(
+		logger,
+		db,
+		processHealthStore,
+		sreSmartBotService,
+		dispatcherRuntimeStore,
+		monitorSubscriber,
+		buildNotificationEventSubscriber,
+		relay,
+		func(ctx context.Context, title string, message string, notificationType string) (int, error) {
+			return emitRuntimeDependencyNotification(
+				ctx,
+				db,
+				buildNotificationDeliveryRepo,
+				wsHub,
+				title,
+				message,
+				notificationType,
+			)
 		},
-	})
-
-	processHealthStore.Upsert("runtime_dependency_watcher", runtimehealth.ProcessStatus{
-		Enabled:      runtimeDependencyWatcherEnabled,
-		Running:      runtimeDependencyWatcherEnabled,
-		LastActivity: time.Now().UTC(),
-		Message:      "runtime dependency watcher initialized",
-		Metrics: map[string]int64{
-			"runtime_dependency_checks_total":       0,
-			"runtime_dependency_check_failures":     0,
-			"runtime_dependency_degraded_count":     0,
-			"runtime_dependency_critical_count":     0,
-			"runtime_dependency_alerts_emitted":     0,
-			"runtime_dependency_recoveries_emitted": 0,
+		appsresmartbot.RuntimeDependencyWatcherConfig{
+			Enabled:                         runtimeDependencyWatcherEnabled,
+			Interval:                        time.Duration(runtimeDependencyWatcherIntervalSeconds) * time.Second,
+			AlertCooldown:                   time.Duration(runtimeDependencyAlertCooldownSeconds) * time.Second,
+			CheckTimeout:                    time.Duration(runtimeDependencyCheckTimeoutSeconds) * time.Second,
+			InternalRegistryGCWorkerEnabled: internalRegistryGCWorkerEnabled,
+			InternalRegistryGCWorkerURL:     internalRegistryGCWorkerHealthURL,
+			InternalRegistryGCWorkerTimeout: time.Duration(internalRegistryGCWorkerHealthTimeoutSeconds) * time.Second,
+			DispatcherEnabled:               cfg.Dispatcher.Enabled,
+			WorkflowEnabled:                 cfg.Workflow.Enabled,
 		},
-	})
-	if runtimeDependencyWatcherEnabled {
-		logger.Info("Background process starting",
-			zap.String("component", "runtime_dependency_watcher"),
-			zap.Duration("interval", time.Duration(runtimeDependencyWatcherIntervalSeconds)*time.Second),
-			zap.Duration("check_timeout", time.Duration(runtimeDependencyCheckTimeoutSeconds)*time.Second),
-			zap.Duration("alert_cooldown", time.Duration(runtimeDependencyAlertCooldownSeconds)*time.Second),
-		)
-		go func() {
-			ticker := time.NewTicker(time.Duration(runtimeDependencyWatcherIntervalSeconds) * time.Second)
-			defer ticker.Stop()
+	)
 
-			var checksTotal int64
-			var checkFailures int64
-			var alertsEmitted int64
-			var recoveriesEmitted int64
-			var lastAlertSignature string
-			var lastAlertAt time.Time
-
-			runTick := func() {
-				checksTotal++
-				now := time.Now().UTC()
-				checkCtx, cancel := context.WithTimeout(context.Background(), time.Duration(runtimeDependencyCheckTimeoutSeconds)*time.Second)
-				defer cancel()
-
-				issues := make([]runtimeDependencyIssue, 0, 8)
-				if pingErr := db.PingContext(checkCtx); pingErr != nil {
-					issues = append(issues, runtimeDependencyIssue{
-						Key:      "database",
-						Severity: "critical",
-						Message:  pingErr.Error(),
-					})
-					checkFailures++
-				}
-
-				if !internalRegistryGCWorkerEnabled {
-					processHealthStore.Upsert("internal_registry_gc_worker", runtimehealth.ProcessStatus{
-						Enabled:      false,
-						Running:      false,
-						LastActivity: now,
-						Message:      "disabled",
-						Metrics: map[string]int64{
-							"last_run_candidates":      0,
-							"last_run_deleted":         0,
-							"last_run_errors":          0,
-							"last_run_reclaimed_bytes": 0,
-							"total_deleted":            0,
-							"total_reclaimed_bytes":    0,
-						},
-					})
-				} else {
-					healthCtx, healthCancel := context.WithTimeout(context.Background(), time.Duration(internalRegistryGCWorkerHealthTimeoutSeconds)*time.Second)
-					req, reqErr := http.NewRequestWithContext(healthCtx, http.MethodGet, internalRegistryGCWorkerHealthURL, nil)
-					if reqErr != nil {
-						processHealthStore.Upsert("internal_registry_gc_worker", runtimehealth.ProcessStatus{
-							Enabled:      true,
-							Running:      false,
-							LastActivity: now,
-							Message:      fmt.Sprintf("invalid health URL: %v", reqErr),
-						})
-						checkFailures++
-						healthCancel()
-					} else {
-						resp, callErr := http.DefaultClient.Do(req)
-						if callErr != nil {
-							processHealthStore.Upsert("internal_registry_gc_worker", runtimehealth.ProcessStatus{
-								Enabled:      true,
-								Running:      false,
-								LastActivity: now,
-								Message:      fmt.Sprintf("health check failed: %v", callErr),
-							})
-							checkFailures++
-							healthCancel()
-						} else {
-							var payload map[string]interface{}
-							decodeErr := json.NewDecoder(resp.Body).Decode(&payload)
-							_ = resp.Body.Close()
-							healthCancel()
-
-							toInt64 := func(v interface{}) int64 {
-								switch t := v.(type) {
-								case float64:
-									return int64(t)
-								case int:
-									return int64(t)
-								case int64:
-									return t
-								case json.Number:
-									n, _ := t.Int64()
-									return n
-								default:
-									return 0
-								}
-							}
-
-							gcMetrics := map[string]int64{
-								"last_run_candidates":      toInt64(payload["last_run_candidates"]),
-								"last_run_deleted":         toInt64(payload["last_run_deleted"]),
-								"last_run_errors":          toInt64(payload["last_run_errors"]),
-								"last_run_reclaimed_bytes": toInt64(payload["last_run_reclaimed_bytes"]),
-								"total_deleted":            toInt64(payload["total_deleted"]),
-								"total_reclaimed_bytes":    toInt64(payload["total_reclaimed_bytes"]),
-							}
-
-							gcMessage := "gc worker healthy"
-							if decodeErr != nil {
-								gcMessage = fmt.Sprintf("health response parse failed: %v", decodeErr)
-							} else if message, ok := payload["message"].(string); ok && strings.TrimSpace(message) != "" {
-								gcMessage = strings.TrimSpace(message)
-							}
-
-							gcRunning := resp.StatusCode >= 200 && resp.StatusCode < 300 && decodeErr == nil
-							if !gcRunning {
-								checkFailures++
-								if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-									gcMessage = fmt.Sprintf("health check returned HTTP %d", resp.StatusCode)
-								}
-							}
-
-							processHealthStore.Upsert("internal_registry_gc_worker", runtimehealth.ProcessStatus{
-								Enabled:      true,
-								Running:      gcRunning,
-								LastActivity: now,
-								Message:      gcMessage,
-								Metrics:      gcMetrics,
-							})
-						}
-					}
-				}
-
-				checkRuntimeProcess := func(name string, severity string, required bool) {
-					if !required {
-						return
-					}
-					status, ok := processHealthStore.GetStatus(name)
-					if !ok {
-						issues = append(issues, runtimeDependencyIssue{
-							Key:      name,
-							Severity: severity,
-							Message:  "status not reported",
-						})
-						checkFailures++
-						return
-					}
-					if !status.Enabled {
-						issues = append(issues, runtimeDependencyIssue{
-							Key:      name,
-							Severity: severity,
-							Message:  "component disabled",
-						})
-						checkFailures++
-						return
-					}
-					if !status.Running {
-						msg := strings.TrimSpace(status.Message)
-						if msg == "" {
-							msg = "component not running"
-						}
-						issues = append(issues, runtimeDependencyIssue{
-							Key:      name,
-							Severity: severity,
-							Message:  msg,
-						})
-						checkFailures++
-					}
-				}
-
-				dispatcherRequired := cfg.Dispatcher.Enabled
-				if !dispatcherRequired && dispatcherRuntimeStore != nil {
-					if externalStatus, err := dispatcherRuntimeStore.GetLatestRuntimeStatus(checkCtx, appdispatcher.DispatcherModeExternal); err != nil || externalStatus == nil || !externalStatus.Running || time.Since(externalStatus.LastHeartbeat) > 90*time.Second {
-						dispatcherRequired = true
-					}
-				}
-
-				checkRuntimeProcess("dispatcher", "critical", dispatcherRequired)
-				checkRuntimeProcess("workflow_orchestrator", "critical", cfg.Workflow.Enabled)
-				checkRuntimeProcess("messaging_outbox_relay", "critical", relay != nil)
-				checkRuntimeProcess("build_monitor_event_subscriber", "degraded", monitorSubscriber != nil)
-				checkRuntimeProcess("build_notification_event_subscriber", "degraded", buildNotificationEventSubscriber != nil)
-				checkRuntimeProcess("internal_registry_gc_worker", "degraded", internalRegistryGCWorkerEnabled)
-
-				if status, ok := processHealthStore.GetStatus("provider_readiness_watcher"); !ok {
-					issues = append(issues, runtimeDependencyIssue{
-						Key:      "provider_readiness_watcher",
-						Severity: "degraded",
-						Message:  "status not reported",
-					})
-					checkFailures++
-				} else if status.Enabled && !status.Running {
-					msg := strings.TrimSpace(status.Message)
-					if msg == "" {
-						msg = "component not running"
-					}
-					issues = append(issues, runtimeDependencyIssue{
-						Key:      "provider_readiness_watcher",
-						Severity: "degraded",
-						Message:  msg,
-					})
-					checkFailures++
-				}
-
-				if status, ok := processHealthStore.GetStatus("tenant_asset_drift_watcher"); !ok {
-					issues = append(issues, runtimeDependencyIssue{
-						Key:      "tenant_asset_drift_watcher",
-						Severity: "degraded",
-						Message:  "status not reported",
-					})
-					checkFailures++
-				} else if status.Enabled && !status.Running {
-					msg := strings.TrimSpace(status.Message)
-					if msg == "" {
-						msg = "component not running"
-					}
-					issues = append(issues, runtimeDependencyIssue{
-						Key:      "tenant_asset_drift_watcher",
-						Severity: "degraded",
-						Message:  msg,
-					})
-					checkFailures++
-				}
-
-				if status, ok := processHealthStore.GetStatus("quarantine_release_compliance_watcher"); !ok {
-					issues = append(issues, runtimeDependencyIssue{
-						Key:      "quarantine_release_compliance_watcher",
-						Severity: "degraded",
-						Message:  "status not reported",
-					})
-					checkFailures++
-				} else if status.Enabled && !status.Running {
-					msg := strings.TrimSpace(status.Message)
-					if msg == "" {
-						msg = "component not running"
-					}
-					issues = append(issues, runtimeDependencyIssue{
-						Key:      "quarantine_release_compliance_watcher",
-						Severity: "degraded",
-						Message:  msg,
-					})
-					checkFailures++
-				}
-
-				criticalCount := int64(0)
-				degradedCount := int64(0)
-				issueMessages := make([]string, 0, len(issues))
-				for _, issue := range issues {
-					if strings.EqualFold(issue.Severity, "critical") {
-						criticalCount++
-					} else {
-						degradedCount++
-					}
-					issueMessages = append(issueMessages, fmt.Sprintf("%s (%s): %s", issue.Key, strings.ToUpper(issue.Severity), issue.Message))
-				}
-
-				signature := runtimeDependencyIssuesSignature(issues)
-				if signature != "" {
-					shouldNotify := false
-					if signature != lastAlertSignature {
-						shouldNotify = true
-					} else if runtimeDependencyAlertCooldownSeconds > 0 && time.Since(lastAlertAt) >= time.Duration(runtimeDependencyAlertCooldownSeconds)*time.Second {
-						shouldNotify = true
-					}
-
-					if shouldNotify {
-						count, notifyErr := emitRuntimeDependencyNotification(
-							context.Background(),
-							db,
-							buildNotificationDeliveryRepo,
-							wsHub,
-							"Runtime dependency alert",
-							"Required runtime dependencies are degraded: "+strings.Join(issueMessages, " | "),
-							"system_alert",
-						)
-						if notifyErr != nil {
-							logger.Warn("Runtime dependency alert notification failed", zap.Error(notifyErr))
-						} else {
-							alertsEmitted++
-							lastAlertSignature = signature
-							lastAlertAt = now
-							logger.Warn("Runtime dependency alert emitted",
-								zap.Int("issues", len(issues)),
-								zap.Int("notifications", count),
-								zap.String("signature", signature),
-							)
-						}
-					}
-				} else if lastAlertSignature != "" {
-					count, notifyErr := emitRuntimeDependencyNotification(
-						context.Background(),
-						db,
-						buildNotificationDeliveryRepo,
-						wsHub,
-						"Runtime dependencies recovered",
-						"Runtime dependency watcher reports all required services as healthy.",
-						"system_alert",
-					)
-					if notifyErr != nil {
-						logger.Warn("Runtime dependency recovery notification failed", zap.Error(notifyErr))
-					} else {
-						recoveriesEmitted++
-						lastAlertSignature = ""
-						lastAlertAt = now
-						logger.Info("Runtime dependency recovery notification emitted",
-							zap.Int("notifications", count),
-						)
-					}
-				}
-
-				message := "all dependencies healthy"
-				if len(issueMessages) > 0 {
-					message = "degraded dependencies: " + strings.Join(issueMessages, " | ")
-				}
-				processHealthStore.Upsert("runtime_dependency_watcher", runtimehealth.ProcessStatus{
-					Enabled:      true,
-					Running:      true,
-					LastActivity: now,
-					Message:      message,
-					Metrics: map[string]int64{
-						"runtime_dependency_checks_total":       checksTotal,
-						"runtime_dependency_check_failures":     checkFailures,
-						"runtime_dependency_degraded_count":     degradedCount,
-						"runtime_dependency_critical_count":     criticalCount,
-						"runtime_dependency_alerts_emitted":     alertsEmitted,
-						"runtime_dependency_recoveries_emitted": recoveriesEmitted,
-					},
-				})
-			}
-
-			runTick()
-			for {
-				<-ticker.C
-				runTick()
-			}
-		}()
-	} else {
-		processHealthStore.Upsert("runtime_dependency_watcher", runtimehealth.ProcessStatus{
-			Enabled:      false,
-			Running:      false,
-			LastActivity: time.Now().UTC(),
-			Message:      "runtime dependency watcher disabled",
-			Metrics: map[string]int64{
-				"runtime_dependency_checks_total":       0,
-				"runtime_dependency_check_failures":     0,
-				"runtime_dependency_degraded_count":     0,
-				"runtime_dependency_critical_count":     0,
-				"runtime_dependency_alerts_emitted":     0,
-				"runtime_dependency_recoveries_emitted": 0,
-			},
-		})
+	clusterMetricsSnapshotIngesterEnabled := getBoolEnv("IF_CLUSTER_METRICS_SNAPSHOT_INGESTER_ENABLED", true)
+	clusterMetricsSnapshotIntervalSeconds := getIntEnv("IF_CLUSTER_METRICS_SNAPSHOT_INTERVAL_SECONDS", 300)
+	if clusterMetricsSnapshotIntervalSeconds < 60 {
+		clusterMetricsSnapshotIntervalSeconds = 300
 	}
+	clusterMetricsSnapshotTimeoutSeconds := getIntEnv("IF_CLUSTER_METRICS_SNAPSHOT_TIMEOUT_SECONDS", 20)
+	if clusterMetricsSnapshotTimeoutSeconds < 5 {
+		clusterMetricsSnapshotTimeoutSeconds = 20
+	}
+	clusterMetricsRetentionDays := getIntEnv("IF_CLUSTER_METRICS_RETENTION_DAYS", 14)
+	if clusterMetricsRetentionDays < 1 {
+		clusterMetricsRetentionDays = 14
+	}
+	clusterMetricsNodeCPUSaturationPercent := getIntEnv("IF_CLUSTER_METRICS_NODE_CPU_SATURATION_PERCENT", 85)
+	if clusterMetricsNodeCPUSaturationPercent < 1 {
+		clusterMetricsNodeCPUSaturationPercent = 85
+	}
+	clusterMetricsNodeMemorySaturationPercent := getIntEnv("IF_CLUSTER_METRICS_NODE_MEMORY_SATURATION_PERCENT", 85)
+	if clusterMetricsNodeMemorySaturationPercent < 1 {
+		clusterMetricsNodeMemorySaturationPercent = 85
+	}
+	clusterMetricsPodRestartThreshold := getIntEnv("IF_CLUSTER_METRICS_POD_RESTART_THRESHOLD", 3)
+	if clusterMetricsPodRestartThreshold < 1 {
+		clusterMetricsPodRestartThreshold = 3
+	}
+	clusterMetricsClusterName := strings.TrimSpace(os.Getenv("IF_CLUSTER_METRICS_CLUSTER_NAME"))
+	if clusterMetricsClusterName == "" {
+		clusterMetricsClusterName = "image-factory"
+	}
+	clusterMetricsRepo := postgres.NewClusterMetricsSnapshotRepository(db, logger)
+	clustermetrics.StartSnapshotIngester(
+		logger,
+		processHealthStore,
+		k8sClient,
+		clusterMetricsClient,
+		clusterMetricsRepo,
+		sreSmartBotService,
+		clustermetrics.RunnerConfig{
+			Enabled:                     clusterMetricsSnapshotIngesterEnabled,
+			Interval:                    time.Duration(clusterMetricsSnapshotIntervalSeconds) * time.Second,
+			Timeout:                     time.Duration(clusterMetricsSnapshotTimeoutSeconds) * time.Second,
+			RetentionDays:               clusterMetricsRetentionDays,
+			ClusterName:                 clusterMetricsClusterName,
+			NodeCPUSaturationPercent:    clusterMetricsNodeCPUSaturationPercent,
+			NodeMemorySaturationPercent: clusterMetricsNodeMemorySaturationPercent,
+			PodRestartThreshold:         int32(clusterMetricsPodRestartThreshold),
+		},
+	)
 
 	imageImportNotificationReceiptCleanupEnabled := getBoolEnv("IF_IMAGE_IMPORT_NOTIFICATION_RECEIPT_CLEANUP_ENABLED", true)
 	imageImportNotificationReceiptRetentionDays := getIntEnv("IF_IMAGE_IMPORT_NOTIFICATION_RECEIPT_RETENTION_DAYS", 30)
@@ -3111,6 +2109,94 @@ func main() {
 
 	// Initialize HTTP router
 	router := rest.NewRouter(cfg, logger, db, auditService)
+
+	httpSignalRunnerEnabled := getBoolEnv("IF_HTTP_SIGNAL_RUNNER_ENABLED", true)
+	httpSignalIntervalSeconds := getIntEnv("IF_HTTP_SIGNAL_INTERVAL_SECONDS", 120)
+	if httpSignalIntervalSeconds < 30 {
+		httpSignalIntervalSeconds = 120
+	}
+	httpSignalMinRequestCount := int64(getIntEnv("IF_HTTP_SIGNAL_MIN_REQUEST_COUNT", 20))
+	if httpSignalMinRequestCount < 1 {
+		httpSignalMinRequestCount = 20
+	}
+	httpSignalErrorRatePercent := getIntEnv("IF_HTTP_SIGNAL_ERROR_RATE_PERCENT", 10)
+	if httpSignalErrorRatePercent < 1 {
+		httpSignalErrorRatePercent = 10
+	}
+	httpSignalAverageLatencyThresholdMs := int64(getIntEnv("IF_HTTP_SIGNAL_AVG_LATENCY_THRESHOLD_MS", 800))
+	if httpSignalAverageLatencyThresholdMs < 1 {
+		httpSignalAverageLatencyThresholdMs = 800
+	}
+	httpSignalRequestVolumeThreshold := int64(getIntEnv("IF_HTTP_SIGNAL_REQUEST_VOLUME_THRESHOLD", 250))
+	if httpSignalRequestVolumeThreshold < 1 {
+		httpSignalRequestVolumeThreshold = 250
+	}
+	httpSignalRetentionDays := getIntEnv("IF_HTTP_SIGNAL_RETENTION_DAYS", 7)
+	if httpSignalRetentionDays < 1 {
+		httpSignalRetentionDays = 7
+	}
+	asyncBacklogRunnerEnabled := getBoolEnv("IF_ASYNC_BACKLOG_SIGNAL_RUNNER_ENABLED", true)
+	asyncBacklogIntervalSeconds := getIntEnv("IF_ASYNC_BACKLOG_SIGNAL_INTERVAL_SECONDS", 120)
+	if asyncBacklogIntervalSeconds < 30 {
+		asyncBacklogIntervalSeconds = 120
+	}
+	asyncBacklogBuildQueueThreshold := int64(getIntEnv("IF_ASYNC_BACKLOG_BUILD_QUEUE_THRESHOLD", 10))
+	if asyncBacklogBuildQueueThreshold < 1 {
+		asyncBacklogBuildQueueThreshold = 10
+	}
+	asyncBacklogEmailQueueThreshold := int64(getIntEnv("IF_ASYNC_BACKLOG_EMAIL_QUEUE_THRESHOLD", 20))
+	if asyncBacklogEmailQueueThreshold < 1 {
+		asyncBacklogEmailQueueThreshold = 20
+	}
+	asyncBacklogOutboxThreshold := int64(getIntEnv("IF_ASYNC_BACKLOG_OUTBOX_THRESHOLD", 15))
+	if asyncBacklogOutboxThreshold < 1 {
+		asyncBacklogOutboxThreshold = 15
+	}
+	appSignalsRepo := postgres.NewAppSignalsRepository(db, logger)
+	httpSignalStore := router.HTTPRequestSignalStore()
+	appsignals.StartHTTPGoldenSignalRunner(
+		logger,
+		processHealthStore,
+		appsignals.HTTPSignalSnapshotterFunc(func(now time.Time) appsignals.HTTPRequestSignalSnapshot {
+			if httpSignalStore == nil {
+				return appsignals.HTTPRequestSignalSnapshot{}
+			}
+			snapshot := httpSignalStore.SnapshotAndReset(now)
+			return appsignals.HTTPRequestSignalSnapshot{
+				WindowStartedAt:  snapshot.WindowStartedAt,
+				WindowEndedAt:    snapshot.WindowEndedAt,
+				RequestCount:     snapshot.RequestCount,
+				ServerErrorCount: snapshot.ServerErrorCount,
+				ClientErrorCount: snapshot.ClientErrorCount,
+				TotalLatencyMs:   snapshot.TotalLatencyMs,
+				MaxLatencyMs:     snapshot.MaxLatencyMs,
+			}
+		}),
+		appSignalsRepo,
+		sreSmartBotService,
+		appsignals.RunnerConfig{
+			Enabled:                 httpSignalRunnerEnabled,
+			Interval:                time.Duration(httpSignalIntervalSeconds) * time.Second,
+			RetentionDays:           httpSignalRetentionDays,
+			MinRequestCount:         httpSignalMinRequestCount,
+			ErrorRatePercent:        httpSignalErrorRatePercent,
+			AverageLatencyThreshold: httpSignalAverageLatencyThresholdMs,
+			RequestVolumeThreshold:  httpSignalRequestVolumeThreshold,
+		},
+	)
+	asyncsignals.StartAsyncBacklogSignalRunner(
+		logger,
+		db,
+		processHealthStore,
+		sreSmartBotService,
+		asyncsignals.RunnerConfig{
+			Enabled:                  asyncBacklogRunnerEnabled,
+			Interval:                 time.Duration(asyncBacklogIntervalSeconds) * time.Second,
+			BuildQueueThreshold:      asyncBacklogBuildQueueThreshold,
+			EmailQueueThreshold:      asyncBacklogEmailQueueThreshold,
+			MessagingOutboxThreshold: asyncBacklogOutboxThreshold,
+		},
+	)
 
 	// Setup routes
 	rest.SetupRoutes(router, tenantRepo, tenantService, buildRepo, buildService, buildExecutionService, projectRepo, projectService, userRepo, userService, rbacRepo, rbacService, systemConfigRepo, logger, ldapService, auditService, notificationTemplateRepo, wsHub, db, cfg, buildPolicyService, dispatcherMetricsProvider, dispatcherController, orchestratorController, dispatcherRuntimeStore, processHealthStore, cfg.Dispatcher.Enabled, infrastructureEventPublisher, releaseComplianceMetrics, eventBus)

@@ -703,6 +703,361 @@ export interface ReleaseGovernancePolicyConfig {
     window_minutes: number
 }
 
+export type SREIncidentSeverity = 'info' | 'warning' | 'critical'
+export type SREIncidentConfidence = 'low' | 'medium' | 'high'
+export type SREIncidentStatus = 'observed' | 'triaged' | 'contained' | 'recovering' | 'resolved' | 'suppressed' | 'escalated'
+
+export interface SREIncident {
+    id: string
+    tenant_id?: string | null
+    correlation_key: string
+    domain: string
+    incident_type: string
+    display_name: string
+    summary: string
+    severity: SREIncidentSeverity
+    confidence: SREIncidentConfidence
+    status: SREIncidentStatus
+    source: string
+    first_observed_at: string
+    last_observed_at: string
+    contained_at?: string | null
+    resolved_at?: string | null
+    suppressed_until?: string | null
+    metadata?: Record<string, any> | null
+    created_at: string
+    updated_at: string
+}
+
+export interface SREFinding {
+    id: string
+    incident_id?: string | null
+    source: string
+    signal_type: string
+    signal_key: string
+    severity: SREIncidentSeverity
+    confidence: SREIncidentConfidence
+    title: string
+    message: string
+    raw_payload?: Record<string, any> | null
+    occurred_at: string
+    created_at: string
+}
+
+export interface SREEvidence {
+    id: string
+    incident_id: string
+    evidence_type: string
+    summary: string
+    payload?: Record<string, any> | null
+    captured_at: string
+    created_at: string
+}
+
+export interface SREActionAttempt {
+    id: string
+    incident_id: string
+    action_key: string
+    action_class: string
+    target_kind: string
+    target_ref: string
+    status: string
+    actor_type: string
+    actor_id?: string
+    approval_required: boolean
+    requested_at: string
+    started_at?: string | null
+    completed_at?: string | null
+    error_message?: string
+    result_payload?: Record<string, any> | null
+    created_at: string
+    updated_at: string
+}
+
+export interface SREApproval {
+    id: string
+    incident_id: string
+    action_attempt_id?: string | null
+    channel_provider_id: string
+    status: string
+    request_message: string
+    requested_by?: string
+    decided_by?: string
+    decision_comment?: string
+    requested_at: string
+    decided_at?: string | null
+    expires_at?: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface SREIncidentListResponse {
+    incidents: SREIncident[]
+    total: number
+    limit: number
+    offset: number
+}
+
+export interface SREIncidentDetailResponse {
+    incident: SREIncident
+    findings: SREFinding[]
+    evidence: SREEvidence[]
+    action_attempts: SREActionAttempt[]
+    approvals: SREApproval[]
+}
+
+export interface SREIncidentWorkspaceResponse {
+    incident: SREIncident
+    executive_summary: string[]
+    recommended_questions: string[]
+    suggested_tooling: string[]
+    enabled_mcp_servers: SRESmartBotMCPServer[]
+    agent_runtime: SRESmartBotAgentRuntimeConfig
+}
+
+export interface SREMCPToolDescriptor {
+    server_id: string
+    server_name: string
+    server_kind: string
+    tool_name: string
+    display_name: string
+    description: string
+    read_only: boolean
+    incident_required: boolean
+}
+
+export interface SREMCPToolListResponse {
+    tools: SREMCPToolDescriptor[]
+}
+
+export interface SREMCPToolInvocationRequest {
+    server_id: string
+    tool_name: string
+}
+
+export interface SREMCPToolInvocationResponse {
+    server_id: string
+    server_name: string
+    server_kind: string
+    tool_name: string
+    executed_at: string
+    payload: Record<string, any>
+}
+
+export interface SREAgentDraftHypothesis {
+    title: string
+    confidence: string
+    rationale: string
+    signals_used: string[]
+    evidence_refs?: SREAgentDraftEvidenceRef[]
+}
+
+export interface SREAgentDraftPlanStep {
+    title: string
+    description: string
+    evidence_refs?: SREAgentDraftEvidenceRef[]
+}
+
+export interface SREAgentDraftEvidenceRef {
+    tool_name: string
+    server_name: string
+    summary: string
+}
+
+export interface SREAgentDraftResponse {
+    incident_id: string
+    mode: string
+    summary: string
+    hypotheses: SREAgentDraftHypothesis[]
+    investigation_plan: SREAgentDraftPlanStep[]
+    tool_runs: SREMCPToolInvocationResponse[]
+    human_confirmation_required: boolean
+}
+
+export interface SREAgentInterpretationResponse {
+    draft?: SREAgentDraftResponse
+    provider: string
+    model: string
+    generated: boolean
+    operator_summary?: string
+    likely_root_cause?: string
+    watchouts?: string[]
+    operator_message_draft?: string
+    raw_response?: string
+}
+
+export interface SREAgentRuntimeProbeResponse {
+    provider: string
+    model: string
+    base_url?: string
+    healthy: boolean
+    status: string
+    message: string
+    latency_ms?: number
+    sample_response?: string
+    model_installed: boolean
+    installed_models?: string[]
+    guidance?: string[]
+}
+
+export interface SREApprovalQueueItem {
+    approval: SREApproval
+    incident?: SREIncident
+    action?: SREActionAttempt
+}
+
+export interface SREApprovalListResponse {
+    approvals: SREApprovalQueueItem[]
+    total: number
+    limit: number
+    offset: number
+}
+
+export interface SRESmartBotOperatorRule {
+    id: string
+    name: string
+    domain: string
+    incident_type: string
+    severity: string
+    enabled: boolean
+    source: string
+    match_labels?: Record<string, string>
+    threshold?: number
+    for_duration_seconds?: number
+    suggested_action?: string
+    auto_allowed?: boolean
+}
+
+export interface SRESmartBotDetectorRule {
+    id: string
+    name: string
+    enabled: boolean
+    source?: string
+    query: string
+    threshold?: number
+    domain: string
+    incident_type: string
+    severity: string
+    confidence?: string
+    signal_key?: string
+    suggested_action?: string
+    auto_created?: boolean
+}
+
+export interface SRESmartBotChannelProvider {
+    id: string
+    name: string
+    kind: string
+    enabled: boolean
+    supports_interactive_approval?: boolean
+    config_ref?: string
+    settings?: Record<string, string>
+}
+
+export interface SRESmartBotMCPServer {
+    id: string
+    name: string
+    kind: string
+    enabled: boolean
+    transport: string
+    endpoint?: string
+    config_ref?: string
+    allowed_tools?: string[]
+    read_only?: boolean
+    approval_required?: boolean
+    settings?: Record<string, string>
+}
+
+export interface SRESmartBotAgentRuntimeConfig {
+    enabled: boolean
+    provider?: string
+    model?: string
+    base_url?: string
+    system_prompt_ref?: string
+    operator_summary_enabled: boolean
+    hypothesis_ranking_enabled: boolean
+    draft_action_plans_enabled: boolean
+    conversational_approval_support: boolean
+    max_tool_calls_per_turn: number
+    max_incidents_per_summary: number
+    require_human_confirmation_for_message: boolean
+}
+
+export interface SRESmartBotPolicyConfig {
+    display_name: string
+    enabled: boolean
+    environment_mode: string
+    detector_learning_mode?: 'disabled' | 'suggest_only' | 'training_auto_create'
+    default_channel?: string
+    default_channel_provider_id?: string
+    auto_observe_enabled: boolean
+    auto_notify_enabled: boolean
+    auto_contain_enabled: boolean
+    auto_recover_enabled: boolean
+    require_approval_for_recover: boolean
+    require_approval_for_disruptive: boolean
+    duplicate_alert_suppression_seconds: number
+    action_cooldown_seconds: number
+    enabled_domains: string[]
+    channel_providers: SRESmartBotChannelProvider[]
+    mcp_servers: SRESmartBotMCPServer[]
+    agent_runtime: SRESmartBotAgentRuntimeConfig
+    detector_rules: SRESmartBotDetectorRule[]
+    operator_rules: SRESmartBotOperatorRule[]
+}
+
+export interface SRESmartBotMutationResponse {
+    incident?: SREIncident
+    action?: SREActionAttempt
+    approval?: SREApproval
+}
+
+export type SREDetectorRuleSuggestionStatus = 'pending' | 'accepted' | 'rejected'
+
+export interface SREDetectorRuleSuggestion {
+    id: string
+    tenant_id?: string | null
+    incident_id?: string | null
+    fingerprint: string
+    name: string
+    description: string
+    query: string
+    threshold: number
+    domain: string
+    incident_type: string
+    severity: SREIncidentSeverity
+    confidence: SREIncidentConfidence
+    signal_key?: string
+    source: string
+    status: SREDetectorRuleSuggestionStatus
+    auto_created: boolean
+    reason?: string
+    evidence_payload?: Record<string, any> | null
+    proposed_by?: string
+    reviewed_by?: string
+    reviewed_at?: string | null
+    activated_rule_id?: string
+    created_at: string
+    updated_at: string
+}
+
+export interface SREDetectorRuleSuggestionListResponse {
+    suggestions: SREDetectorRuleSuggestion[]
+    limit: number
+    offset: number
+}
+
+export interface SREDemoScenario {
+    id: string
+    name: string
+    summary: string
+    recommended_walkthrough: string
+}
+
+export interface SREDemoScenarioListResponse {
+    scenarios: SREDemoScenario[]
+}
+
 export interface DenialMetricsRow {
     tenant_id?: string
     capability_key: string

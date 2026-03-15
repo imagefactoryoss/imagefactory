@@ -312,6 +312,46 @@ make docker-build-all-multiarch CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry
 make release-deploy CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry>
 ```
 
+### Registry Naming Notes
+
+GitLab Container Registry supports nested paths such as:
+
+```bash
+registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend:<tag>
+```
+
+Docker Hub does not. If you need Docker Hub, flatten the repository names and use:
+
+```bash
+docker.io/imagefactoryoss/image-factory-backend:<tag>
+```
+
+Examples:
+
+```bash
+# GitLab Container Registry
+make docker-build-all-multiarch \
+  CONTAINER_ENGINE=podman \
+  IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory \
+  IMAGE_TAG=<tag>
+
+# Docker Hub
+make docker-build-all-multiarch \
+  CONTAINER_ENGINE=podman \
+  IMAGE_REGISTRY=docker.io/imagefactoryoss \
+  IMAGE_TAG=<tag>
+```
+
+When targeting Docker Hub, keep the image names flat:
+
+- `image-factory-backend`
+- `image-factory-frontend`
+- `image-factory-docs`
+- `image-factory-dispatcher`
+- `image-factory-notification-worker`
+- `image-factory-email-worker`
+- `image-factory-internal-registry-gc-worker`
+
 ## Quirks And Troubleshooting
 
 - If reusing mutable tags (`backend`, `frontend`, etc.), set `imagePullPolicy=Always`.
@@ -384,3 +424,20 @@ Expected end state:
 - Prefer managed Postgres/Redis/NATS/object storage/registry for production.
 - Disable bundled dependencies when using managed services.
 - Replace default secrets and tune resource requests/limits before production rollout.
+## Docker Hub Notes
+
+Docker Hub does not support nested repository paths like:
+
+- `registry.gitlab.com/<namespace>/<project>/<image>:<tag>`
+
+If you publish Image Factory images to Docker Hub, use flat repository names instead:
+
+- `docker.io/<namespace>/image-factory-backend:<tag>`
+- `docker.io/<namespace>/image-factory-frontend:<tag>`
+- `docker.io/<namespace>/image-factory-docs:<tag>`
+- `docker.io/<namespace>/image-factory-dispatcher:<tag>`
+- `docker.io/<namespace>/image-factory-notification-worker:<tag>`
+- `docker.io/<namespace>/image-factory-email-worker:<tag>`
+- `docker.io/<namespace>/image-factory-internal-registry-gc-worker:<tag>`
+
+To deploy from Docker Hub, create a local Helm override file and replace the application image repositories with your Docker Hub namespace and tags.

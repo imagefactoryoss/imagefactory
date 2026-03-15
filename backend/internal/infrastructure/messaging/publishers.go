@@ -8,6 +8,7 @@ import (
 	"github.com/srikarm/image-factory/internal/domain/build"
 	"github.com/srikarm/image-factory/internal/domain/infrastructure"
 	"github.com/srikarm/image-factory/internal/domain/project"
+	domainsresmartbot "github.com/srikarm/image-factory/internal/domain/sresmartbot"
 	"github.com/srikarm/image-factory/internal/domain/tenant"
 )
 
@@ -325,6 +326,140 @@ func (p *ProjectEventPublisher) PublishProjectDeleted(ctx context.Context, event
 			"project_id": event.ProjectID().String(),
 		},
 	})
+}
+
+// SREEventPublisher publishes SRE Smart Bot ledger events onto the bus.
+type SREEventPublisher struct {
+	bus    EventBus
+	source string
+	schema string
+}
+
+func NewSREEventPublisher(bus EventBus, source, schemaVersion string) *SREEventPublisher {
+	return &SREEventPublisher{bus: bus, source: source, schema: schemaVersion}
+}
+
+func (p *SREEventPublisher) PublishFindingObserved(ctx context.Context, incident *domainsresmartbot.Incident, finding *domainsresmartbot.Finding) error {
+	if p == nil || p.bus == nil || incident == nil || finding == nil {
+		return nil
+	}
+	return p.bus.Publish(ctx, Event{
+		Type:          EventTypeSREFindingObserved,
+		TenantID:      uuidPtrString(incident.TenantID),
+		Source:        p.source,
+		OccurredAt:    finding.OccurredAt,
+		SchemaVersion: p.schema,
+		CorrelationID: incident.CorrelationKey,
+		Payload: map[string]interface{}{
+			"incident_id":       incident.ID.String(),
+			"correlation_key":   incident.CorrelationKey,
+			"domain":            incident.Domain,
+			"incident_type":     incident.IncidentType,
+			"display_name":      incident.DisplayName,
+			"status":            string(incident.Status),
+			"severity":          string(incident.Severity),
+			"confidence":        string(incident.Confidence),
+			"finding_id":        finding.ID.String(),
+			"finding_source":    finding.Source,
+			"finding_title":     finding.Title,
+			"finding_message":   finding.Message,
+			"signal_type":       finding.SignalType,
+			"signal_key":        finding.SignalKey,
+			"first_observed_at": incident.FirstObservedAt.Format(time.RFC3339),
+			"last_observed_at":  incident.LastObservedAt.Format(time.RFC3339),
+		},
+	})
+}
+
+func (p *SREEventPublisher) PublishIncidentResolved(ctx context.Context, incident *domainsresmartbot.Incident) error {
+	if p == nil || p.bus == nil || incident == nil {
+		return nil
+	}
+	resolvedAt := incident.LastObservedAt
+	if incident.ResolvedAt != nil {
+		resolvedAt = *incident.ResolvedAt
+	}
+	return p.bus.Publish(ctx, Event{
+		Type:          EventTypeSREIncidentResolved,
+		TenantID:      uuidPtrString(incident.TenantID),
+		Source:        p.source,
+		OccurredAt:    resolvedAt,
+		SchemaVersion: p.schema,
+		CorrelationID: incident.CorrelationKey,
+		Payload: map[string]interface{}{
+			"incident_id":      incident.ID.String(),
+			"correlation_key":  incident.CorrelationKey,
+			"domain":           incident.Domain,
+			"incident_type":    incident.IncidentType,
+			"display_name":     incident.DisplayName,
+			"status":           string(incident.Status),
+			"severity":         string(incident.Severity),
+			"confidence":       string(incident.Confidence),
+			"summary":          incident.Summary,
+			"resolved_at":      resolvedAt.Format(time.RFC3339),
+			"last_observed_at": incident.LastObservedAt.Format(time.RFC3339),
+		},
+	})
+}
+
+func (p *SREEventPublisher) PublishEvidenceAdded(ctx context.Context, incident *domainsresmartbot.Incident, evidence *domainsresmartbot.Evidence) error {
+	if p == nil || p.bus == nil || incident == nil || evidence == nil {
+		return nil
+	}
+	return p.bus.Publish(ctx, Event{
+		Type:          EventTypeSREEvidenceAdded,
+		TenantID:      uuidPtrString(incident.TenantID),
+		Source:        p.source,
+		OccurredAt:    evidence.CapturedAt,
+		SchemaVersion: p.schema,
+		CorrelationID: incident.CorrelationKey,
+		Payload: map[string]interface{}{
+			"incident_id":     incident.ID.String(),
+			"correlation_key": incident.CorrelationKey,
+			"domain":          incident.Domain,
+			"incident_type":   incident.IncidentType,
+			"status":          string(incident.Status),
+			"evidence_id":     evidence.ID.String(),
+			"evidence_type":   evidence.EvidenceType,
+			"summary":         evidence.Summary,
+			"captured_at":     evidence.CapturedAt.Format(time.RFC3339),
+		},
+	})
+}
+
+func (p *SREEventPublisher) PublishActionProposed(ctx context.Context, incident *domainsresmartbot.Incident, attempt *domainsresmartbot.ActionAttempt) error {
+	if p == nil || p.bus == nil || incident == nil || attempt == nil {
+		return nil
+	}
+	return p.bus.Publish(ctx, Event{
+		Type:          EventTypeSREActionProposed,
+		TenantID:      uuidPtrString(incident.TenantID),
+		Source:        p.source,
+		OccurredAt:    attempt.RequestedAt,
+		SchemaVersion: p.schema,
+		CorrelationID: incident.CorrelationKey,
+		Payload: map[string]interface{}{
+			"incident_id":       incident.ID.String(),
+			"correlation_key":   incident.CorrelationKey,
+			"domain":            incident.Domain,
+			"incident_type":     incident.IncidentType,
+			"status":            string(incident.Status),
+			"action_attempt_id": attempt.ID.String(),
+			"action_key":        attempt.ActionKey,
+			"action_class":      attempt.ActionClass,
+			"target_kind":       attempt.TargetKind,
+			"target_ref":        attempt.TargetRef,
+			"approval_required": attempt.ApprovalRequired,
+			"action_status":     attempt.Status,
+		},
+	})
+}
+
+func uuidPtrString(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
 }
 
 func actorID(id *uuid.UUID) string {

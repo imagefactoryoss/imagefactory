@@ -1,0 +1,34 @@
+.git
+.github
+.DS_Store
+image-factory-multi-root.code-workspace
+
+# Local environment and generated runtime data
+.env
+.env.local
+dump.rdb
+logs/
+tmp/
+
+# Backend build artifacts
+backend/coverage.html
+backend/coverage.out
+backend/server
+backend/email-worker
+backend/dispatcher
+backend/notification-worker
+backend/internal-registry-gc-worker
+backend/migrate
+backend/essential-config-seeder
+backend/email-template-seeder
+backend/external-service-seeder
+backend/external-tenant-service
+
+# Frontend dependencies and generated assets
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Repository-level dependencies and caches
+node_modules/
+coverage/

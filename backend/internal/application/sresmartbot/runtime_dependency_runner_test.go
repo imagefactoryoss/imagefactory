@@ -1,13 +1,13 @@
-package main
+package sresmartbot
 
 import "testing"
 
 func TestRuntimeDependencyIssuesSignature_IsStableAndSorted(t *testing.T) {
-	a := []runtimeDependencyIssue{
+	a := []RuntimeDependencyIssue{
 		{Key: "dispatcher", Severity: "critical", Message: "down"},
 		{Key: "database", Severity: "critical", Message: "timeout"},
 	}
-	b := []runtimeDependencyIssue{
+	b := []RuntimeDependencyIssue{
 		{Key: "database", Severity: "critical", Message: "something else"},
 		{Key: "dispatcher", Severity: "critical", Message: "different text"},
 	}

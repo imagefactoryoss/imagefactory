@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -602,6 +603,422 @@ func validateCategoryConfigValue(configType ConfigType, configKey string, config
 	return nil
 }
 
+func defaultRobotSREPolicyConfig() RobotSREPolicyConfig {
+	defaultAgentRuntimeBaseURL := strings.TrimSpace(os.Getenv("IF_SRE_AGENT_RUNTIME_BASE_URL"))
+	if defaultAgentRuntimeBaseURL == "" {
+		defaultAgentRuntimeBaseURL = "http://127.0.0.1:11434"
+	}
+	defaultAgentRuntimeModel := strings.TrimSpace(os.Getenv("IF_SRE_AGENT_RUNTIME_MODEL"))
+	if defaultAgentRuntimeModel == "" {
+		defaultAgentRuntimeModel = "llama3.2:3b"
+	}
+	return RobotSREPolicyConfig{
+		DisplayName:                      "SRE Smart Bot",
+		Enabled:                          true,
+		EnvironmentMode:                  "demo",
+		DetectorLearningMode:             "suggest_only",
+		DefaultChannel:                   "in_app",
+		DefaultChannelProviderID:         "in-app-default",
+		AutoObserveEnabled:               true,
+		AutoNotifyEnabled:                true,
+		AutoContainEnabled:               true,
+		AutoRecoverEnabled:               false,
+		RequireApprovalForRecover:        true,
+		RequireApprovalForDisruptive:     true,
+		DuplicateAlertSuppressionSeconds: 900,
+		ActionCooldownSeconds:            900,
+		EnabledDomains: []string{
+			"infrastructure",
+			"runtime_services",
+			"application_services",
+			"network_ingress",
+			"identity_security",
+			"release_configuration",
+			"operator_channels",
+		},
+		ChannelProviders: []RobotSREChannelProvider{
+			{
+				ID:                          "in-app-default",
+				Name:                        "In-App Admin Notifications",
+				Kind:                        "in_app",
+				Enabled:                     true,
+				SupportsInteractiveApproval: true,
+			},
+		},
+		MCPServers: []RobotSREMCPServer{
+			{
+				ID:               "observability-default",
+				Name:             "Observability Read Model",
+				Kind:             "observability",
+				Enabled:          true,
+				Transport:        "embedded",
+				AllowedTools:     []string{"incidents.list", "incidents.get", "findings.list", "evidence.list", "runtime_health.get", "logs.recent"},
+				ReadOnly:         true,
+				ApprovalRequired: false,
+			},
+			{
+				ID:               "release-default",
+				Name:             "Release Compliance Read Model",
+				Kind:             "release",
+				Enabled:          true,
+				Transport:        "embedded",
+				AllowedTools:     []string{"release_drift.summary"},
+				ReadOnly:         true,
+				ApprovalRequired: false,
+			},
+		},
+		AgentRuntime: RobotSREAgentRuntimeConfig{
+			Enabled:                            false,
+			Provider:                           "ollama",
+			Model:                              defaultAgentRuntimeModel,
+			BaseURL:                            defaultAgentRuntimeBaseURL,
+			SystemPromptRef:                    "sre_smart_bot_default",
+			OperatorSummaryEnabled:             true,
+			HypothesisRankingEnabled:           true,
+			DraftActionPlansEnabled:            true,
+			ConversationalApprovalSupport:      false,
+			MaxToolCallsPerTurn:                6,
+			MaxIncidentsPerSummary:             5,
+			RequireHumanConfirmationForMessage: true,
+		},
+		DetectorRules: []RobotSREDetectorRule{},
+		OperatorRules: []RobotSREOperatorRule{},
+	}
+}
+
+// DefaultRobotSREPolicyConfig returns the deployment-aware default Robot SRE
+// policy configuration for bootstrap and first-run setup flows.
+func DefaultRobotSREPolicyConfig() RobotSREPolicyConfig {
+	return defaultRobotSREPolicyConfig()
+}
+
+func applyRobotSREPolicyDefaults(cfg *RobotSREPolicyConfig) {
+	if cfg == nil {
+		return
+	}
+	defaultCfg := defaultRobotSREPolicyConfig()
+	if strings.TrimSpace(cfg.DisplayName) == "" {
+		cfg.DisplayName = defaultCfg.DisplayName
+	}
+	if strings.TrimSpace(cfg.EnvironmentMode) == "" {
+		cfg.EnvironmentMode = defaultCfg.EnvironmentMode
+	}
+	if strings.TrimSpace(cfg.DetectorLearningMode) == "" {
+		cfg.DetectorLearningMode = defaultCfg.DetectorLearningMode
+	}
+	if strings.TrimSpace(cfg.DefaultChannel) == "" {
+		cfg.DefaultChannel = defaultCfg.DefaultChannel
+	}
+	if strings.TrimSpace(cfg.DefaultChannelProviderID) == "" {
+		cfg.DefaultChannelProviderID = defaultCfg.DefaultChannelProviderID
+	}
+	if cfg.DuplicateAlertSuppressionSeconds <= 0 {
+		cfg.DuplicateAlertSuppressionSeconds = defaultCfg.DuplicateAlertSuppressionSeconds
+	}
+	if cfg.ActionCooldownSeconds <= 0 {
+		cfg.ActionCooldownSeconds = defaultCfg.ActionCooldownSeconds
+	}
+	if len(cfg.EnabledDomains) == 0 {
+		cfg.EnabledDomains = append([]string(nil), defaultCfg.EnabledDomains...)
+	}
+	if len(cfg.ChannelProviders) == 0 {
+		cfg.ChannelProviders = append([]RobotSREChannelProvider(nil), defaultCfg.ChannelProviders...)
+	}
+	if len(cfg.MCPServers) == 0 {
+		cfg.MCPServers = append([]RobotSREMCPServer(nil), defaultCfg.MCPServers...)
+	}
+	if strings.TrimSpace(cfg.AgentRuntime.Provider) == "" {
+		cfg.AgentRuntime.Provider = defaultCfg.AgentRuntime.Provider
+	}
+	if strings.TrimSpace(cfg.AgentRuntime.BaseURL) == "" {
+		cfg.AgentRuntime.BaseURL = defaultCfg.AgentRuntime.BaseURL
+	}
+	if strings.TrimSpace(cfg.AgentRuntime.SystemPromptRef) == "" {
+		cfg.AgentRuntime.SystemPromptRef = defaultCfg.AgentRuntime.SystemPromptRef
+	}
+	if cfg.AgentRuntime.MaxToolCallsPerTurn <= 0 {
+		cfg.AgentRuntime.MaxToolCallsPerTurn = defaultCfg.AgentRuntime.MaxToolCallsPerTurn
+	}
+	if cfg.AgentRuntime.MaxIncidentsPerSummary <= 0 {
+		cfg.AgentRuntime.MaxIncidentsPerSummary = defaultCfg.AgentRuntime.MaxIncidentsPerSummary
+	}
+	if cfg.OperatorRules == nil {
+		cfg.OperatorRules = []RobotSREOperatorRule{}
+	}
+	if cfg.DetectorRules == nil {
+		cfg.DetectorRules = []RobotSREDetectorRule{}
+	}
+}
+
+func validateRobotSREPolicyConfig(cfg *RobotSREPolicyConfig) error {
+	if cfg == nil {
+		return errors.New("robot sre policy is required")
+	}
+
+	applyRobotSREPolicyDefaults(cfg)
+
+	validEnvironmentModes := map[string]struct{}{
+		"demo":       {},
+		"staging":    {},
+		"production": {},
+	}
+	validDetectorLearningModes := map[string]struct{}{
+		"disabled":             {},
+		"suggest_only":         {},
+		"training_auto_create": {},
+	}
+	validChannels := map[string]struct{}{
+		"in_app":   {},
+		"email":    {},
+		"webhook":  {},
+		"slack":    {},
+		"teams":    {},
+		"telegram": {},
+		"whatsapp": {},
+		"custom":   {},
+	}
+	validMCPKinds := map[string]struct{}{
+		"kubernetes":    {},
+		"oci":           {},
+		"database":      {},
+		"release":       {},
+		"chat":          {},
+		"observability": {},
+		"custom":        {},
+	}
+	validMCPTransports := map[string]struct{}{
+		"embedded": {},
+		"http":     {},
+		"stdio":    {},
+		"custom":   {},
+	}
+	validAgentProviders := map[string]struct{}{
+		"custom": {},
+		"ollama": {},
+		"openai": {},
+		"none":   {},
+	}
+	validDomains := map[string]struct{}{
+		"infrastructure":        {},
+		"runtime_services":      {},
+		"application_services":  {},
+		"network_ingress":       {},
+		"identity_security":     {},
+		"release_configuration": {},
+		"operator_channels":     {},
+	}
+	validSeverities := map[string]struct{}{
+		"info":     {},
+		"warning":  {},
+		"critical": {},
+	}
+
+	if _, ok := validEnvironmentModes[strings.TrimSpace(cfg.EnvironmentMode)]; !ok {
+		return fmt.Errorf("environment_mode must be one of: demo, staging, production")
+	}
+	if _, ok := validDetectorLearningModes[strings.TrimSpace(cfg.DetectorLearningMode)]; !ok {
+		return fmt.Errorf("detector_learning_mode must be one of: disabled, suggest_only, training_auto_create")
+	}
+	if _, ok := validChannels[strings.TrimSpace(cfg.DefaultChannel)]; !ok {
+		return fmt.Errorf("default_channel must be one of: in_app, email, webhook, slack, teams, telegram, whatsapp, custom")
+	}
+	if cfg.DuplicateAlertSuppressionSeconds < 60 || cfg.DuplicateAlertSuppressionSeconds > 86400 {
+		return fmt.Errorf("duplicate_alert_suppression_seconds must be between 60 and 86400")
+	}
+	if cfg.ActionCooldownSeconds < 60 || cfg.ActionCooldownSeconds > 86400 {
+		return fmt.Errorf("action_cooldown_seconds must be between 60 and 86400")
+	}
+
+	seenDomains := make(map[string]struct{}, len(cfg.EnabledDomains))
+	for _, domain := range cfg.EnabledDomains {
+		trimmed := strings.TrimSpace(domain)
+		if _, ok := validDomains[trimmed]; !ok {
+			return fmt.Errorf("enabled_domains contains invalid domain %q", domain)
+		}
+		if _, exists := seenDomains[trimmed]; exists {
+			return fmt.Errorf("enabled_domains contains duplicate domain %q", domain)
+		}
+		seenDomains[trimmed] = struct{}{}
+	}
+
+	seenProviderIDs := make(map[string]struct{}, len(cfg.ChannelProviders))
+	defaultProviderFound := false
+	for idx := range cfg.ChannelProviders {
+		provider := &cfg.ChannelProviders[idx]
+		provider.ID = strings.TrimSpace(provider.ID)
+		provider.Name = strings.TrimSpace(provider.Name)
+		provider.Kind = strings.TrimSpace(provider.Kind)
+		provider.ConfigRef = strings.TrimSpace(provider.ConfigRef)
+
+		if provider.ID == "" {
+			return fmt.Errorf("channel_providers[%d].id is required", idx)
+		}
+		if _, exists := seenProviderIDs[provider.ID]; exists {
+			return fmt.Errorf("channel_providers contains duplicate id %q", provider.ID)
+		}
+		seenProviderIDs[provider.ID] = struct{}{}
+		if provider.Name == "" {
+			return fmt.Errorf("channel_providers[%d].name is required", idx)
+		}
+		if _, ok := validChannels[provider.Kind]; !ok {
+			return fmt.Errorf("channel_providers[%d].kind must be one of: in_app, email, webhook, slack, teams, telegram, whatsapp, custom", idx)
+		}
+		if provider.ID == cfg.DefaultChannelProviderID {
+			defaultProviderFound = true
+			if !provider.Enabled {
+				return fmt.Errorf("default_channel_provider_id must reference an enabled provider")
+			}
+		}
+	}
+	if strings.TrimSpace(cfg.DefaultChannelProviderID) != "" && !defaultProviderFound {
+		return fmt.Errorf("default_channel_provider_id must reference a configured provider")
+	}
+
+	seenMCPServerIDs := make(map[string]struct{}, len(cfg.MCPServers))
+	for idx := range cfg.MCPServers {
+		server := &cfg.MCPServers[idx]
+		server.ID = strings.TrimSpace(server.ID)
+		server.Name = strings.TrimSpace(server.Name)
+		server.Kind = strings.TrimSpace(server.Kind)
+		server.Transport = strings.TrimSpace(server.Transport)
+		server.Endpoint = strings.TrimSpace(server.Endpoint)
+		server.ConfigRef = strings.TrimSpace(server.ConfigRef)
+
+		if server.ID == "" {
+			return fmt.Errorf("mcp_servers[%d].id is required", idx)
+		}
+		if _, exists := seenMCPServerIDs[server.ID]; exists {
+			return fmt.Errorf("mcp_servers contains duplicate id %q", server.ID)
+		}
+		seenMCPServerIDs[server.ID] = struct{}{}
+		if server.Name == "" {
+			return fmt.Errorf("mcp_servers[%d].name is required", idx)
+		}
+		if _, ok := validMCPKinds[server.Kind]; !ok {
+			return fmt.Errorf("mcp_servers[%d].kind must be one of: kubernetes, oci, database, release, chat, observability, custom", idx)
+		}
+		if _, ok := validMCPTransports[server.Transport]; !ok {
+			return fmt.Errorf("mcp_servers[%d].transport must be one of: embedded, http, stdio, custom", idx)
+		}
+		if server.Transport == "http" && server.Endpoint == "" {
+			return fmt.Errorf("mcp_servers[%d].endpoint is required when transport=http", idx)
+		}
+	}
+
+	cfg.AgentRuntime.Provider = strings.TrimSpace(cfg.AgentRuntime.Provider)
+	cfg.AgentRuntime.Model = strings.TrimSpace(cfg.AgentRuntime.Model)
+	cfg.AgentRuntime.BaseURL = strings.TrimRight(strings.TrimSpace(cfg.AgentRuntime.BaseURL), "/")
+	cfg.AgentRuntime.SystemPromptRef = strings.TrimSpace(cfg.AgentRuntime.SystemPromptRef)
+	if _, ok := validAgentProviders[cfg.AgentRuntime.Provider]; !ok {
+		return fmt.Errorf("agent_runtime.provider must be one of: custom, ollama, openai, none")
+	}
+	if cfg.AgentRuntime.MaxToolCallsPerTurn < 1 || cfg.AgentRuntime.MaxToolCallsPerTurn > 20 {
+		return fmt.Errorf("agent_runtime.max_tool_calls_per_turn must be between 1 and 20")
+	}
+	if cfg.AgentRuntime.MaxIncidentsPerSummary < 1 || cfg.AgentRuntime.MaxIncidentsPerSummary > 20 {
+		return fmt.Errorf("agent_runtime.max_incidents_per_summary must be between 1 and 20")
+	}
+	if cfg.AgentRuntime.Enabled && cfg.AgentRuntime.Provider != "none" && cfg.AgentRuntime.Model == "" {
+		return fmt.Errorf("agent_runtime.model is required when agent runtime is enabled")
+	}
+	if cfg.AgentRuntime.Enabled && cfg.AgentRuntime.Provider == "ollama" && cfg.AgentRuntime.BaseURL == "" {
+		return fmt.Errorf("agent_runtime.base_url is required when provider=ollama")
+	}
+
+	seenRuleIDs := make(map[string]struct{}, len(cfg.OperatorRules))
+	for idx := range cfg.OperatorRules {
+		rule := &cfg.OperatorRules[idx]
+		rule.ID = strings.TrimSpace(rule.ID)
+		rule.Name = strings.TrimSpace(rule.Name)
+		rule.Domain = strings.TrimSpace(rule.Domain)
+		rule.IncidentType = strings.TrimSpace(rule.IncidentType)
+		rule.Severity = strings.TrimSpace(rule.Severity)
+		rule.Source = strings.TrimSpace(rule.Source)
+		if rule.Source == "" {
+			rule.Source = "operator_defined"
+		}
+
+		if rule.ID == "" {
+			return fmt.Errorf("operator_rules[%d].id is required", idx)
+		}
+		if _, exists := seenRuleIDs[rule.ID]; exists {
+			return fmt.Errorf("operator_rules contains duplicate id %q", rule.ID)
+		}
+		seenRuleIDs[rule.ID] = struct{}{}
+		if rule.Name == "" {
+			return fmt.Errorf("operator_rules[%d].name is required", idx)
+		}
+		if _, ok := validDomains[rule.Domain]; !ok {
+			return fmt.Errorf("operator_rules[%d].domain is invalid", idx)
+		}
+		if rule.IncidentType == "" {
+			return fmt.Errorf("operator_rules[%d].incident_type is required", idx)
+		}
+		if _, ok := validSeverities[rule.Severity]; !ok {
+			return fmt.Errorf("operator_rules[%d].severity must be one of: info, warning, critical", idx)
+		}
+		if rule.Threshold < 0 {
+			return fmt.Errorf("operator_rules[%d].threshold must be >= 0", idx)
+		}
+		if rule.ForDurationSeconds < 0 || rule.ForDurationSeconds > 86400 {
+			return fmt.Errorf("operator_rules[%d].for_duration_seconds must be between 0 and 86400", idx)
+		}
+	}
+
+	seenDetectorRuleIDs := make(map[string]struct{}, len(cfg.DetectorRules))
+	validConfidences := map[string]struct{}{
+		"":       {},
+		"low":    {},
+		"medium": {},
+		"high":   {},
+	}
+	for idx := range cfg.DetectorRules {
+		rule := &cfg.DetectorRules[idx]
+		rule.ID = strings.TrimSpace(rule.ID)
+		rule.Name = strings.TrimSpace(rule.Name)
+		rule.Query = strings.TrimSpace(rule.Query)
+		rule.Domain = strings.TrimSpace(rule.Domain)
+		rule.IncidentType = strings.TrimSpace(rule.IncidentType)
+		rule.Severity = strings.TrimSpace(rule.Severity)
+		rule.Confidence = strings.TrimSpace(rule.Confidence)
+		rule.SignalKey = strings.TrimSpace(rule.SignalKey)
+		rule.Source = strings.TrimSpace(rule.Source)
+		if rule.Source == "" {
+			rule.Source = "operator_defined"
+		}
+		if rule.ID == "" {
+			return fmt.Errorf("detector_rules[%d].id is required", idx)
+		}
+		if _, exists := seenDetectorRuleIDs[rule.ID]; exists {
+			return fmt.Errorf("detector_rules contains duplicate id %q", rule.ID)
+		}
+		seenDetectorRuleIDs[rule.ID] = struct{}{}
+		if rule.Name == "" {
+			return fmt.Errorf("detector_rules[%d].name is required", idx)
+		}
+		if rule.Query == "" {
+			return fmt.Errorf("detector_rules[%d].query is required", idx)
+		}
+		if _, ok := validDomains[rule.Domain]; !ok {
+			return fmt.Errorf("detector_rules[%d].domain is invalid", idx)
+		}
+		if rule.IncidentType == "" {
+			return fmt.Errorf("detector_rules[%d].incident_type is required", idx)
+		}
+		if _, ok := validSeverities[rule.Severity]; !ok {
+			return fmt.Errorf("detector_rules[%d].severity must be one of: info, warning, critical", idx)
+		}
+		if _, ok := validConfidences[rule.Confidence]; !ok {
+			return fmt.Errorf("detector_rules[%d].confidence must be one of: low, medium, high", idx)
+		}
+		if rule.Threshold < 0 {
+			return fmt.Errorf("detector_rules[%d].threshold must be >= 0", idx)
+		}
+	}
+
+	return nil
+}
+
 func validateRuntimeAssetStorageProfile(prefix string, profile RuntimeAssetStorageProfile, fieldErrors map[string]string) {
 	storageType := strings.TrimSpace(strings.ToLower(profile.Type))
 	switch storageType {
@@ -1012,8 +1429,8 @@ func (s *Service) GetGeneralConfig(ctx context.Context, tenantID uuid.UUID) (*Ge
 	generalConfig := &GeneralConfig{
 		SystemName:              "ImageFactory",
 		SystemDescription:       "Internal Image Factory Platform",
-		AdminEmail:              "admin@imagefactory.local",
-		SupportEmail:            "support@imagefactory.local",
+		AdminEmail:              "admin@imgfactory.com",
+		SupportEmail:            "support@imgfactory.com",
 		TimeZone:                "UTC",
 		DateFormat:              "YYYY-MM-DD",
 		DefaultLanguage:         "en",
@@ -2268,6 +2685,87 @@ func (s *Service) UpdateReleaseGovernancePolicyConfig(ctx context.Context, tenan
 			zap.String("updatedBy", updatedBy.String()))
 	} else {
 		s.logger.Info("Global release governance policy configuration updated",
+			zap.String("updatedBy", updatedBy.String()))
+	}
+
+	return cfg, nil
+}
+
+// GetRobotSREPolicyConfig retrieves Robot SRE policy configuration.
+// Tenant scope falls back to global scope when no tenant override exists.
+func (s *Service) GetRobotSREPolicyConfig(ctx context.Context, tenantID *uuid.UUID) (*RobotSREPolicyConfig, error) {
+	config, err := s.repository.FindByKey(ctx, tenantID, "robot_sre_policy")
+	if err != nil {
+		if errors.Is(err, ErrConfigNotFound) || strings.Contains(err.Error(), "no rows in result set") {
+			if tenantID != nil {
+				s.logger.Info("Tenant Robot SRE policy config not found, using global default",
+					zap.String("tenantID", tenantID.String()))
+				config, err = s.repository.FindByKey(ctx, nil, "robot_sre_policy")
+				if err == nil {
+					goto parseConfig
+				}
+			}
+			defaultCfg := defaultRobotSREPolicyConfig()
+			return &defaultCfg, nil
+		}
+		if tenantID != nil {
+			s.logger.Error("Failed to get Robot SRE policy config", zap.Error(err), zap.String("tenantID", tenantID.String()))
+		} else {
+			s.logger.Error("Failed to get global Robot SRE policy config", zap.Error(err))
+		}
+		return nil, err
+	}
+
+	if config.Status() != ConfigStatusActive {
+		if tenantID != nil {
+			s.logger.Error("Robot SRE policy config is not active", zap.String("tenantID", tenantID.String()), zap.String("status", string(config.Status())))
+		} else {
+			s.logger.Error("Global Robot SRE policy config is not active", zap.String("status", string(config.Status())))
+		}
+		return nil, fmt.Errorf("robot sre policy configuration is not active")
+	}
+
+parseConfig:
+	var policyConfig RobotSREPolicyConfig
+	if err := json.Unmarshal(config.ConfigValue(), &policyConfig); err != nil {
+		s.logger.Error("Failed to unmarshal Robot SRE policy config", zap.Error(err))
+		return nil, err
+	}
+	applyRobotSREPolicyDefaults(&policyConfig)
+	if err := validateRobotSREPolicyConfig(&policyConfig); err != nil {
+		s.logger.Error("Invalid Robot SRE policy config persisted", zap.Error(err))
+		return nil, err
+	}
+	return &policyConfig, nil
+}
+
+// GetRobotSREPolicyDefaults returns the current deployment-aware default policy.
+func (s *Service) GetRobotSREPolicyDefaults() RobotSREPolicyConfig {
+	return defaultRobotSREPolicyConfig()
+}
+
+// UpdateRobotSREPolicyConfig updates Robot SRE policy configuration.
+func (s *Service) UpdateRobotSREPolicyConfig(ctx context.Context, tenantID *uuid.UUID, cfg *RobotSREPolicyConfig, updatedBy uuid.UUID) (*RobotSREPolicyConfig, error) {
+	if updatedBy == uuid.Nil {
+		return nil, errors.New("updated by user ID is required")
+	}
+	applyRobotSREPolicyDefaults(cfg)
+	if err := validateRobotSREPolicyConfig(cfg); err != nil {
+		return nil, err
+	}
+
+	_, err := s.CreateOrUpdateCategoryConfig(ctx, tenantID, ConfigTypeToolSettings, "robot_sre_policy", cfg, updatedBy)
+	if err != nil {
+		s.logger.Error("Failed to save Robot SRE policy config", zap.Error(err))
+		return nil, err
+	}
+
+	if tenantID != nil {
+		s.logger.Info("Robot SRE policy configuration updated",
+			zap.String("tenantID", tenantID.String()),
+			zap.String("updatedBy", updatedBy.String()))
+	} else {
+		s.logger.Info("Global Robot SRE policy configuration updated",
 			zap.String("updatedBy", updatedBy.String()))
 	}
 

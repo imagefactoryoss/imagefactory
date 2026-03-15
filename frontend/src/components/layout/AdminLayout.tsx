@@ -1,6 +1,7 @@
 import { useRefresh } from '@/context/RefreshContext'
 import { useConfirmDialog } from '@/context/ConfirmDialogContext'
 import { useDashboardPath } from '@/hooks/useAccess'
+import { adminService } from '@/services/adminService'
 import { authService } from '@/services/authService'
 import { profileService } from '@/services/profileService'
 import { useAuthStore } from '@/store/auth'
@@ -30,6 +31,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     const [showProfileMenu, setShowProfileMenu] = useState(false)
     const [showContextSelector, setShowContextSelector] = useState(false)
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+    const [pendingDetectorRuleSuggestions, setPendingDetectorRuleSuggestions] = useState(0)
+    const isAdmin = !!canAccessAdmin
 
     useEffect(() => {
         if (setupRequired && location.pathname !== '/admin/setup') {
@@ -37,7 +40,47 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         }
     }, [setupRequired, location.pathname, navigate])
 
-    const isAdmin = !!canAccessAdmin
+    useEffect(() => {
+        if (!isAdmin || setupRequired) return
+
+        let cancelled = false
+        const loadPendingDetectorSuggestions = async () => {
+            try {
+                const response = await adminService.getSREDetectorRuleSuggestions({
+                    status: 'pending',
+                    limit: 100,
+                    offset: 0,
+                })
+                if (!cancelled) {
+                    setPendingDetectorRuleSuggestions((response.suggestions || []).length)
+                }
+            } catch {
+                if (!cancelled) {
+                    setPendingDetectorRuleSuggestions(0)
+                }
+            }
+        }
+
+        void loadPendingDetectorSuggestions()
+        return () => {
+            cancelled = true
+        }
+    }, [isAdmin, location.pathname, setupRequired])
+
+    const renderNavLabel = (name: string, href: string, active: boolean) => (
+        <div className="flex items-center gap-2 font-medium text-sm">
+            <span>{name}</span>
+            {href === '/admin/operations/sre-smart-bot/detector-rules' && pendingDetectorRuleSuggestions > 0 ? (
+                <span className={`inline-flex min-w-[1.5rem] items-center justify-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
+                    active
+                        ? 'border-blue-200/70 bg-blue-500/30 text-white'
+                        : 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200'
+                }`}>
+                    {pendingDetectorRuleSuggestions}
+                </span>
+            ) : null}
+        </div>
+    )
 
     // Load tenant data on component mount
     useEffect(() => {
@@ -180,6 +223,35 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     icon: '📋',
                     description: 'Resource limits and scheduling rules',
                 },
+            ]
+        },
+        {
+            title: 'SRE Smart Bot',
+            items: [
+                ...(isAdmin ? [{
+                    name: 'Incident Workspace',
+                    href: '/admin/operations/sre-smart-bot',
+                    icon: '🤖',
+                    description: 'Inspect incidents, evidence, actions, and approvals',
+                },
+                {
+                    name: 'Approvals',
+                    href: '/admin/operations/sre-smart-bot/approvals',
+                    icon: '✅',
+                    description: 'Review pending and recent SRE Smart Bot approval requests',
+                },
+                {
+                    name: 'Detector Rules',
+                    href: '/admin/operations/sre-smart-bot/detector-rules',
+                    icon: '🧠',
+                    description: 'Review learned detector rules and activate accepted suggestions',
+                },
+                {
+                    name: 'Settings',
+                    href: '/admin/operations/sre-smart-bot/settings',
+                    icon: '🛡️',
+                    description: 'Configure policy, channels, domains, and operator rules',
+                }] : []),
             ]
         },
         {
@@ -508,7 +580,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                                                             <div className="flex items-center gap-3 flex-1">
                                                                 <span className="text-xl">{item.icon}</span>
                                                                 <div className="flex-1 text-left">
-                                                                    <div className="font-medium text-sm">{item.name}</div>
+                                                                    {renderNavLabel(item.name, item.href, active)}
                                                                     <div
                                                                         className={`text-xs ${active
                                                                             ? 'text-blue-100'
@@ -593,7 +665,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                                                             <div className="flex items-center gap-3">
                                                                 <span className="text-xl">{item.icon}</span>
                                                                 <div className="flex-1">
-                                                                    <div className="font-medium text-sm">{item.name}</div>
+                                                                    {renderNavLabel(item.name, item.href, false)}
                                                                     <div className="text-xs text-slate-600 dark:text-slate-500">
                                                                         {item.description}
                                                                     </div>
@@ -615,7 +687,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                                                         <div className="flex items-center gap-3">
                                                             <span className="text-xl">{item.icon}</span>
                                                             <div className="flex-1">
-                                                                <div className="font-medium text-sm">{item.name}</div>
+                                                                {renderNavLabel(item.name, item.href, active)}
                                                                 <div
                                                                     className={`text-xs ${active
                                                                         ? 'text-blue-100'
