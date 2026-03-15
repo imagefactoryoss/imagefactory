@@ -1482,6 +1482,223 @@ func TestService_UpdateReleaseGovernancePolicyConfig_SavesValidatedConfig(t *tes
 	assert.Equal(t, 120, got.WindowMinutes)
 }
 
+func TestService_GetRobotSREPolicyConfig_DefaultWhenMissing(t *testing.T) {
+	logger := zap.NewNop()
+	mockRepo := &MockRepository{}
+	service := NewService(mockRepo, logger)
+
+	ctx := context.Background()
+	mockRepo.On("FindByKey", ctx, (*uuid.UUID)(nil), "robot_sre_policy").Return((*SystemConfig)(nil), ErrConfigNotFound).Once()
+
+	got, err := service.GetRobotSREPolicyConfig(ctx, nil)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.True(t, got.Enabled)
+	assert.Equal(t, "SRE Smart Bot", got.DisplayName)
+	assert.Equal(t, "demo", got.EnvironmentMode)
+	assert.Equal(t, "in_app", got.DefaultChannel)
+	assert.Equal(t, "in-app-default", got.DefaultChannelProviderID)
+	assert.True(t, got.AutoContainEnabled)
+	assert.False(t, got.AutoRecoverEnabled)
+	assert.Contains(t, got.EnabledDomains, "infrastructure")
+	require.Len(t, got.ChannelProviders, 1)
+	assert.Equal(t, "in_app", got.ChannelProviders[0].Kind)
+	require.Len(t, got.MCPServers, 2)
+	assert.Equal(t, "observability", got.MCPServers[0].Kind)
+	assert.Equal(t, "release", got.MCPServers[1].Kind)
+	assert.False(t, got.AgentRuntime.Enabled)
+	assert.Equal(t, "ollama", got.AgentRuntime.Provider)
+	assert.Equal(t, "llama3.2:3b", got.AgentRuntime.Model)
+	assert.Equal(t, "http://127.0.0.1:11434", got.AgentRuntime.BaseURL)
+	assert.Equal(t, "sre_smart_bot_default", got.AgentRuntime.SystemPromptRef)
+}
+
+func TestService_UpdateRobotSREPolicyConfig_RejectsInvalidEnvironmentMode(t *testing.T) {
+	logger := zap.NewNop()
+	mockRepo := &MockRepository{}
+	service := NewService(mockRepo, logger)
+
+	ctx := context.Background()
+	tenantID := uuid.New()
+	updatedBy := uuid.New()
+	cfg := &RobotSREPolicyConfig{
+		DisplayName:                      "SRE Smart Bot",
+		Enabled:                          true,
+		EnvironmentMode:                  "wild-west",
+		DefaultChannel:                   "telegram",
+		DefaultChannelProviderID:         "ops-telegram",
+		AutoObserveEnabled:               true,
+		AutoNotifyEnabled:                true,
+		AutoContainEnabled:               true,
+		AutoRecoverEnabled:               false,
+		RequireApprovalForRecover:        true,
+		RequireApprovalForDisruptive:     true,
+		DuplicateAlertSuppressionSeconds: 900,
+		ActionCooldownSeconds:            900,
+		EnabledDomains:                   []string{"infrastructure"},
+		ChannelProviders: []RobotSREChannelProvider{
+			{ID: "ops-telegram", Name: "Ops Telegram", Kind: "telegram", Enabled: true},
+		},
+	}
+
+	got, err := service.UpdateRobotSREPolicyConfig(ctx, &tenantID, cfg, updatedBy)
+	require.Error(t, err)
+	assert.Nil(t, got)
+	assert.Contains(t, err.Error(), "environment_mode")
+}
+
+func TestService_GetRobotSREPolicyConfig_DefaultsAgentRuntimeFromEnv(t *testing.T) {
+	t.Setenv("IF_SRE_AGENT_RUNTIME_BASE_URL", "http://image-factory-ollama.image-factory.svc.cluster.local:11434")
+	t.Setenv("IF_SRE_AGENT_RUNTIME_MODEL", "llama3.2:3b")
+
+	logger := zap.NewNop()
+	mockRepo := &MockRepository{}
+	service := NewService(mockRepo, logger)
+
+	ctx := context.Background()
+	mockRepo.On("FindByKey", ctx, (*uuid.UUID)(nil), "robot_sre_policy").Return((*SystemConfig)(nil), ErrConfigNotFound).Once()
+
+	got, err := service.GetRobotSREPolicyConfig(ctx, nil)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "http://image-factory-ollama.image-factory.svc.cluster.local:11434", got.AgentRuntime.BaseURL)
+	assert.Equal(t, "llama3.2:3b", got.AgentRuntime.Model)
+}
+
+func TestService_UpdateRobotSREPolicyConfig_SavesValidatedConfig(t *testing.T) {
+	logger := zap.NewNop()
+	mockRepo := &MockRepository{}
+	service := NewService(mockRepo, logger)
+
+	ctx := context.Background()
+	tenantID := uuid.New()
+	updatedBy := uuid.New()
+	cfg := &RobotSREPolicyConfig{
+		DisplayName:                      "SRE Smart Bot",
+		Enabled:                          true,
+		EnvironmentMode:                  "demo",
+		DefaultChannel:                   "custom",
+		DefaultChannelProviderID:         "ops-webhook",
+		AutoObserveEnabled:               true,
+		AutoNotifyEnabled:                true,
+		AutoContainEnabled:               true,
+		AutoRecoverEnabled:               false,
+		RequireApprovalForRecover:        true,
+		RequireApprovalForDisruptive:     true,
+		DuplicateAlertSuppressionSeconds: 900,
+		ActionCooldownSeconds:            900,
+		EnabledDomains:                   []string{"infrastructure", "runtime_services", "application_services"},
+		ChannelProviders: []RobotSREChannelProvider{
+			{
+				ID:                          "ops-webhook",
+				Name:                        "Enterprise Incident Gateway",
+				Kind:                        "webhook",
+				Enabled:                     true,
+				SupportsInteractiveApproval: true,
+				ConfigRef:                   "external_service_robot_sre_gateway",
+			},
+		},
+		MCPServers: []RobotSREMCPServer{
+			{
+				ID:           "ops-observability",
+				Name:         "Observability Gateway",
+				Kind:         "observability",
+				Enabled:      true,
+				Transport:    "http",
+				Endpoint:     "https://ops.example.com/mcp/observability",
+				AllowedTools: []string{"incidents.list", "evidence.list"},
+				ReadOnly:     true,
+			},
+		},
+		AgentRuntime: RobotSREAgentRuntimeConfig{
+			Enabled:                            true,
+			Provider:                           "openai",
+			Model:                              "gpt-5.1-mini",
+			SystemPromptRef:                    "sre_smart_bot_enterprise",
+			OperatorSummaryEnabled:             true,
+			HypothesisRankingEnabled:           true,
+			DraftActionPlansEnabled:            true,
+			ConversationalApprovalSupport:      true,
+			MaxToolCallsPerTurn:                8,
+			MaxIncidentsPerSummary:             6,
+			RequireHumanConfirmationForMessage: true,
+		},
+		OperatorRules: []RobotSREOperatorRule{
+			{
+				ID:           "node-disk-pressure-demo",
+				Name:         "Node disk pressure containment",
+				Domain:       "infrastructure",
+				IncidentType: "node_disk_pressure",
+				Severity:     "critical",
+				Enabled:      true,
+				Source:       "operator_defined",
+				Threshold:    3,
+			},
+		},
+	}
+
+	mockRepo.On("ExistsByKey", ctx, &tenantID, "robot_sre_policy").Return(false, nil).Once()
+	mockRepo.On("Save", ctx, mock.AnythingOfType("*systemconfig.SystemConfig")).Return(nil).Once()
+
+	got, err := service.UpdateRobotSREPolicyConfig(ctx, &tenantID, cfg, updatedBy)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "custom", got.DefaultChannel)
+	assert.Equal(t, "ops-webhook", got.DefaultChannelProviderID)
+	require.Len(t, got.ChannelProviders, 1)
+	assert.Equal(t, "webhook", got.ChannelProviders[0].Kind)
+	require.Len(t, got.MCPServers, 1)
+	assert.Equal(t, "http", got.MCPServers[0].Transport)
+	assert.Equal(t, "openai", got.AgentRuntime.Provider)
+	assert.Equal(t, "gpt-5.1-mini", got.AgentRuntime.Model)
+	require.Len(t, got.OperatorRules, 1)
+	assert.Equal(t, "node-disk-pressure-demo", got.OperatorRules[0].ID)
+}
+
+func TestService_UpdateRobotSREPolicyConfig_RejectsEnabledAgentRuntimeWithoutModel(t *testing.T) {
+	logger := zap.NewNop()
+	mockRepo := &MockRepository{}
+	service := NewService(mockRepo, logger)
+
+	ctx := context.Background()
+	tenantID := uuid.New()
+	updatedBy := uuid.New()
+	cfg := &RobotSREPolicyConfig{
+		DisplayName:                      "SRE Smart Bot",
+		Enabled:                          true,
+		EnvironmentMode:                  "demo",
+		DefaultChannel:                   "in_app",
+		DefaultChannelProviderID:         "in-app-default",
+		AutoObserveEnabled:               true,
+		AutoNotifyEnabled:                true,
+		AutoContainEnabled:               true,
+		AutoRecoverEnabled:               false,
+		RequireApprovalForRecover:        true,
+		RequireApprovalForDisruptive:     true,
+		DuplicateAlertSuppressionSeconds: 900,
+		ActionCooldownSeconds:            900,
+		EnabledDomains:                   []string{"infrastructure"},
+		ChannelProviders: []RobotSREChannelProvider{
+			{ID: "in-app-default", Name: "In-App", Kind: "in_app", Enabled: true},
+		},
+		MCPServers: []RobotSREMCPServer{
+			{ID: "ops-observability", Name: "Observability", Kind: "observability", Enabled: true, Transport: "embedded"},
+		},
+		AgentRuntime: RobotSREAgentRuntimeConfig{
+			Enabled:                true,
+			Provider:               "openai",
+			SystemPromptRef:        "sre_default",
+			MaxToolCallsPerTurn:    6,
+			MaxIncidentsPerSummary: 5,
+		},
+	}
+
+	got, err := service.UpdateRobotSREPolicyConfig(ctx, &tenantID, cfg, updatedBy)
+	require.Error(t, err)
+	assert.Nil(t, got)
+	assert.Contains(t, err.Error(), "agent_runtime.model")
+}
+
 func TestService_SimulateQuarantinePolicy(t *testing.T) {
 	logger := zap.NewNop()
 	service := NewService(&MockRepository{}, logger)

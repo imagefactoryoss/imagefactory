@@ -64,6 +64,10 @@ import ExternalServicesPage from '@/pages/admin/ExternalServicesPage'
 import AuthProvidersPage from '@/pages/admin/AuthProvidersPage'
 import InitialSetupPage from '@/pages/admin/InitialSetupPage'
 import OperationalCapabilitiesPage from '@/pages/admin/OperationalCapabilitiesPage'
+import SRESmartBotApprovalsPage from '@/pages/admin/SRESmartBotApprovalsPage'
+import SRESmartBotDetectorRulesPage from '@/pages/admin/SRESmartBotDetectorRulesPage'
+import SRESmartBotIncidentsPage from '@/pages/admin/SRESmartBotIncidentsPage'
+import SRESmartBotSettingsPage from '@/pages/admin/SRESmartBotSettingsPage'
 import PermissionDefinitionsPage from '@/pages/admin/PermissionDefinitionsPage'
 import PermissionManagementPage from '@/pages/admin/PermissionManagementPage'
 import QuarantineReviewWorkbenchPage from '@/pages/admin/QuarantineReviewWorkbenchPage'
@@ -340,6 +344,10 @@ function AppRoutes() {
                                             <Route path="access/permissions" element={<PermissionManagementPage />} />
                                             <Route path="access/permission-definitions" element={<PermissionDefinitionsPage />} />
                                             <Route path="access/operational-capabilities" element={<OperationalCapabilitiesPage />} />
+                                            <Route path="operations/sre-smart-bot" element={<SRESmartBotIncidentsPage />} />
+                                            <Route path="operations/sre-smart-bot/approvals" element={<SRESmartBotApprovalsPage />} />
+                                            <Route path="operations/sre-smart-bot/detector-rules" element={<SRESmartBotDetectorRulesPage />} />
+                                            <Route path="operations/sre-smart-bot/settings" element={<SRESmartBotSettingsPage />} />
                                             <Route path="tenants" element={<TenantManagementPage />} />
                                             <Route path="tenants/:id" element={<TenantDetailsPage />} />
                                             <Route path="system-config" element={<SystemConfigurationPage />} />

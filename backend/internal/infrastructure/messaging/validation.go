@@ -43,6 +43,13 @@ var requiredFieldsByType = map[string][]string{
 	EventTypeQuarantineReleaseRecovered:      {"tenant_id", "actor_id", "state", "failure_ratio", "failure_ratio_threshold", "consecutive_failures", "consecutive_failures_threshold", "minimum_samples", "idempotency_key"},
 	EventTypeQuarantineReleaseDriftDetected:  {"external_image_import_id", "tenant_id", "release_state", "source_image_digest", "internal_image_ref", "released_at", "idempotency_key"},
 	EventTypeQuarantineReleaseDriftRecovered: {"external_image_import_id", "tenant_id", "previous_release_state", "source_image_digest", "internal_image_ref", "released_at", "idempotency_key"},
+
+	EventTypeSREFindingObserved:          {"incident_id", "correlation_key", "domain", "incident_type", "status", "severity", "finding_id", "signal_type", "signal_key"},
+	EventTypeSREIncidentResolved:         {"incident_id", "correlation_key", "domain", "incident_type", "status", "severity", "resolved_at"},
+	EventTypeSREEvidenceAdded:            {"incident_id", "correlation_key", "domain", "incident_type", "status", "evidence_id", "evidence_type"},
+	EventTypeSREActionProposed:           {"incident_id", "correlation_key", "domain", "incident_type", "status", "action_attempt_id", "action_key", "action_class", "target_kind", "target_ref"},
+	EventTypeSREDetectorFindingObserved:  {"correlation_key", "domain", "incident_type", "summary", "source", "severity", "confidence", "finding_title", "finding_message", "signal_type", "signal_key"},
+	EventTypeSREDetectorFindingRecovered: {"correlation_key", "domain", "incident_type", "summary", "source", "resolved_at"},
 }
 
 func validateEvent(event Event) error {

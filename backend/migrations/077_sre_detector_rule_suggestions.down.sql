@@ -1,0 +1,6 @@
+DROP TRIGGER IF EXISTS sre_detector_rule_suggestions_timestamp_trigger ON sre_detector_rule_suggestions;
+DROP FUNCTION IF EXISTS update_sre_detector_rule_suggestions_timestamp();
+DROP INDEX IF EXISTS idx_sre_detector_rule_suggestions_created_at;
+DROP INDEX IF EXISTS idx_sre_detector_rule_suggestions_status;
+DROP INDEX IF EXISTS idx_sre_detector_rule_suggestions_tenant;
+DROP TABLE IF EXISTS sre_detector_rule_suggestions;

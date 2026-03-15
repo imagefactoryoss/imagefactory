@@ -24,6 +24,7 @@ import (
 	appbuild "github.com/srikarm/image-factory/internal/application/build"
 	appbuildnotifications "github.com/srikarm/image-factory/internal/application/buildnotifications"
 	"github.com/srikarm/image-factory/internal/application/runtimehealth"
+	appsresmartbot "github.com/srikarm/image-factory/internal/application/sresmartbot"
 	"github.com/srikarm/image-factory/internal/domain/build"
 	"github.com/srikarm/image-factory/internal/domain/buildnotification"
 	"github.com/srikarm/image-factory/internal/domain/eprregistration"
@@ -42,6 +43,7 @@ import (
 	"github.com/srikarm/image-factory/internal/infrastructure/config"
 	"github.com/srikarm/image-factory/internal/infrastructure/denialtelemetry"
 	"github.com/srikarm/image-factory/internal/infrastructure/k8s"
+	"github.com/srikarm/image-factory/internal/infrastructure/logdetector"
 	"github.com/srikarm/image-factory/internal/infrastructure/messaging"
 	"github.com/srikarm/image-factory/internal/infrastructure/middleware"
 	persistencePg "github.com/srikarm/image-factory/internal/infrastructure/persistence/postgres"
@@ -177,10 +179,11 @@ func (n *imageCatalogAlertNotifier) NotifyCatalogIngestIssue(
 // Router represents the HTTP router
 type Router struct {
 	chi.Router
-	logger          *zap.Logger
-	healthService   *health.Service
-	healthHandler   *HealthHandler
-	auditMiddleware *middleware.AuditMiddleware
+	logger             *zap.Logger
+	healthService      *health.Service
+	healthHandler      *HealthHandler
+	auditMiddleware    *middleware.AuditMiddleware
+	httpRequestSignals *middleware.HTTPRequestSignalStore
 }
 
 // setupTenantRoutes sets up routes for tenant operations
@@ -264,12 +267,15 @@ func NewRouter(cfg *config.Config, logger *zap.Logger, db interface{}, auditServ
 	sqlxDB := db.(*sqlx.DB)
 	healthService := health.NewService(sqlxDB, cfg, logger)
 	healthHandler := NewHealthHandler(healthService, logger)
+	httpRequestSignals := middleware.NewHTTPRequestSignalStore()
+	router.Use(httpRequestSignals.Middleware)
 
 	r := &Router{
-		Router:        router,
-		logger:        logger,
-		healthService: healthService,
-		healthHandler: healthHandler,
+		Router:             router,
+		logger:             logger,
+		healthService:      healthService,
+		healthHandler:      healthHandler,
+		httpRequestSignals: httpRequestSignals,
 	}
 
 	// Initialize audit middleware if provided
@@ -286,6 +292,13 @@ func NewRouter(cfg *config.Config, logger *zap.Logger, db interface{}, auditServ
 	router.Get("/", r.defaultHandler)
 
 	return r
+}
+
+func (r *Router) HTTPRequestSignalStore() *middleware.HTTPRequestSignalStore {
+	if r == nil {
+		return nil
+	}
+	return r.httpRequestSignals
 }
 
 // SetAuditMiddleware sets the audit middleware for the router
@@ -514,6 +527,21 @@ func SetupRoutes(
 	onDemandScanRequestHandler.SetAuditService(auditService)
 	onDemandScanRequestHandler.SetDenialMetrics(denialMetrics)
 	onDemandScanRequestHandler.SetSystemConfigService(systemConfigService)
+	sreSmartBotRepo := postgres.NewSRESmartBotRepository(sqlxDB, logger)
+	appSignalsRepo := postgres.NewAppSignalsRepository(sqlxDB, logger)
+	buildNotificationDeliveryRepo := postgres.NewBuildNotificationDeliveryRepository(sqlxDB, logger)
+	sreSmartBotActionService := appsresmartbot.NewActionService(sreSmartBotRepo, infrastructureService, systemConfigService, buildNotificationDeliveryRepo, notificationService, logger)
+	sreSmartBotDemoService := appsresmartbot.NewDemoService(appsresmartbot.NewService(sreSmartBotRepo, nil, logger), sreSmartBotRepo, logger)
+	sreSmartBotDetectorSuggestionService := appsresmartbot.NewDetectorRuleSuggestionService(sreSmartBotRepo, systemConfigService, logger)
+	sreSmartBotWorkspaceService := appsresmartbot.NewWorkspaceService(sreSmartBotRepo, systemConfigService)
+	sreLogDetectorBaseURL := strings.TrimSpace(os.Getenv("IF_SRE_LOG_DETECTOR_LOKI_BASE_URL"))
+	sreLogDetectorTimeout := time.Duration(getIntEnv("IF_SRE_LOG_DETECTOR_TIMEOUT_SECONDS", 15)) * time.Second
+	sreSmartBotLokiClient := logdetector.NewLokiClient(sreLogDetectorBaseURL, &http.Client{Timeout: sreLogDetectorTimeout})
+	sreSmartBotMCPService := appsresmartbot.NewMCPService(sreSmartBotRepo, systemConfigService, processStatusProvider, appSignalsRepo, releaseComplianceMetrics, sreSmartBotLokiClient, sqlxDB)
+	sreSmartBotAgentService := appsresmartbot.NewAgentService(sreSmartBotWorkspaceService, sreSmartBotMCPService)
+	sreSmartBotProbeService := appsresmartbot.NewAgentRuntimeProbeService()
+	sreSmartBotInterpretationService := appsresmartbot.NewInterpretationService(sreSmartBotAgentService, sreSmartBotWorkspaceService)
+	sreSmartBotHandler := NewSRESmartBotHandler(sreSmartBotRepo, sreSmartBotActionService, sreSmartBotDemoService, sreSmartBotDetectorSuggestionService, sreSmartBotWorkspaceService, sreSmartBotMCPService, sreSmartBotAgentService, sreSmartBotProbeService, sreSmartBotInterpretationService, logger)
 	configureImageCatalogSubscriber(
 		sqlxDB,
 		systemConfigService,
@@ -626,6 +654,7 @@ func SetupRoutes(
 		workflowHandler,
 		auditHandler,
 		onboardingHandler,
+		sreSmartBotHandler,
 	)
 
 	registerSecurityCatalogRepoRoutes(

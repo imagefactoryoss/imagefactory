@@ -13,6 +13,12 @@ import (
 	domainworkflow "github.com/srikarm/image-factory/internal/domain/workflow"
 )
 
+type nilDispatcherController struct{}
+
+func (n *nilDispatcherController) Start(ctx context.Context) bool { return false }
+func (n *nilDispatcherController) Stop() bool                     { return false }
+func (n *nilDispatcherController) Status() bool                  { return false }
+
 type stubDispatcherController struct {
 	running bool
 }
@@ -58,6 +64,34 @@ type executionPipelineHealthResponse struct {
 
 func TestExecutionPipelineHealth_DispatcherDisabledNoStatus(t *testing.T) {
 	handler := NewExecutionPipelineHealthHandler(nil, nil, nil, false, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/execution-pipeline/health", nil)
+	w := httptest.NewRecorder()
+
+	handler.GetHealth(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var response executionPipelineHealthResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	dispatcher := response.Components["dispatcher"]
+	if dispatcher.Enabled {
+		t.Fatalf("expected dispatcher disabled")
+	}
+	if dispatcher.Running {
+		t.Fatalf("expected dispatcher not running")
+	}
+	if dispatcher.Available {
+		t.Fatalf("expected dispatcher unavailable")
+	}
+}
+
+func TestExecutionPipelineHealth_TypedNilDispatcherFallsBackToUnavailable(t *testing.T) {
+	var controller *nilDispatcherController
+	handler := NewExecutionPipelineHealthHandler(controller, nil, nil, false, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/execution-pipeline/health", nil)
 	w := httptest.NewRecorder()
 

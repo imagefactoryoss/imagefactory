@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	_ "github.com/lib/pq"
+	"github.com/srikarm/image-factory/internal/domain/systemconfig"
 	"github.com/srikarm/image-factory/internal/testutil"
 )
 
@@ -70,7 +71,7 @@ func TestEnsureSystemBootstrap_SeedsSecurityReviewersGroupIdempotently(t *testin
 	db := openEssentialSeederTestDB(t)
 	createSeederTempTables(t, db)
 
-	if _, err := db.Exec(`INSERT INTO users (email) VALUES ('admin@imagefactory.local')`); err != nil {
+	if _, err := db.Exec(`INSERT INTO users (email) VALUES ('admin@imgfactory.com')`); err != nil {
 		t.Fatalf("failed seeding admin user: %v", err)
 	}
 
@@ -128,11 +129,56 @@ func TestEnsureSystemBootstrap_SeedsSecurityReviewersGroupIdempotently(t *testin
 		JOIN users u ON u.id = gm.user_id
 		WHERE t.tenant_code='sysadmin'
 		  AND g.role_type='system_administrator'
-		  AND u.email='admin@imagefactory.local'
+		  AND u.email='admin@imgfactory.com'
 	`).Scan(&adminMemberships); err != nil {
 		t.Fatalf("failed counting sysadmin memberships: %v", err)
 	}
 	if adminMemberships != 1 {
 		t.Fatalf("expected one sysadmin membership for admin user, got %d", adminMemberships)
+	}
+}
+
+func TestBuildEssentialConfigs_IncludesRobotSREPolicyWhenBootstrapEnabled(t *testing.T) {
+	t.Setenv("IF_BOOTSTRAP_SEED_ROBOT_SRE_POLICY", "true")
+	t.Setenv("IF_SRE_AGENT_RUNTIME_BASE_URL", "http://image-factory-ollama:11434")
+	t.Setenv("IF_SRE_AGENT_RUNTIME_MODEL", "llama3.2:3b")
+
+	configs := buildEssentialConfigs()
+
+	var found *EssentialConfig
+	for i := range configs {
+		config := &configs[i]
+		if config.ConfigType == "tool_settings" && config.ConfigKey == "robot_sre_policy" {
+			found = config
+			break
+		}
+	}
+
+	if found == nil {
+		t.Fatalf("expected robot_sre_policy config to be included when bootstrap seeding is enabled")
+	}
+
+	policy, ok := found.Data.(systemconfig.RobotSREPolicyConfig)
+	if !ok {
+		t.Fatalf("expected robot_sre_policy data to be RobotSREPolicyConfig, got %T", found.Data)
+	}
+
+	if policy.AgentRuntime.BaseURL != "http://image-factory-ollama:11434" {
+		t.Fatalf("expected seeded agent runtime base URL to come from env, got %q", policy.AgentRuntime.BaseURL)
+	}
+	if policy.AgentRuntime.Model != "llama3.2:3b" {
+		t.Fatalf("expected seeded agent runtime model to come from env, got %q", policy.AgentRuntime.Model)
+	}
+}
+
+func TestBuildEssentialConfigs_SkipsRobotSREPolicyWhenBootstrapDisabled(t *testing.T) {
+	t.Setenv("IF_BOOTSTRAP_SEED_ROBOT_SRE_POLICY", "false")
+
+	configs := buildEssentialConfigs()
+
+	for _, config := range configs {
+		if config.ConfigType == "tool_settings" && config.ConfigKey == "robot_sre_policy" {
+			t.Fatalf("did not expect robot_sre_policy config when bootstrap seeding is disabled")
+		}
 	}
 }

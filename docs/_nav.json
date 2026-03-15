@@ -102,6 +102,16 @@
       ]
     },
     {
+      "title": "SRE Smart Bot Design",
+      "items": [
+        { "title": "SRE Smart Bot Product And AI Overview", "path": "/implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md", "folder": "" },
+        { "title": "SRE Smart Bot Implementation Plan", "path": "/implementation/ROBOT_SRE_IMPLEMENTATION_PLAN.md", "folder": "" },
+        { "title": "SRE Smart Bot Requirements And Design", "path": "/implementation/ROBOT_SRE_OPS_PERSONA_REQUIREMENTS_AND_DESIGN.md", "folder": "" },
+        { "title": "Robot SRE Incident Taxonomy And Policy Matrix", "path": "/implementation/ROBOT_SRE_INCIDENT_TAXONOMY_AND_POLICY_MATRIX.md", "folder": "" },
+        { "title": "Robot SRE Log Intelligence And Incident Detection", "path": "/implementation/ROBOT_SRE_LOG_INTELLIGENCE_AND_INCIDENT_DETECTION.md", "folder": "" }
+      ]
+    },
+    {
       "title": "Contributor And Process",
       "items": [
         { "title": "Owner And Admin Testing Guide", "path": "/authentication/OWNER_ADMIN_TESTING_GUIDE.md", "folder": "" },

@@ -1352,6 +1352,88 @@ func (h *SystemConfigHandler) UpdateReleaseGovernancePolicy(w http.ResponseWrite
 	json.NewEncoder(w).Encode(updatedConfig)
 }
 
+// GetRobotSREPolicy handles GET /api/v1/admin/settings/robot-sre
+func (h *SystemConfigHandler) GetRobotSREPolicy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	authCtx, _ := middleware.GetAuthContext(r)
+	tenantIDPtr, status, message := h.resolveTenantScope(authCtx, r.URL.Query().Get("tenant_id"), isAllTenantsScopeRequested(r, authCtx))
+	if status != 0 {
+		http.Error(w, message, status)
+		return
+	}
+
+	config, err := h.systemConfigService.GetRobotSREPolicyConfig(r.Context(), tenantIDPtr)
+	if err != nil {
+		h.logger.Error("Failed to get Robot SRE policy config", zap.Error(err))
+		http.Error(w, "Failed to get robot sre policy configuration", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(config)
+}
+
+// GetRobotSREPolicyDefaults handles GET /api/v1/admin/settings/robot-sre/defaults
+func (h *SystemConfigHandler) GetRobotSREPolicyDefaults(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	config := h.systemConfigService.GetRobotSREPolicyDefaults()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(config)
+}
+
+// UpdateRobotSREPolicy handles PUT /api/v1/admin/settings/robot-sre
+func (h *SystemConfigHandler) UpdateRobotSREPolicy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req systemconfig.RobotSREPolicyConfig
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode update Robot SRE policy request", zap.Error(err))
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	authCtx, _ := middleware.GetAuthContext(r)
+	tenantIDPtr, status, message := h.resolveTenantScope(authCtx, r.URL.Query().Get("tenant_id"), isAllTenantsScopeRequested(r, authCtx))
+	if status != 0 {
+		http.Error(w, message, status)
+		return
+	}
+	updatedBy := authCtx.UserID
+
+	updatedConfig, err := h.systemConfigService.UpdateRobotSREPolicyConfig(r.Context(), tenantIDPtr, &req, updatedBy)
+	if err != nil {
+		h.logger.Error("Failed to update Robot SRE policy config", zap.Error(err))
+		http.Error(w, "Failed to update robot sre policy configuration", http.StatusBadRequest)
+		return
+	}
+
+	if h.auditService != nil {
+		auditTenantID := authCtx.TenantID
+		auditData := map[string]interface{}{
+			"is_global": tenantIDPtr == nil,
+		}
+		if tenantIDPtr != nil {
+			auditData["target_tenant"] = tenantIDPtr.String()
+		}
+		h.auditService.LogUserAction(r.Context(), auditTenantID, authCtx.UserID, audit.AuditEventConfigChange, "robot_sre_policy", "update",
+			"Robot SRE policy configuration updated", auditData)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updatedConfig)
+}
+
 func decodeQuarantinePolicyRequest(r *http.Request) (*systemconfig.QuarantinePolicyConfig, error) {
 	var payload map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {

@@ -143,7 +143,7 @@ func ensureSystemBootstrap(db *sql.DB) error {
 		SELECT tg.id, u.id, true, CURRENT_TIMESTAMP
 		FROM tenant_groups tg
 		JOIN tenants t ON t.id = tg.tenant_id
-		JOIN users u ON u.email = 'admin@imagefactory.local'
+		JOIN users u ON u.email = 'admin@imgfactory.com'
 		WHERE t.tenant_code = 'sysadmin'
 		  AND tg.role_type = 'system_administrator'
 		ON CONFLICT (group_id, user_id) DO NOTHING
@@ -156,6 +156,20 @@ func ensureSystemBootstrap(db *sql.DB) error {
 }
 
 func seedEssentialConfigs(db *sql.DB) error {
+	configs := buildEssentialConfigs()
+
+	ctx := context.Background()
+
+	for _, config := range configs {
+		if err := seedEssentialConfig(ctx, db, config); err != nil {
+			return fmt.Errorf("failed to seed config %s/%s: %w", config.ConfigType, config.ConfigKey, err)
+		}
+	}
+
+	return nil
+}
+
+func buildEssentialConfigs() []EssentialConfig {
 	ldapAllowedDomains := ldapAllowedDomainsFromEnv()
 	tektonManifestURLs := tektonCoreManifestURLsFromEnv()
 	sorRuntimeMode := defaultSORRuntimeErrorMode()
@@ -270,15 +284,16 @@ func seedEssentialConfigs(db *sql.DB) error {
 		},
 	}
 
-	ctx := context.Background()
-
-	for _, config := range configs {
-		if err := seedEssentialConfig(ctx, db, config); err != nil {
-			return fmt.Errorf("failed to seed config %s/%s: %w", config.ConfigType, config.ConfigKey, err)
-		}
+	if getEnvAsBool("IF_BOOTSTRAP_SEED_ROBOT_SRE_POLICY", false) {
+		configs = append(configs, EssentialConfig{
+			ConfigType:  systemconfig.ConfigTypeToolSettings,
+			ConfigKey:   "robot_sre_policy",
+			Description: "Default SRE Smart Bot policy configuration",
+			Data:        systemconfig.DefaultRobotSREPolicyConfig(),
+		})
 	}
 
-	return nil
+	return configs
 }
 
 func defaultSORRuntimeErrorMode() string {
