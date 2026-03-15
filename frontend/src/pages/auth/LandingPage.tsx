@@ -32,9 +32,34 @@ const capabilityCards = [
     },
     {
         icon: Sparkles,
-        title: 'Operational Controls',
-        description: 'Manage runtime services, policies, health, and capability access from admin surfaces.',
+        title: 'SRE Smart Bot',
+        description: 'Learn from logs and golden signals, detect incidents early, guide remediation, and notify operators with evidence.',
     },
+]
+
+const srePillars = [
+    {
+        title: 'Learn',
+        description: 'Observes incidents, logs, golden signals, and operator actions to improve detector coverage over time.',
+    },
+    {
+        title: 'Detect',
+        description: 'Correlates runtime health, Loki evidence, HTTP trends, backlog pressure, and messaging transport instability.',
+    },
+    {
+        title: 'Remediate',
+        description: 'Suggests or executes bounded actions with approvals, policy controls, and an auditable incident ledger.',
+    },
+    {
+        title: 'Notify',
+        description: 'Delivers summaries, approvals, and operator-ready guidance through configurable channels and admin workflows.',
+    },
+]
+
+const aiRuntimeHighlights = [
+    'Embedded small LLM runtime option for private, low-footprint interpretation.',
+    'Grounded on MCP evidence and deterministic drafts instead of freeform guesses.',
+    'Useful for summarization, hypothesis framing, and operator-facing explanations.',
 ]
 
 const LandingPage: React.FC = () => {
@@ -77,12 +102,12 @@ const LandingPage: React.FC = () => {
             <main className="mx-auto max-w-7xl px-6 py-14">
                 <section className="grid gap-10 lg:grid-cols-[minmax(0,1.25fr)_420px] lg:items-center">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">Container Delivery Platform</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">Container Delivery + AI Operations</p>
                         <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-5xl">
-                            Governed Container Image Build and Scan Operations For Multi-Tenant Teams
+                            Governed Container Delivery With An SRE Smart Bot That Learns, Detects, Remediates, and Notifies
                         </h1>
                         <p className="mt-5 max-w-3xl text-base text-slate-600 dark:text-slate-300">
-                            Image Factory centralizes build execution, image evidence, quarantine controls, and operational health so teams can ship faster without losing governance.
+                            Image Factory centralizes build execution, image evidence, quarantine controls, and operational health, then layers on SRE Smart Bot to turn logs, signals, and incidents into guided operator action.
                         </p>
                         <div className="mt-8 flex flex-wrap gap-3">
                             <Link
@@ -101,12 +126,52 @@ const LandingPage: React.FC = () => {
                     </div>
 
                     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Platform Outcomes</h2>
+                        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            SRE Smart Bot
+                        </div>
+                        <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-slate-100">AI-Assisted Operator Outcomes</h2>
                         <ul className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-300">
-                            <li>Unified pipeline visibility from request to publish.</li>
-                            <li>Capability-aware access and secure tenant boundaries.</li>
-                            <li>Evidence-backed release decisions with scan/SBOM context.</li>
-                            <li>Operational telemetry for runtime service reliability.</li>
+                            <li>Grounded incident summaries tied to logs, metrics, backlog, and messaging health.</li>
+                            <li>Read-only MCP tools for evidence gathering before any action is proposed.</li>
+                            <li>Approval-aware remediation for safe operational recovery.</li>
+                            <li>Detector learning that can suggest or auto-create rules in training mode.</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section className="mt-10 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">SRE Smart Bot Loop</p>
+                            <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">Built for real operations, not just dashboards</h2>
+                            <p className="mt-2 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
+                                The bot combines deterministic policy, MCP-based evidence gathering, and an optional embedded small-LLM layer so operators can understand what is happening before they decide what to do.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {srePillars.map((pillar) => (
+                            <article key={pillar.title} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 dark:border-slate-700 dark:bg-slate-950/40">
+                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{pillar.title}</p>
+                                <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{pillar.description}</p>
+                            </article>
+                        ))}
+                    </div>
+
+                    <div className="mt-6 rounded-2xl border border-cyan-200 bg-cyan-50/70 p-5 dark:border-cyan-800 dark:bg-cyan-950/20">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-cyan-700 dark:text-cyan-300" />
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Embedded Small LLM, Used Carefully</p>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-slate-700 dark:text-slate-300">
+                            SRE Smart Bot can run with a small embedded model for local interpretation and incident storytelling, while keeping remediation deterministic and approval-bound.
+                        </p>
+                        <ul className="mt-3 space-y-1 text-xs text-slate-700 dark:text-slate-300">
+                            {aiRuntimeHighlights.map((item) => (
+                                <li key={item}>{item}</li>
+                            ))}
                         </ul>
                     </div>
                 </section>

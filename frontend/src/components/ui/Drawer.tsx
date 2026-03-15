@@ -6,7 +6,7 @@ interface DrawerProps {
     description?: string
     onClose: () => void
     children: React.ReactNode
-    width?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+    width?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '60vw'
 }
 
 const widthClasses: Record<NonNullable<DrawerProps['width']>, string> = {
@@ -15,6 +15,8 @@ const widthClasses: Record<NonNullable<DrawerProps['width']>, string> = {
     lg: 'sm:max-w-lg',
     xl: 'sm:max-w-xl',
     '2xl': 'sm:max-w-2xl',
+    '3xl': 'sm:max-w-3xl',
+    '60vw': 'sm:max-w-[60vw]',
 }
 
 const Drawer: React.FC<DrawerProps> = ({

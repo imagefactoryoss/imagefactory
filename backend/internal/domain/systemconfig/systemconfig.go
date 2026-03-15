@@ -316,6 +316,111 @@ type ReleaseGovernancePolicyConfig struct {
 	WindowMinutes                int     `json:"window_minutes"`
 }
 
+// RobotSREOperatorRule represents an operator-defined detection/remediation rule
+// managed from the admin UI. These are additive to built-in rules.
+type RobotSREOperatorRule struct {
+	ID                 string            `json:"id"`
+	Name               string            `json:"name"`
+	Domain             string            `json:"domain"`
+	IncidentType       string            `json:"incident_type"`
+	Severity           string            `json:"severity"`
+	Enabled            bool              `json:"enabled"`
+	Source             string            `json:"source"`
+	MatchLabels        map[string]string `json:"match_labels,omitempty"`
+	Threshold          int               `json:"threshold,omitempty"`
+	ForDurationSeconds int               `json:"for_duration_seconds,omitempty"`
+	SuggestedAction    string            `json:"suggested_action,omitempty"`
+	AutoAllowed        bool              `json:"auto_allowed,omitempty"`
+}
+
+// RobotSREDetectorRule represents an active log detector rule used by the SRE
+// Smart Bot log intelligence pipeline.
+type RobotSREDetectorRule struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Enabled         bool   `json:"enabled"`
+	Source          string `json:"source,omitempty"`
+	Query           string `json:"query"`
+	Threshold       int    `json:"threshold,omitempty"`
+	Domain          string `json:"domain"`
+	IncidentType    string `json:"incident_type"`
+	Severity        string `json:"severity"`
+	Confidence      string `json:"confidence,omitempty"`
+	SignalKey       string `json:"signal_key,omitempty"`
+	SuggestedAction string `json:"suggested_action,omitempty"`
+	AutoCreated     bool   `json:"auto_created,omitempty"`
+}
+
+// RobotSREChannelProvider defines a configurable operator channel integration.
+type RobotSREChannelProvider struct {
+	ID                          string            `json:"id"`
+	Name                        string            `json:"name"`
+	Kind                        string            `json:"kind"`
+	Enabled                     bool              `json:"enabled"`
+	SupportsInteractiveApproval bool              `json:"supports_interactive_approval,omitempty"`
+	ConfigRef                   string            `json:"config_ref,omitempty"`
+	Settings                    map[string]string `json:"settings,omitempty"`
+}
+
+// RobotSREMCPServer defines a configurable MCP-style tool endpoint that the
+// SRE Smart Bot agent/runtime may use for evidence gathering and bounded tool
+// execution.
+type RobotSREMCPServer struct {
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	Kind             string            `json:"kind"`
+	Enabled          bool              `json:"enabled"`
+	Transport        string            `json:"transport"`
+	Endpoint         string            `json:"endpoint,omitempty"`
+	ConfigRef        string            `json:"config_ref,omitempty"`
+	AllowedTools     []string          `json:"allowed_tools,omitempty"`
+	ReadOnly         bool              `json:"read_only,omitempty"`
+	ApprovalRequired bool              `json:"approval_required,omitempty"`
+	Settings         map[string]string `json:"settings,omitempty"`
+}
+
+// RobotSREAgentRuntimeConfig controls the optional AI/agent feature layer that
+// sits on top of deterministic incident, policy, and approval logic.
+type RobotSREAgentRuntimeConfig struct {
+	Enabled                            bool   `json:"enabled"`
+	Provider                           string `json:"provider,omitempty"`
+	Model                              string `json:"model,omitempty"`
+	BaseURL                            string `json:"base_url,omitempty"`
+	SystemPromptRef                    string `json:"system_prompt_ref,omitempty"`
+	OperatorSummaryEnabled             bool   `json:"operator_summary_enabled"`
+	HypothesisRankingEnabled           bool   `json:"hypothesis_ranking_enabled"`
+	DraftActionPlansEnabled            bool   `json:"draft_action_plans_enabled"`
+	ConversationalApprovalSupport      bool   `json:"conversational_approval_support"`
+	MaxToolCallsPerTurn                int    `json:"max_tool_calls_per_turn,omitempty"`
+	MaxIncidentsPerSummary             int    `json:"max_incidents_per_summary,omitempty"`
+	RequireHumanConfirmationForMessage bool   `json:"require_human_confirmation_for_message"`
+}
+
+// RobotSREPolicyConfig controls environment posture, operator channels, and
+// operator-defined rules for the SRE Smart Bot subsystem.
+type RobotSREPolicyConfig struct {
+	DisplayName                      string                     `json:"display_name"`
+	Enabled                          bool                       `json:"enabled"`
+	EnvironmentMode                  string                     `json:"environment_mode"`
+	DetectorLearningMode             string                     `json:"detector_learning_mode,omitempty"`
+	DefaultChannel                   string                     `json:"default_channel,omitempty"`
+	DefaultChannelProviderID         string                     `json:"default_channel_provider_id,omitempty"`
+	AutoObserveEnabled               bool                       `json:"auto_observe_enabled"`
+	AutoNotifyEnabled                bool                       `json:"auto_notify_enabled"`
+	AutoContainEnabled               bool                       `json:"auto_contain_enabled"`
+	AutoRecoverEnabled               bool                       `json:"auto_recover_enabled"`
+	RequireApprovalForRecover        bool                       `json:"require_approval_for_recover"`
+	RequireApprovalForDisruptive     bool                       `json:"require_approval_for_disruptive"`
+	DuplicateAlertSuppressionSeconds int                        `json:"duplicate_alert_suppression_seconds"`
+	ActionCooldownSeconds            int                        `json:"action_cooldown_seconds"`
+	EnabledDomains                   []string                   `json:"enabled_domains"`
+	ChannelProviders                 []RobotSREChannelProvider  `json:"channel_providers,omitempty"`
+	MCPServers                       []RobotSREMCPServer        `json:"mcp_servers,omitempty"`
+	AgentRuntime                     RobotSREAgentRuntimeConfig `json:"agent_runtime"`
+	DetectorRules                    []RobotSREDetectorRule     `json:"detector_rules,omitempty"`
+	OperatorRules                    []RobotSREOperatorRule     `json:"operator_rules,omitempty"`
+}
+
 // BuildMethodAvailability represents availability of build methods
 type BuildMethodAvailability struct {
 	Container bool `json:"container"`
@@ -585,6 +690,22 @@ func (c *SystemConfig) GetExternalServiceConfig() (*ExternalServiceConfig, error
 	}
 
 	var config ExternalServiceConfig
+	if err := json.Unmarshal(c.configValue, &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// GetRobotSREPolicyConfig returns the Robot SRE policy configuration.
+func (c *SystemConfig) GetRobotSREPolicyConfig() (*RobotSREPolicyConfig, error) {
+	if c.configType != ConfigTypeToolSettings {
+		return nil, errors.New("configuration is not tool_settings type")
+	}
+	if c.configKey != "robot_sre_policy" {
+		return nil, errors.New("configuration is not robot_sre_policy")
+	}
+
+	var config RobotSREPolicyConfig
 	if err := json.Unmarshal(c.configValue, &config); err != nil {
 		return nil, err
 	}

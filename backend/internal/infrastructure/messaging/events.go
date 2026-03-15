@@ -46,4 +46,11 @@ const (
 	EventTypeEPRRegistrationRevalidated = "epr.registration.revalidated"
 	EventTypeEPRLifecycleExpiring       = "epr.lifecycle.expiring"
 	EventTypeEPRLifecycleExpired        = "epr.lifecycle.expired"
+
+	EventTypeSREFindingObserved          = "sre.finding.observed"
+	EventTypeSREIncidentResolved         = "sre.incident.resolved"
+	EventTypeSREEvidenceAdded            = "sre.evidence.added"
+	EventTypeSREActionProposed           = "sre.action.proposed"
+	EventTypeSREDetectorFindingObserved  = "sre.detector.finding.observed"
+	EventTypeSREDetectorFindingRecovered = "sre.detector.finding.recovered"
 )

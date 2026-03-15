@@ -15,6 +15,11 @@
     {
       "title": "Platform Overview",
       "items": [
+        },
+        {
+          "title": "Admin Tenant Scope Route Checklist",
+          "path": "/implementation/ADMIN_TENANT_SCOPE_ROUTE_CHECKLIST.md",
+          "folder": ""
         { "title": "Operational Capabilities", "path": "/overview/OPERATIONAL_CAPABILITIES_MATRIX.md", "folder": "" },
         { "title": "Quarantine Process Guide", "path": "/overview/QUARANTINE_PROCESS_GUIDE.md", "folder": "" }
       ]
@@ -99,6 +104,16 @@
         { "title": "Domain Availability", "path": "/reference/domain_availability.md", "folder": "" },
         { "title": "Makefile Commands", "path": "/reference/MAKEFILE_COMMANDS.md", "folder": "" },
         { "title": "OKE Shortname Enforcement Script", "path": "/reference/OKE_SHORTNAME_ENFORCEMENT_SCRIPT.md", "folder": "" }
+      ]
+    },
+    {
+      "title": "SRE Smart Bot Design",
+      "items": [
+        { "title": "SRE Smart Bot Product And AI Overview", "path": "/implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md", "folder": "" },
+        { "title": "SRE Smart Bot Implementation Plan", "path": "/implementation/ROBOT_SRE_IMPLEMENTATION_PLAN.md", "folder": "" },
+        { "title": "SRE Smart Bot Requirements And Design", "path": "/implementation/ROBOT_SRE_OPS_PERSONA_REQUIREMENTS_AND_DESIGN.md", "folder": "" },
+        { "title": "Robot SRE Incident Taxonomy And Policy Matrix", "path": "/implementation/ROBOT_SRE_INCIDENT_TAXONOMY_AND_POLICY_MATRIX.md", "folder": "" },
+        { "title": "Robot SRE Log Intelligence And Incident Detection", "path": "/implementation/ROBOT_SRE_LOG_INTELLIGENCE_AND_INCIDENT_DETECTION.md", "folder": "" }
       ]
     },
     {

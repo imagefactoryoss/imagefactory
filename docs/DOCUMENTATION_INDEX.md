@@ -86,6 +86,18 @@ flowchart TD
 - [reference/SYSTEM_CONFIGURATION_OPPORTUNITIES.md](reference/SYSTEM_CONFIGURATION_OPPORTUNITIES.md)
 - [reference/USER_MANAGEMENT.md](reference/USER_MANAGEMENT.md)
 
+## SRE Smart Bot Design
+
+- [implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md](implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md)
+- [implementation/ROBOT_SRE_IMPLEMENTATION_PLAN.md](implementation/ROBOT_SRE_IMPLEMENTATION_PLAN.md)
+- [implementation/ROBOT_SRE_OPS_PERSONA_REQUIREMENTS_AND_DESIGN.md](implementation/ROBOT_SRE_OPS_PERSONA_REQUIREMENTS_AND_DESIGN.md)
+- [implementation/ROBOT_SRE_INCIDENT_TAXONOMY_AND_POLICY_MATRIX.md](implementation/ROBOT_SRE_INCIDENT_TAXONOMY_AND_POLICY_MATRIX.md)
+- [implementation/ROBOT_SRE_LOG_INTELLIGENCE_AND_INCIDENT_DETECTION.md](implementation/ROBOT_SRE_LOG_INTELLIGENCE_AND_INCIDENT_DETECTION.md)
+
+## Implementation Contracts
+
+- [implementation/ADMIN_TENANT_SCOPE_ROUTE_CHECKLIST.md](implementation/ADMIN_TENANT_SCOPE_ROUTE_CHECKLIST.md)
+
 ## Contributor And Process Reference
 
 - [reference/PULL_REQUEST.md](reference/PULL_REQUEST.md)

@@ -49,6 +49,7 @@ func registerIdentitySystemAdminRoutes(
 	workflowHandler *WorkflowHandler,
 	auditHandler *AuditHandler,
 	onboardingHandler *OnboardingHandler,
+	sreSmartBotHandler *SRESmartBotHandler,
 ) {
 	// Register profile routes
 	profileHandler := NewProfileHandler(sqlxDB, auditService, logger)
@@ -151,6 +152,9 @@ func registerIdentitySystemAdminRoutes(
 	router.Get("/api/v1/settings/release-governance-policy", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.Authenticate(http.HandlerFunc(systemConfigHandler.GetReleaseGovernancePolicy))).ServeHTTP)
 	router.Get("/api/v1/admin/settings/release-governance-policy", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(systemConfigHandler.GetReleaseGovernancePolicy)).ServeHTTP)
 	router.Put("/api/v1/admin/settings/release-governance-policy", authMiddleware.RequirePermission(permissionService, "system", "manage_config")(http.HandlerFunc(systemConfigHandler.UpdateReleaseGovernancePolicy)).ServeHTTP)
+	router.Get("/api/v1/admin/settings/robot-sre", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(systemConfigHandler.GetRobotSREPolicy)).ServeHTTP)
+	router.Get("/api/v1/admin/settings/robot-sre/defaults", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(systemConfigHandler.GetRobotSREPolicyDefaults)).ServeHTTP)
+	router.Put("/api/v1/admin/settings/robot-sre", authMiddleware.RequirePermission(permissionService, "system", "manage_config")(http.HandlerFunc(systemConfigHandler.UpdateRobotSREPolicy)).ServeHTTP)
 
 	// Register external services routes
 	router.Get("/api/v1/admin/external-services/{name}", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(systemConfigHandler.GetExternalService)).ServeHTTP)
@@ -210,6 +214,29 @@ func registerIdentitySystemAdminRoutes(
 		router.Put("/api/v1/admin/infrastructure/nodes/{id}", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(infraAdminHandler.UpdateNode)).ServeHTTP)
 		router.Delete("/api/v1/admin/infrastructure/nodes/{id}", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(infraAdminHandler.DeleteNode)).ServeHTTP)
 		router.Get("/api/v1/admin/infrastructure/health", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(infraAdminHandler.GetInfrastructureHealth)).ServeHTTP)
+
+	}
+
+	if sreSmartBotHandler != nil {
+		router.Get("/api/v1/admin/sre/demo/scenarios", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ListDemoScenarios)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/demo/incidents", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(sreSmartBotHandler.GenerateDemoIncident)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/incidents", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ListIncidents)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/incidents/{id}", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetIncident)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/detector-rule-suggestions", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ListDetectorRuleSuggestions)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/incidents/{id}/detector-rule-suggestions", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(sreSmartBotHandler.ProposeDetectorRuleSuggestion)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/detector-rule-suggestions/{suggestionId}/accept", authMiddleware.RequirePermission(permissionService, "system", "manage_config")(http.HandlerFunc(sreSmartBotHandler.AcceptDetectorRuleSuggestion)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/detector-rule-suggestions/{suggestionId}/reject", authMiddleware.RequirePermission(permissionService, "system", "manage_config")(http.HandlerFunc(sreSmartBotHandler.RejectDetectorRuleSuggestion)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/incidents/{id}/workspace", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetIncidentWorkspace)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/incidents/{id}/mcp/tools", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ListMCPTools)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/incidents/{id}/mcp/invoke", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.InvokeMCPTool)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/agent/probe", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ProbeAgentRuntime)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/incidents/{id}/agent/draft", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentDraft)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/incidents/{id}/agent/interpretation", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentInterpretation)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/approvals", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ListApprovals)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/incidents/{id}/email-summary", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(sreSmartBotHandler.EmailIncidentSummary)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/incidents/{id}/actions/{actionId}/request-approval", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(sreSmartBotHandler.RequestApproval)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/incidents/{id}/actions/{actionId}/execute", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(sreSmartBotHandler.ExecuteAction)).ServeHTTP)
+		router.Post("/api/v1/admin/sre/incidents/{id}/approvals/{approvalId}/decide", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(sreSmartBotHandler.DecideApproval)).ServeHTTP)
 	}
 
 	// Check user email endpoint
