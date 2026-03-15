@@ -95,7 +95,7 @@ export const InfrastructurePanel: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [autoRefresh, setAutoRefresh] = useState(true);
-    const [refreshInterval, setRefreshInterval] = useState(5000);
+    const [refreshInterval] = useState(5000);
 
     // Form state
     const [showForm, setShowForm] = useState(false);
@@ -251,15 +251,6 @@ export const InfrastructurePanel: React.FC = () => {
     const getResourcePercentage = (used: number = 0, total: number): number => {
         if (total === 0) return 0;
         return Math.round((used / total) * 100);
-    };
-
-    // Format bytes to human readable
-    const formatBytes = (bytes: number): string => {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
     if (!user) {

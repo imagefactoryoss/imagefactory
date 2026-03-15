@@ -114,7 +114,7 @@ const BuildCreationWizard: React.FC = () => {
                 if (!isMounted) return
 
                 const sourceManifest = sourceBuild.manifest || ({} as any)
-                const sourceConfig = sourceManifest.buildConfig || {}
+                const sourceConfig = (sourceManifest.buildConfig || {}) as Partial<BuildConfig>
                 const sourceDescription = (sourceManifest as any).description || ''
 
                 setCloneProjectId(sourceBuild.projectId || null)

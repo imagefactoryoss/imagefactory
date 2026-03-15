@@ -77,19 +77,6 @@ const AdminBuildPoliciesPage: React.FC = () => {
         return descriptions[policy.policy_key] || policy.description || ''
     }
 
-    const getPolicyIcon = (policyType: string) => {
-        switch (policyType) {
-            case 'resource_limit':
-                return <HardDrive className="w-5 h-5" />
-            case 'scheduling_rule':
-                return <Clock className="w-5 h-5" />
-            case 'approval_workflow':
-                return <Users className="w-5 h-5" />
-            default:
-                return <Settings className="w-5 h-5" />
-        }
-    }
-
     const getPolicyTitle = (policyKey: string): string => {
         const titles: Record<string, string> = {
             'max_build_duration': 'Maximum Build Duration',

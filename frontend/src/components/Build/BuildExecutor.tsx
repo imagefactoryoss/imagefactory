@@ -3,7 +3,7 @@ import { Build, BuildClient, CreateBuildRequest } from '../../api/buildClient';
 import BuildLogs from './BuildLogs';
 import BuildStatus from './BuildStatus';
 
-interface BuildExecutorProps {
+export interface BuildExecutorProps {
     client: BuildClient;
     projectId: string;
 }

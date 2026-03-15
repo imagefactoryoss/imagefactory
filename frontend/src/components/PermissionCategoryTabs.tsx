@@ -17,8 +17,6 @@ export const PermissionCategoryTabs: React.FC<PermissionCategoryTabsProps> = ({
     permissions,
     assignedPermissionIds,
     onPermissionToggle,
-    onSelectAll,
-    onDeselectAll,
     loading = false,
     selectedPermissions = new Set(),
     readOnly = false,

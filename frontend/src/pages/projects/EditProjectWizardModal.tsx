@@ -918,7 +918,7 @@ export default function EditProjectWizardModal({
                                             <div className="flex-1 space-y-2">
                                                 <select
                                                     id="branch"
-                                                    value={branches.includes(formData.branch) ? formData.branch : '__custom__'}
+                                                    value={branches.includes(formData.branch ?? '') ? formData.branch : '__custom__'}
                                                     onChange={(e) => {
                                                         const next = e.target.value
                                                         setFormData({ ...formData, branch: next === '__custom__' ? '' : next })

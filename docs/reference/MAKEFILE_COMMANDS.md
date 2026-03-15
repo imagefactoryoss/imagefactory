@@ -8,7 +8,7 @@ The Makefile supports both Docker and Podman.
 
 - `CONTAINER_ENGINE` (default: `podman`)
 - `COMPOSE_CMD` (default: `podman compose`)
-- `FRONTEND_USE_LOCAL_DIST` (default: `false`; when `true`, builds local `frontend/dist` and copies it into nginx image)
+- `FRONTEND_USE_LOCAL_DIST` (default: `true`; when `true`, builds local `frontend/dist` and copies it into nginx image)
 
 Examples:
 
@@ -127,7 +127,7 @@ This publishes manifest lists for:
 make build-all-images CONTAINER_ENGINE=podman COMPOSE_CMD="podman compose"
 make docker-pull-runtime CONTAINER_ENGINE=podman
 make docker-build-all-multiarch CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry>
-make docker-build-all-multiarch CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry> FRONTEND_USE_LOCAL_DIST=true
+make docker-build-all-multiarch CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry> FRONTEND_USE_LOCAL_DIST=false
 ```
 
 ### 7) Build + Push + Helm Deploy in one command
@@ -141,7 +141,7 @@ make release-deploy \
 make release-deploy \
   IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory \
   CONTAINER_ENGINE=podman \
-  FRONTEND_USE_LOCAL_DIST=true
+  FRONTEND_USE_LOCAL_DIST=false
 ```
 
 What it does:

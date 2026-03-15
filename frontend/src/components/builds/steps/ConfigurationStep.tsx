@@ -534,7 +534,9 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
                         imageTags={wizardState.buildConfig?.tags || []}
                         onImageTagsChange={(tags) => updateBuildConfig({ tags })}
                         initialValue={{
-                            dockerfile: wizardState.buildConfig?.dockerfile,
+                            dockerfile: typeof wizardState.buildConfig?.dockerfile === 'string'
+                                ? { source: 'path', path: wizardState.buildConfig.dockerfile }
+                                : wizardState.buildConfig?.dockerfile,
                             build_context: wizardState.buildConfig?.buildContext || '.',
                             registry_repo: wizardState.buildConfig?.registryRepo || '',
                             platforms: wizardState.buildConfig?.platforms,

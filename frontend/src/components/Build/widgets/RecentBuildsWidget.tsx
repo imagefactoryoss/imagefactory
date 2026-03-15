@@ -26,7 +26,7 @@ export const RecentBuildsWidget: React.FC<RecentBuildsWidgetProps> = ({ projectI
                 projectId,
                 limit,
                 page: 1,
-                tenantId: selectedTenantId,
+                tenantId: selectedTenantId || undefined,
             })
             setBuilds(response.data.slice(0, limit))
         } catch (error) {

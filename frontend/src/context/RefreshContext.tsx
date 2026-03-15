@@ -32,7 +32,7 @@ export const RefreshProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsRefreshing(true)
         try {
             // Execute all registered refresh callbacks in parallel
-            await Promise.all(refreshCallbacks.map(callback => callback().catch(err => {
+            await Promise.all(refreshCallbacks.map(callback => callback().catch(() => {
                 return Promise.resolve() // Don't let one failure stop others
             })))
         } finally {

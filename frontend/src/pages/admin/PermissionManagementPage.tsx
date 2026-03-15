@@ -22,7 +22,7 @@ class PermissionPageErrorBoundary extends React.Component<
         return { hasError: true, error: error.message }
     }
 
-    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    componentDidCatch(_error: Error, _errorInfo: React.ErrorInfo) {
     }
 
     render() {

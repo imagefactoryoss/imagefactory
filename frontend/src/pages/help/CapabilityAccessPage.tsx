@@ -187,7 +187,7 @@ const CapabilityAccessPage: React.FC = () => {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Operational Capabilities</h2>
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
           {Object.keys(capabilities).map((key) => {
-            const enabled = Boolean((capabilities as Record<string, boolean>)[key])
+            const enabled = Boolean((capabilities as unknown as Record<string, boolean>)[key])
             const entry = labels[key] || {
               name: key,
               description: 'Capability entitlement status for this tenant.',

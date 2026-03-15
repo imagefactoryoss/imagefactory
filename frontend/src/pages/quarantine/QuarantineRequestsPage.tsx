@@ -383,7 +383,7 @@ const QuarantineRequestsPage: React.FC<QuarantineRequestsPageProps> = ({ mode = 
 
     const handleCloneImportRequest = (row: ImageImportRequest) => {
         setImportDraftValues({
-            eprRecordId: row.epr_record_id,
+            eprRecordId: row.epr_record_id || '',
             sourceRegistry: row.source_registry,
             sourceImageRef: row.source_image_ref,
             registryAuthId: row.registry_auth_id || undefined,
