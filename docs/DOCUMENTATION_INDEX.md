@@ -9,6 +9,7 @@ This index covers the public-facing documentation retained in the open-source re
 - [getting-started/LOCAL_DEV_SETUP.md](getting-started/LOCAL_DEV_SETUP.md)
 - [user-journeys/QUICK_START.md](user-journeys/QUICK_START.md)
 - [api/BUILD_API_GUIDE.md](api/BUILD_API_GUIDE.md)
+- [implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md](implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md)
 
 ## Reading Path
 
@@ -21,6 +22,7 @@ flowchart TD
     A --> F[API Guide]
     A --> G[Deeper Topic Sections]
     G --> H[Operations]
+    H --> H1[SRE Smart Bot]
     G --> I[Architecture]
     G --> J[Access And Journeys]
     G --> K[Reference]
@@ -32,6 +34,7 @@ flowchart TD
 - [kubernetes-integration/README.md](kubernetes-integration/README.md)
 - [overview/QUARANTINE_PROCESS_GUIDE.md](overview/QUARANTINE_PROCESS_GUIDE.md)
 - [overview/OPERATIONAL_CAPABILITIES_MATRIX.md](overview/OPERATIONAL_CAPABILITIES_MATRIX.md)
+- [implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md](implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md)
 - [authentication/OWNER_ADMIN_QUICK_START.md](authentication/OWNER_ADMIN_QUICK_START.md)
 - [user-journeys/QUICK_START.md](user-journeys/QUICK_START.md)
 
@@ -86,7 +89,7 @@ flowchart TD
 - [reference/SYSTEM_CONFIGURATION_OPPORTUNITIES.md](reference/SYSTEM_CONFIGURATION_OPPORTUNITIES.md)
 - [reference/USER_MANAGEMENT.md](reference/USER_MANAGEMENT.md)
 
-## SRE Smart Bot Design
+## SRE Smart Bot
 
 - [implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md](implementation/SRE_SMART_BOT_PRODUCT_AND_AI_OVERVIEW.md)
 - [implementation/ROBOT_SRE_IMPLEMENTATION_PLAN.md](implementation/ROBOT_SRE_IMPLEMENTATION_PLAN.md)

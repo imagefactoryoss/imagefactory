@@ -26,6 +26,7 @@ flowchart TD
     E --> I[User Journeys]
     E --> J[Architecture Reference]
     E --> K[Implementation Reference]
+    K --> K1[SRE Smart Bot]
     E --> L[Contributor And Process]
 ```
 
@@ -55,7 +56,7 @@ Tekton provider preparation:
 - User Roles And Access: RBAC, quick starts, and identity-related reference
 - User Journeys: role-specific workflow guides
 - Architecture Reference: technical design and implementation structure
-- Implementation Reference: deeper operational and configuration notes
+- Implementation Reference: deeper operational and configuration notes, including SRE Smart Bot
 - Contributor And Process: maintenance and repository workflow material
 
 ## Notes On Scope
