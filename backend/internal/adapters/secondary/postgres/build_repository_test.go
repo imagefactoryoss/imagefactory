@@ -69,6 +69,9 @@ func TestBuildConfigData_Validation(t *testing.T) {
 			Dockerfile:   "FROM ubuntu:20.04",
 			BuildContext: ".",
 			Platforms:    []string{"linux/amd64", "linux/arm64"},
+			Metadata: map[string]interface{}{
+				"registry_repo": "registry.example.com/team/buildx-app:latest",
+			},
 		}
 		assert.NoError(t, config.Validate())
 	})
@@ -79,6 +82,9 @@ func TestBuildConfigData_Validation(t *testing.T) {
 			BuildMethod:  "buildx",
 			Dockerfile:   "FROM ubuntu:20.04",
 			BuildContext: ".",
+			Metadata: map[string]interface{}{
+				"registry_repo": "registry.example.com/team/buildx-app:latest",
+			},
 		}
 		assert.Error(t, config.Validate())
 		assert.Contains(t, config.Validate().Error(), "platforms are required")
@@ -89,6 +95,9 @@ func TestBuildConfigData_Validation(t *testing.T) {
 			BuildID:     buildID,
 			BuildMethod: "container",
 			Dockerfile:  "FROM ubuntu:20.04",
+			Metadata: map[string]interface{}{
+				"registry_repo": "registry.example.com/team/container-app:latest",
+			},
 		}
 		assert.NoError(t, config.Validate())
 	})

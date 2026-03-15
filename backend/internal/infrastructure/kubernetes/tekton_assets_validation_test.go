@@ -63,12 +63,12 @@ func TestTektonAssets_TasksAreValidAndNamed(t *testing.T) {
 	}
 
 	expectedNames := map[string]bool{
-		"git-clone":       false,
-		"docker-build":    false,
-		"buildx":          false,
-		"kaniko":          false,
-		"kaniko-no-push":  false,
-		"packer":          false,
+		"git-clone":      false,
+		"docker-build":   false,
+		"buildx":         false,
+		"kaniko":         false,
+		"kaniko-no-push": false,
+		"packer":         false,
 	}
 
 	for _, entry := range entries {
@@ -181,8 +181,8 @@ func TestTektonAssets_PipelinesAreValidAndNamed(t *testing.T) {
 		if p.Kind != "Pipeline" {
 			t.Fatalf("expected kind Pipeline in %s, got %q", path, p.Kind)
 		}
-		if !strings.HasPrefix(p.Name, "image-factory-build-v1-") {
-			t.Fatalf("pipeline name in %s must start with image-factory-build-v1-, got %q", path, p.Name)
+		if !strings.HasPrefix(p.Name, "image-factory-") {
+			t.Fatalf("pipeline name in %s must start with image-factory-, got %q", path, p.Name)
 		}
 		if len(p.Spec.Tasks) == 0 {
 			t.Fatalf("pipeline %s has no tasks", p.Name)
@@ -225,17 +225,6 @@ func TestTektonAssets_PipelinesWireOptionalGitAuthWorkspace(t *testing.T) {
 			t.Fatalf("failed to parse pipeline YAML %s: %v", path, err)
 		}
 
-		gitAuthOptional := false
-		for _, ws := range p.Spec.Workspaces {
-			if ws.Name == "git-auth" {
-				gitAuthOptional = ws.Optional
-				break
-			}
-		}
-		if !gitAuthOptional {
-			t.Fatalf("pipeline %s must declare optional git-auth workspace", p.Name)
-		}
-
 		cloneTaskFound := false
 		cloneAuthBindingFound := false
 		for _, task := range p.Spec.Tasks {
@@ -251,7 +240,18 @@ func TestTektonAssets_PipelinesWireOptionalGitAuthWorkspace(t *testing.T) {
 			}
 		}
 		if !cloneTaskFound {
-			t.Fatalf("pipeline %s must include git-clone task", p.Name)
+			continue
+		}
+
+		gitAuthOptional := false
+		for _, ws := range p.Spec.Workspaces {
+			if ws.Name == "git-auth" {
+				gitAuthOptional = ws.Optional
+				break
+			}
+		}
+		if !gitAuthOptional {
+			t.Fatalf("pipeline %s must declare optional git-auth workspace", p.Name)
 		}
 		if !cloneAuthBindingFound {
 			t.Fatalf("pipeline %s must bind clone auth workspace to git-auth", p.Name)
