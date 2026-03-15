@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"time"
 
 	appdispatcher "github.com/srikarm/image-factory/internal/application/dispatcher"
@@ -128,7 +129,7 @@ func (h *ExecutionPipelineHealthHandler) processHealth(name string) pipelineComp
 }
 
 func (h *ExecutionPipelineHealthHandler) dispatcherHealth(ctx context.Context) pipelineComponentHealth {
-	if h.dispatcherController != nil {
+	if !isNilDispatcherController(h.dispatcherController) {
 		running := h.dispatcherController.Status()
 		resp := pipelineComponentHealth{
 			Enabled:   true,
@@ -169,6 +170,20 @@ func (h *ExecutionPipelineHealthHandler) dispatcherHealth(ctx context.Context) p
 		Available: false,
 		Mode:      appdispatcher.DispatcherModeEmbedded,
 		Message:   "dispatcher status unavailable",
+	}
+}
+
+func isNilDispatcherController(controller DispatcherController) bool {
+	if controller == nil {
+		return true
+	}
+
+	value := reflect.ValueOf(controller)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
 	}
 }
 

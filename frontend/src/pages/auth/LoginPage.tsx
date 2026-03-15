@@ -95,6 +95,13 @@ const LoginPage: React.FC = () => {
                 iconClass: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
                 cardClass: 'border-violet-200 bg-violet-50/70 dark:border-violet-800 dark:bg-violet-950/20',
             },
+            {
+                icon: Sparkles,
+                title: 'SRE Smart Bot',
+                description: 'Learn from signals, detect incidents, recommend safe actions, and notify operators with evidence.',
+                iconClass: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+                cardClass: 'border-cyan-200 bg-cyan-50/70 dark:border-cyan-800 dark:bg-cyan-950/20',
+            },
         ],
         []
     )
@@ -204,12 +211,12 @@ const LoginPage: React.FC = () => {
                             </Link>
                         </div>
                     </div>
-                    <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-5xl">Container Build, Scan, and Quarantine Workflows. All in One Place.</h1>
+                    <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-5xl">Container Delivery, Runtime Operations, and SRE Smart Bot Guidance. All in One Place.</h1>
                     <p className="mt-4 max-w-3xl text-sm text-slate-600 dark:text-slate-300 sm:text-base">
-                        Sign in to manage build pipelines, image evidence, quarantine workflows, and operational controls across tenant workspaces.
+                        Sign in to manage build pipelines, image evidence, quarantine workflows, and an AI-assisted SRE workspace that can learn, detect, remediate, and notify with grounded evidence.
                     </p>
 
-                    <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                    <div className="mt-6 grid gap-3 sm:grid-cols-4">
                         <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/80">
                             <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Capabilities</p>
                             <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">12+</p>
@@ -222,9 +229,13 @@ const LoginPage: React.FC = () => {
                             <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Security Scope</p>
                             <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Tenant-Isolated</p>
                         </div>
+                        <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/80">
+                            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">SRE Smart Bot</p>
+                            <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Learn + Detect</p>
+                        </div>
                     </div>
 
-                    <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         {capabilityHighlights.map((item) => {
                             const Icon = item.icon
                             return (
@@ -248,7 +259,35 @@ const LoginPage: React.FC = () => {
                             <li>Real-time build and notification event streams.</li>
                             <li>Capability-aware route gating for tenant security posture.</li>
                             <li>Admin controls for runtime services, tool availability, and policies.</li>
+                            <li>SRE Smart Bot incident workspace with MCP tools, golden signals, and safe action flows.</li>
                         </ul>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">SRE Smart Bot Value</p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            {[
+                                ['Learn', 'Detector suggestions and training mode improve coverage from repeated operational patterns.'],
+                                ['Detect', 'Correlates Loki logs, HTTP golden signals, async backlog pressure, and messaging health.'],
+                                ['Remediate', 'Uses approval-aware bounded actions instead of uncontrolled automation.'],
+                                ['Notify', 'Delivers summaries and action context to operators through configurable channels.'],
+                            ].map(([title, description]) => (
+                                <div key={title} className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+                                    <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{title}</p>
+                                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{description}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-800 dark:bg-cyan-950/20">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-cyan-700 dark:text-cyan-300" />
+                            <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800 dark:text-cyan-300">Embedded Small LLM</p>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-700 dark:text-slate-300">
+                            The platform can also run with a small embedded model to interpret incidents, summarize evidence, and draft investigations without handing remediation control over to the model.
+                        </p>
                     </div>
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/70">
