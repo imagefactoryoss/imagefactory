@@ -156,7 +156,7 @@ The Robot SRE can feel like a teammate, but it must be honest about uncertainty 
 
 The backend already has a useful foundation:
 
-- `runtime_dependency_watcher` in [`backend/cmd/server/main.go`](/Users/srikarm/projects/image-factory/backend/cmd/server/main.go)
+- `runtime_dependency_watcher` in [`backend/cmd/server/main.go`](../../backend/cmd/server/main.go)
 - process health store and runtime component status
 - notification delivery and websocket updates
 - tenant asset drift watcher

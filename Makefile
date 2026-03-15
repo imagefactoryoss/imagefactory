@@ -342,7 +342,7 @@ docker-build-all-multiarch: ## Build amd64/arm64 images and push manifest list (
 .PHONY: release-deploy
 release-deploy: ## Build+push multiarch images and helm upgrade release with IMAGE_TAG
 	@echo "$(GREEN)Release deploy with tag $(IMAGE_TAG)$(NC)"
-	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory$(NC)"; exit 1; }
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory$(NC)"; exit 1; }
 	@$(MAKE) docker-build-all-multiarch IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) PLATFORMS=$(PLATFORMS) FRONTEND_USE_LOCAL_DIST=$(FRONTEND_USE_LOCAL_DIST)
 	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(HELM_NAMESPACE) --reuse-values \
 		--set backend.image.repository=$(IMAGE_REGISTRY)/image-factory-backend \
