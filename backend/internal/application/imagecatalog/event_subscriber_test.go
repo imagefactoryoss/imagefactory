@@ -133,6 +133,16 @@ func makeSuccessfulKanikoBuild(t *testing.T) *build.Build {
 	return b
 }
 
+func expectedCatalogImageKey(b *build.Build) string {
+	imageRef := inferImageReference(b)
+	repoNoTag, _, _ := splitImageReference(imageRef)
+	imageName := deriveImageName(repoNoTag)
+	if imageName == "" {
+		imageName = b.Manifest().Name
+	}
+	return b.TenantID().String() + ":" + imageName
+}
+
 func TestEventSubscriber_AutoIngestsSuccessfulBuild(t *testing.T) {
 	b := makeSuccessfulKanikoBuild(t)
 	buildRepo := &buildRepoStub{byID: map[uuid.UUID]*build.Build{b.ID(): b}}
@@ -152,7 +162,7 @@ func TestEventSubscriber_AutoIngestsSuccessfulBuild(t *testing.T) {
 		},
 	})
 
-	imageKey := b.TenantID().String() + ":image-factory"
+	imageKey := expectedCatalogImageKey(b)
 	img := imageRepo.byTenantName[imageKey]
 	if img == nil {
 		t.Fatalf("expected catalog image to be created")
@@ -230,7 +240,7 @@ func TestEventSubscriber_ResolvesExecutionWhenEventMetadataUsesCamelCase(t *test
 		},
 	})
 
-	img := imageRepo.byTenantName[b.TenantID().String()+":image-factory"]
+	img := imageRepo.byTenantName[expectedCatalogImageKey(b)]
 	if img == nil {
 		t.Fatalf("expected catalog image to be created")
 	}
@@ -280,7 +290,7 @@ func TestEventSubscriber_FallsBackToLatestBuildExecutionWhenExecutionIDMissing(t
 		},
 	})
 
-	img := imageRepo.byTenantName[b.TenantID().String()+":image-factory"]
+	img := imageRepo.byTenantName[expectedCatalogImageKey(b)]
 	if img == nil {
 		t.Fatalf("expected catalog image to be created")
 	}
@@ -323,7 +333,7 @@ func TestEventSubscriber_StrictExecutionResolutionDisablesFallback(t *testing.T)
 		},
 	})
 
-	img := imageRepo.byTenantName[b.TenantID().String()+":image-factory"]
+	img := imageRepo.byTenantName[expectedCatalogImageKey(b)]
 	if img == nil {
 		t.Fatalf("expected catalog image to be created")
 	}
