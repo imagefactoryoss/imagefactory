@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BuildClient, BuildStatusResponse } from '../../api/buildClient';
 
-interface BuildStatusProps {
+export interface BuildStatusProps {
     client: BuildClient;
     buildId: string;
 }

@@ -1299,92 +1299,6 @@ const SystemConfigurationPage: React.FC = () => {
     }
   };
 
-  const createExternalService = async () => {
-    try {
-      await api.post("/admin/external-services", serviceFormData);
-      toast.success("External service created successfully");
-      setShowCreateServiceForm(false);
-      resetServiceForm();
-      loadExternalServices();
-    } catch (error) {
-      toast.error("Failed to create external service");
-    }
-  };
-
-  const updateExternalService = async () => {
-    if (!editingService) {
-      toast.error("No service selected. Please try again.");
-      return;
-    }
-
-    try {
-      await api.put(
-        `/admin/external-services/${editingService.name}`,
-        serviceFormData,
-      );
-      toast.success("External service updated successfully");
-      setEditingService(null);
-      resetServiceForm();
-      loadExternalServices();
-    } catch (error) {
-      toast.error("Failed to update external service");
-    }
-  };
-
-  const deleteExternalService = async (serviceName: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete the external service "${serviceName}"?`,
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await api.delete(`/admin/external-services/${serviceName}`);
-      toast.success("External service deleted successfully");
-      loadExternalServices();
-    } catch (error) {
-      toast.error("Failed to delete external service");
-    }
-  };
-
-  const resetServiceForm = () => {
-    setServiceFormData({
-      name: "",
-      description: "",
-      url: "",
-      api_key: "",
-      enabled: true,
-    });
-    setFormErrors({});
-  };
-
-  const validateServiceForm = () => {
-    const errors: { [key: string]: string } = {};
-
-    if (!serviceFormData.name.trim()) {
-      errors.name = "Service name is required";
-    }
-
-    if (!serviceFormData.url.trim()) {
-      errors.url = "URL is required";
-    } else {
-      try {
-        new URL(serviceFormData.url);
-      } catch {
-        errors.url = "Please enter a valid URL";
-      }
-    }
-
-    if (!serviceFormData.api_key.trim()) {
-      errors.api_key = "API key is required";
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
   const addAllowedDomain = () => {
     const domain = newDomain.trim();
     if (!domain) return;
@@ -1413,33 +1327,6 @@ const SystemConfigurationPage: React.FC = () => {
       ...prev,
       allowed_domains: prev.allowed_domains.filter((d) => d !== domain),
     }));
-  };
-
-  const startEditingService = async (service: ExternalService) => {
-    try {
-      toast("Loading service details...");
-      const response = await api.get(
-        `/admin/external-services/${service.name}`,
-      );
-      const fullService = response.data;
-      setEditingService(fullService);
-      setServiceFormData({
-        name: fullService.name,
-        description: fullService.description,
-        url: fullService.url,
-        api_key: fullService.api_key || "",
-        enabled: fullService.enabled,
-      });
-      toast.success("Service details loaded");
-    } catch (error) {
-      console.error("Error loading service details:", error);
-      toast.error("Failed to load service details");
-    }
-  };
-
-  const cancelEditingService = () => {
-    setEditingService(null);
-    resetServiceForm();
   };
 
   if (loading) {

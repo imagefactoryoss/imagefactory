@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BuildClient, LogLevel, LogMessage } from '../../api/buildClient';
 
-interface BuildLogsProps {
+export interface BuildLogsProps {
     client: BuildClient;
     buildId: string;
 }
@@ -60,13 +60,6 @@ export const BuildLogs: React.FC<BuildLogsProps> = ({ client, buildId }) => {
             }
         };
     }, [client, buildId, autoScroll]);
-
-    const logLevelColor: Record<LogLevel, string> = {
-        DEBUG: 'text-gray-500',
-        INFO: 'text-blue-600',
-        WARN: 'text-yellow-600',
-        ERROR: 'text-red-600',
-    };
 
     const logLevelBgColor: Record<LogLevel, string> = {
         DEBUG: 'bg-gray-50',

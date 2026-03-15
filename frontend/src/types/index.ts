@@ -407,7 +407,7 @@ export interface ImageImportRequest {
     tenant_id: string
     requested_by_user_id: string
     request_type: ImageImportRequestType
-    epr_record_id: string
+    epr_record_id?: string
     source_registry: string
     source_image_ref: string
     registry_auth_id?: string
@@ -438,7 +438,7 @@ export interface ImageImportRequest {
     release_eligible?: boolean
     release_blocker_reason?: string
     release_reason?: string
-    retryable: boolean
+    retryable?: boolean
     created_at: string
     updated_at: string
 }
@@ -475,6 +475,9 @@ export interface EPRRegistrationRequest {
     product_name: string
     technology_name: string
     business_justification?: string
+    source_registry?: string
+    source_image_example?: string
+    additional_notes?: string
     requested_by_user_id: string
     status: EPRRegistrationStatus
     lifecycle_status?: EPRLifecycleStatus
@@ -1213,6 +1216,10 @@ export interface Build {
     id: string
     tenantId: string
     projectId?: string
+    buildNumber?: number
+    gitBranch?: string
+    gitCommit?: string
+    failureReason?: string | null
     manifest: BuildManifest
     status: BuildStatus
     result?: BuildResult

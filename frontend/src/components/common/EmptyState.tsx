@@ -6,7 +6,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 
 interface EmptyStateProps {
-    icon: string
+    icon?: string
     title: string
     description: string
     actionLabel?: string
@@ -14,6 +14,7 @@ interface EmptyStateProps {
     actionOnClick?: () => void
     actionText?: string
     actionLink?: string
+    action?: React.ReactNode
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
@@ -25,6 +26,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     actionOnClick,
     actionText,
     actionLink,
+    action,
 }) => {
     // Support both actionLabel/actionHref and actionText/actionLink
     const finalLabel = actionText || actionLabel
@@ -32,13 +34,14 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
     return (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className="text-6xl mb-4">{icon}</div>
+            {icon && <div className="text-6xl mb-4">{icon}</div>}
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                 {title}
             </h3>
             <p className="text-slate-600 dark:text-slate-400 max-w-sm mb-6">
                 {description}
             </p>
+            {action}
             {finalLabel && (
                 <>
                     {finalHref ? (

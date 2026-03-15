@@ -173,7 +173,7 @@ describe('InfrastructurePanel', () => {
                 if (url.includes('/nodes') && url.includes('POST')) {
                     return Promise.resolve({
                         ok: true,
-                        json: async () => ({ id: 'new-node', ...mockNode }),
+                        json: async () => ({ ...mockNode, id: 'new-node' }),
                     });
                 }
                 if (url.includes('/health')) {

@@ -143,7 +143,7 @@ const QuarantineReviewWorkbenchPage: React.FC<QuarantineReviewWorkbenchPageProps
       if (!normalizedSearch) return true
       return (
         row.source_image_ref.toLowerCase().includes(normalizedSearch) ||
-        row.epr_record_id.toLowerCase().includes(normalizedSearch) ||
+        (row.epr_record_id || '').toLowerCase().includes(normalizedSearch) ||
         row.status.toLowerCase().includes(normalizedSearch) ||
         (row.sync_state || '').toLowerCase().includes(normalizedSearch)
       )

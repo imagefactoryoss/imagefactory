@@ -174,7 +174,8 @@ describe("ToolAvailabilityManager tenant/global scope behavior", () => {
       expect(buildService.updateToolAvailability).toHaveBeenCalled();
     });
 
-    const [payload] = vi.mocked(buildService.updateToolAvailability).mock.calls.at(-1)!;
+    const calls = vi.mocked(buildService.updateToolAvailability).mock.calls;
+    const [payload] = calls[calls.length - 1]!;
     expect(payload.build_methods).toEqual({
       container: false,
       packer: false,

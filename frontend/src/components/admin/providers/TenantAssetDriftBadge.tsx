@@ -1,4 +1,3 @@
-import React from "react";
 import { TenantAssetDriftStatus } from "@/types";
 
 type TenantAssetDriftBadgeProps = {

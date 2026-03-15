@@ -69,6 +69,9 @@ const BuildsPage: React.FC = () => {
             const sourcesByID: Record<string, string> = {}
             await Promise.all(
                 projectIDs.map(async (projectID) => {
+                    if (!projectID) {
+                        return
+                    }
                     try {
                         const sources = await projectService.listProjectSources(projectID)
                         sources.forEach((source) => {

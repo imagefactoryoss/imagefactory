@@ -526,7 +526,8 @@ describe('QuarantineReviewWorkbenchPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View' }))
     expect(await screen.findByText('EPR Registration Detail')).toBeInTheDocument()
     expect(screen.getAllByText('Actions').length).toBeGreaterThan(0)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Approve' }).at(-1) as HTMLElement)
+    const approveButtons = screen.getAllByRole('button', { name: 'Approve' })
+    fireEvent.click(approveButtons[approveButtons.length - 1] as HTMLElement)
 
     await waitFor(() => {
       expect(confirmDialogMock).toHaveBeenCalled()

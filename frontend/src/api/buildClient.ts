@@ -55,7 +55,7 @@ export interface BuildList {
 // Build status response
 export interface BuildStatusResponse {
     build_id: string;
-    status: BuildStatus;
+    status: BuildStatus | 'in_progress' | 'success';
     progress?: {
         current_step: number;
         total_steps: number;
@@ -125,16 +125,13 @@ export interface APIError {
 
 export class BuildClient {
     private baseURL: string;
-    private token: string;
 
-    constructor(token: string, baseURL: string = 'http://localhost:8080/api/v1') {
-        this.token = token;
+    constructor(_token: string, baseURL: string = 'http://localhost:8080/api/v1') {
         this.baseURL = baseURL;
     }
 
     // Refresh token for expired tokens
-    setToken(token: string): void {
-        this.token = token;
+    setToken(_token: string): void {
     }
 
     // ========================================================================

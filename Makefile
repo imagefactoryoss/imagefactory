@@ -13,7 +13,7 @@ IMAGE_VERSION ?= v0.1.0
 IMAGE_ID ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 IMAGE_TAG ?= $(IMAGE_VERSION)-$(IMAGE_ID)
 IMAGE_REGISTRY ?=
-FRONTEND_USE_LOCAL_DIST ?= false
+FRONTEND_USE_LOCAL_DIST ?= true
 HELM_RELEASE ?= image-factory
 HELM_NAMESPACE ?= image-factory
 HELM_CHART ?= ./deploy/helm/image-factory
@@ -266,7 +266,13 @@ docker-build: ## Build Docker images
 	if [ "$(FRONTEND_USE_LOCAL_DIST)" = "true" ]; then \
 		echo "$(YELLOW)Using local frontend dist for image build...$(NC)"; \
 		(cd $(FRONTEND_DIR) && (npm run build || npx vite build)); \
+		if [ ! -d "$(FRONTEND_DIR)/dist" ]; then \
+			echo "$(RED)frontend/dist not found after local build. Aborting.$(NC)"; \
+			exit 1; \
+		fi; \
 		FRONTEND_TARGET=runtime-local; \
+	else \
+		echo "$(YELLOW)Using container frontend build stage...$(NC)"; \
 	fi; \
 	$(CONTAINER_ENGINE) build -t image-factory-backend:latest $(BACKEND_DIR); \
 	$(CONTAINER_ENGINE) build --target $$FRONTEND_TARGET -t image-factory-frontend:latest $(FRONTEND_DIR); \
@@ -309,7 +315,13 @@ docker-build-all-multiarch: ## Build amd64/arm64 images and push manifest list (
 	if [ "$(FRONTEND_USE_LOCAL_DIST)" = "true" ]; then \
 		echo "$(YELLOW)Using local frontend dist for image build...$(NC)"; \
 		(cd $(FRONTEND_DIR) && (npm run build || npx vite build)); \
+		if [ ! -d "$(FRONTEND_DIR)/dist" ]; then \
+			echo "$(RED)frontend/dist not found after local build. Aborting.$(NC)"; \
+			exit 1; \
+		fi; \
 		FRONTEND_TARGET=runtime-local; \
+	else \
+		echo "$(YELLOW)Using container frontend build stage...$(NC)"; \
 	fi; \
 	if [ "$(CONTAINER_ENGINE)" = "docker" ]; then \
 		docker buildx build --platform $(PLATFORMS) -t $(IMAGE_REGISTRY)/image-factory-backend:$(IMAGE_TAG) --push $(BACKEND_DIR); \

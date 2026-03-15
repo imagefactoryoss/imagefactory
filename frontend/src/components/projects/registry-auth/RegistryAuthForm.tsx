@@ -49,9 +49,8 @@ const registryHostSuggestionsByType: Record<string, string[]> = {
     ],
 }
 
-const RegistryAuthForm: React.FC<RegistryAuthFormProps> = ({ projectId, allowProjectScope, authToEdit, onSuccess, onCancel }) => {
+const RegistryAuthForm: React.FC<RegistryAuthFormProps> = ({ projectId, authToEdit, onSuccess, onCancel }) => {
     const isEditMode = Boolean(authToEdit)
-    const canSelectProjectScope = Boolean(allowProjectScope ?? projectId)
     const [scope, setScope] = useState<Scope>(authToEdit?.scope === 'tenant' ? 'tenant' : (projectId ? 'project' : 'tenant'))
     const [loading, setLoading] = useState(false)
     const [showHostSuggestions, setShowHostSuggestions] = useState(false)

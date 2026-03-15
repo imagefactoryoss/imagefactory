@@ -25,7 +25,7 @@ export const LastBuildWidget: React.FC<LastBuildWidgetProps> = ({ projectId }) =
                 projectId,
                 limit: 1,
                 page: 1,
-                tenantId: selectedTenantId,
+                tenantId: selectedTenantId || undefined,
             })
             if (response.data.length > 0) {
                 setLastBuild(response.data[0])

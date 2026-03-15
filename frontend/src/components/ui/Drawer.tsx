@@ -7,6 +7,7 @@ interface DrawerProps {
     onClose: () => void
     children: React.ReactNode
     width?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '60vw'
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '60vw'
 }
 
 const widthClasses: Record<NonNullable<DrawerProps['width']>, string> = {
@@ -26,7 +27,10 @@ const Drawer: React.FC<DrawerProps> = ({
     onClose,
     children,
     width = 'md',
+    size,
 }) => {
+    const resolvedWidth = size || width
+
     // Close drawer on Escape key
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -53,7 +57,7 @@ const Drawer: React.FC<DrawerProps> = ({
 
             {/* Drawer */}
             <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-                <div className={`pointer-events-auto w-screen ${widthClasses[width]}`} onClick={(e) => e.stopPropagation()}>
+                <div className={`pointer-events-auto w-screen ${widthClasses[resolvedWidth]}`} onClick={(e) => e.stopPropagation()}>
                     <div className="flex h-full flex-col overflow-y-scroll bg-white dark:bg-slate-900 shadow-xl">
                         {/* Header */}
                         <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-6 sm:px-6">

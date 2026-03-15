@@ -229,7 +229,7 @@ const TenantDetailsPage: React.FC = () => {
         setGroupMembers([])
     }
 
-    const handleRemoveGroupMember = async (groupId: string, memberId: string) => {
+    const handleRemoveGroupMember = async (_groupId: string, _memberId: string) => {
         // TODO: Implement remove group member functionality
     }
 
