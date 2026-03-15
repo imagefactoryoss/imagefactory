@@ -15,6 +15,11 @@
     {
       "title": "Platform Overview",
       "items": [
+        },
+        {
+          "title": "Admin Tenant Scope Route Checklist",
+          "path": "/implementation/ADMIN_TENANT_SCOPE_ROUTE_CHECKLIST.md",
+          "folder": ""
         { "title": "Operational Capabilities", "path": "/overview/OPERATIONAL_CAPABILITIES_MATRIX.md", "folder": "" },
         { "title": "Quarantine Process Guide", "path": "/overview/QUARANTINE_PROCESS_GUIDE.md", "folder": "" }
       ]

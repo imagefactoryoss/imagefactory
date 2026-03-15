@@ -94,6 +94,10 @@ flowchart TD
 - [implementation/ROBOT_SRE_INCIDENT_TAXONOMY_AND_POLICY_MATRIX.md](implementation/ROBOT_SRE_INCIDENT_TAXONOMY_AND_POLICY_MATRIX.md)
 - [implementation/ROBOT_SRE_LOG_INTELLIGENCE_AND_INCIDENT_DETECTION.md](implementation/ROBOT_SRE_LOG_INTELLIGENCE_AND_INCIDENT_DETECTION.md)
 
+## Implementation Contracts
+
+- [implementation/ADMIN_TENANT_SCOPE_ROUTE_CHECKLIST.md](implementation/ADMIN_TENANT_SCOPE_ROUTE_CHECKLIST.md)
+
 ## Contributor And Process Reference
 
 - [reference/PULL_REQUEST.md](reference/PULL_REQUEST.md)
