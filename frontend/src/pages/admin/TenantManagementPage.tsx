@@ -18,6 +18,18 @@ interface ExternalTenant {
     contact_email: string
     status: string
     company: string
+    critical_app: string
+    org: string
+    app_strategy: string
+    record_type: string
+    internal_flag: string
+    prod_date: string
+    tech_exec_email: string
+    lob_primary_email: string
+    app_mgr_netid: string
+    app_mgr_first_name: string
+    app_mgr_last_name: string
+    app_mgr_email: string
 }
 
 interface TenantSelectionModalProps {
@@ -955,17 +967,34 @@ const TenantManagementPage: React.FC = () => {
         try {
             setSubmitting(true)
             const companyId = (window as any).__companyId || null
+            // Auto-populate owner fields from ExternalTenant (APP_MGR fields)
+            const adminName = externalTenant.app_mgr_first_name && externalTenant.app_mgr_last_name
+                ? `${externalTenant.app_mgr_first_name} ${externalTenant.app_mgr_last_name}`.trim()
+                : formData.adminName;
+            const adminEmail = externalTenant.app_mgr_email || formData.adminEmail;
             const createResponse = await api.post('/tenants', {
                 ...(companyId ? { company_id: companyId } : {}),
                 external_tenant_id: externalTenant.id,
                 tenant_code: externalTenant.tenant_id,
                 name: externalTenant.name,
                 slug: externalTenant.slug,
-                admin_name: formData.adminName,
-                admin_email: formData.adminEmail,
+                admin_name: adminName,
+                admin_email: adminEmail,
                 contact_email: externalTenant.contact_email,
                 status: externalTenant.status,
                 company: externalTenant.company,
+                critical_app: externalTenant.critical_app,
+                org: externalTenant.org,
+                app_strategy: externalTenant.app_strategy,
+                record_type: externalTenant.record_type,
+                internal_flag: externalTenant.internal_flag,
+                prod_date: externalTenant.prod_date,
+                tech_exec_email: externalTenant.tech_exec_email,
+                lob_primary_email: externalTenant.lob_primary_email,
+                app_mgr_netid: externalTenant.app_mgr_netid,
+                app_mgr_first_name: externalTenant.app_mgr_first_name,
+                app_mgr_last_name: externalTenant.app_mgr_last_name,
+                app_mgr_email: externalTenant.app_mgr_email,
                 api_rate_limit: formData.apiRateLimit,
                 storage_limit: formData.storageLimit,
                 max_users: formData.maxUsers,
