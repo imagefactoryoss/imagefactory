@@ -214,19 +214,6 @@ func buildEssentialConfigs() []EssentialConfig {
 		},
 		{
 			ConfigType:  systemconfig.ConfigTypeExternalServices,
-			ConfigKey:   "external_service_tenant_service",
-			Description: "Configuration for external tenant management service",
-			Data: systemconfig.ExternalServiceConfig{
-				Name:        "tenant-service",
-				Description: "External tenant management service",
-				URL:         getEnvOrDefault("EXTERNAL_TENANT_SERVICE_URL", "http://localhost:8082"),
-				APIKey:      getEnvOrDefault("EXTERNAL_TENANT_API_KEY", "dev-tenant-api-key-12345"),
-				Headers:     map[string]string{},
-				Enabled:     true,
-			},
-		},
-		{
-			ConfigType:  systemconfig.ConfigTypeExternalServices,
 			ConfigKey:   "external_service_audit_service",
 			Description: "Configuration for external audit logging service",
 			Data: systemconfig.ExternalServiceConfig{
