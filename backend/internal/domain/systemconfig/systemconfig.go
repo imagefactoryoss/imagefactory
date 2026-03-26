@@ -143,6 +143,16 @@ type RuntimeServicesConfig struct {
 	ImageImportNotificationReceiptRetentionDays        int                         `json:"image_import_notification_receipt_retention_days,omitempty"`
 	ImageImportNotificationReceiptCleanupIntervalHours int                         `json:"image_import_notification_receipt_cleanup_interval_hours,omitempty"`
 	StorageProfiles                                    RuntimeAssetStorageProfiles `json:"storage_profiles,omitempty"`
+	// AppHQ tenant lookup service configuration
+	AppHQEnabled       *bool  `json:"apphq_enabled,omitempty"`
+	AppHQOAuthTokenURL string `json:"apphq_oauth_token_url,omitempty"`
+	AppHQClientID      string `json:"apphq_client_id,omitempty"`
+	AppHQClientSecret  string `json:"apphq_client_secret,omitempty"`
+	AppHQAPIURL        string `json:"apphq_api_url,omitempty"`
+	AppHQSystem        string `json:"apphq_system,omitempty"`
+	AppHQSystemName    string `json:"apphq_system_name,omitempty"`
+	AppHQRun           string `json:"apphq_run,omitempty"`
+	AppHQObjCode       string `json:"apphq_obj_cd,omitempty"`
 }
 
 // RuntimeAssetStorageProfile describes storage backend options for runtime assets.
