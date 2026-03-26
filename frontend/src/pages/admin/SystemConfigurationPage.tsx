@@ -444,6 +444,15 @@ const SystemConfigurationPage: React.FC = () => {
           pvc_access_modes: ["ReadWriteOnce"],
         },
       },
+      apphq_enabled: false,
+      apphq_oauth_token_url: "",
+      apphq_client_id: "",
+      apphq_client_secret: "",
+      apphq_api_url: "",
+      apphq_system: "",
+      apphq_system_name: "",
+      apphq_run: "",
+      apphq_obj_cd: "",
     });
   const [runtimeServicesFieldErrors, setRuntimeServicesFieldErrors] = useState<{
     dispatcher_url?: string;

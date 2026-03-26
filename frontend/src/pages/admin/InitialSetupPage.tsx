@@ -1,7 +1,7 @@
 import { api } from '@/services/api'
+import { useAuthStore } from '@/store/auth'
 import React, { useState } from 'react'
 import toast from 'react-hot-toast'
-import { useAuthStore } from '@/store/auth'
 
 const InitialSetupPage: React.FC = () => {
     const { setSetupRequired } = useAuthStore()
@@ -84,6 +84,15 @@ const InitialSetupPage: React.FC = () => {
         provider_readiness_watcher_interval_seconds: 180,
         provider_readiness_watcher_timeout_seconds: 90,
         provider_readiness_watcher_batch_size: 200,
+        apphq_enabled: false,
+        apphq_oauth_token_url: '',
+        apphq_client_id: '',
+        apphq_client_secret: '',
+        apphq_api_url: '',
+        apphq_system: '',
+        apphq_system_name: '',
+        apphq_run: '',
+        apphq_obj_cd: '',
     })
 
     const [ssoType, setSsoType] = useState<'oidc' | 'saml'>('oidc')

@@ -35,8 +35,8 @@ type TenantOnboardingData struct {
 	ContactName  string
 	TenantName   string
 	TenantID     string
-	Industry     string
-	Country      string
+	Status       string
+	Company      string
 	ContactEmail string
 	AdminEmail   string // CC'd recipient (optional)
 	APIRateLimit int
@@ -223,8 +223,8 @@ func (s *NotificationService) SendTenantOnboardingEmail(ctx context.Context, dat
 		"ContactName":  data.ContactName,
 		"TenantName":   data.TenantName,
 		"TenantID":     data.TenantID,
-		"Industry":     data.Industry,
-		"Country":      data.Country,
+		"Industry":     data.Status,
+		"Country":      data.Company,
 		"APIRateLimit": data.APIRateLimit,
 		"StorageLimit": data.StorageLimit,
 		"MaxUsers":     data.MaxUsers,

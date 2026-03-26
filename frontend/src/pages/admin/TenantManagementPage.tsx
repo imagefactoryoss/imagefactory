@@ -1,7 +1,7 @@
-import { useCanManageAdmin } from '@/hooks/useAccess'
 import { useRefresh } from '@/context/RefreshContext'
-import { api } from '@/services/api'
+import { useCanManageAdmin } from '@/hooks/useAccess'
 import { adminService } from '@/services/adminService'
+import { api } from '@/services/api'
 import { operationCapabilityService } from '@/services/operationCapabilityService'
 import { OperationCapabilitiesConfig, Tenant, TenantManagementFilters } from '@/types'
 import React, { useEffect, useState } from 'react'
@@ -16,8 +16,20 @@ interface ExternalTenant {
     slug: string
     description: string
     contact_email: string
-    industry: string
-    country: string
+    status: string
+    company: string
+    critical_app: string
+    org: string
+    app_strategy: string
+    record_type: string
+    internal_flag: string
+    prod_date: string
+    tech_exec_email: string
+    lob_primary_email: string
+    app_mgr_netid: string
+    app_mgr_first_name: string
+    app_mgr_last_name: string
+    app_mgr_email: string
 }
 
 interface TenantSelectionModalProps {
@@ -108,29 +120,27 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
         }
     }, [isOpen])
 
-    // Load external tenants
+    // Load external tenants when modal opens or search query changes (debounced)
     useEffect(() => {
-        if (isOpen) {
-            loadExternalTenants()
-        }
-    }, [isOpen])
+        if (!isOpen) return
 
-    // Filter tenants based on search
+        const timeout = setTimeout(() => {
+            loadExternalTenants()
+        }, searchQuery ? 400 : 0)
+
+        return () => clearTimeout(timeout)
+    }, [isOpen, searchQuery])
+
+    // Keep filtered list in sync with fetched results
     useEffect(() => {
-        const query = searchQuery.toLowerCase()
-        const filtered = externalTenants.filter(
-            (t) =>
-                t.name.toLowerCase().includes(query) ||
-                t.tenant_id.includes(query) ||
-                t.slug.toLowerCase().includes(query)
-        )
-        setFilteredTenants(filtered)
-    }, [searchQuery, externalTenants])
+        setFilteredTenants(externalTenants)
+    }, [externalTenants])
 
     const loadExternalTenants = async () => {
         try {
             setLoading(true)
-            const response = await api.get('/external-tenants')
+            const params = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : ''
+            const response = await api.get(`/external-tenants${params}`)
             const data = response.data
             setExternalTenants(data.tenants || [])
         } catch (error) {
@@ -293,7 +303,7 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
                                                             {tenant.name}
                                                         </div>
                                                         <div className="text-sm text-slate-600 dark:text-slate-400">
-                                                            ID: {tenant.tenant_id} • {tenant.industry} • {tenant.country}
+                                                            ID: {tenant.tenant_id} • {tenant.status} • {tenant.company}
                                                         </div>
                                                         <div className="text-sm text-slate-500 dark:text-slate-500 mt-1">
                                                             {tenant.description}
@@ -318,7 +328,7 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
                                     <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
                                         <div>Tenant ID: <span className="font-mono">{selectedTenant.tenant_id}</span></div>
                                         <div>Contact: <span className="font-mono">{selectedTenant.contact_email}</span></div>
-                                        <div>Industry: {selectedTenant.industry}</div>
+                                        <div>Status: {selectedTenant.status}</div>
                                     </div>
                                 </div>
                             )}
@@ -638,201 +648,201 @@ const TenantFormModal: React.FC<TenantFormModalProps> = ({ isOpen, tenant, onClo
             />
             <div className="absolute inset-y-0 right-0 w-full max-w-2xl">
                 <div className="h-full bg-white dark:bg-slate-800 shadow-xl flex flex-col border-l border-slate-200 dark:border-slate-700">
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                        {tenant ? 'Edit Tenant' : 'Create Tenant'}
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    >
-                        ✕
-                    </button>
-                </div>
-
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
-                    <div className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                            {tenant ? 'Edit Tenant' : 'Create Tenant'}
+                        </h2>
                         <button
-                            type="button"
-                            onClick={() => setActiveFormTab('details')}
-                            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${activeFormTab === 'details'
-                                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
-                                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
-                        >
-                            Details
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveFormTab('capabilities')}
-                            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${activeFormTab === 'capabilities'
-                                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
-                                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
-                        >
-                            Operation Capabilities
-                        </button>
-                    </div>
-
-                    {activeFormTab === 'details' ? (
-                        <>
-                            {/* Tenant Group Name */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Tenant group name *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                                    placeholder="e.g., Finance Team"
-                                />
-                                {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
-                            </div>
-
-                            {/* Slug */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Slug *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.slug}
-                                    onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase() })}
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                                    placeholder="your-company"
-                                />
-                                {errors.slug && <p className="text-xs text-red-600 mt-1">{errors.slug}</p>}
-                            </div>
-
-                            {/* Description */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Description
-                                </label>
-                                <textarea
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                                    placeholder="Brief description of the tenant"
-                                    rows={2}
-                                />
-                            </div>
-
-                            {/* Status */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Status
-                                </label>
-                                <select
-                                    value={formData.status}
-                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                                >
-                                    <option value="active">Active</option>
-                                    <option value="suspended">Suspended</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="archived">Archived</option>
-                                </select>
-                            </div>
-
-                            {/* Max Builds */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Max Builds
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.maxBuilds}
-                                    onChange={(e) => setFormData({ ...formData, maxBuilds: parseInt(e.target.value) })}
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                                    min="1"
-                                />
-                                {errors.maxBuilds && <p className="text-xs text-red-600 mt-1">{errors.maxBuilds}</p>}
-                            </div>
-
-                            {/* Storage Limit */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Storage Limit (GB)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.storageLimit}
-                                    onChange={(e) => setFormData({ ...formData, storageLimit: parseInt(e.target.value) })}
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                                    min="1"
-                                />
-                                {errors.storageLimit && <p className="text-xs text-red-600 mt-1">{errors.storageLimit}</p>}
-                            </div>
-                        </>
-                    ) : null}
-
-                    {activeFormTab === 'capabilities' ? (
-                        <div className="space-y-4">
-                            <div className="rounded-md border border-slate-300 dark:border-slate-600 p-3 space-y-3">
-                                <div>
-                                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Operation Capability Entitlements</h4>
-                                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                                        Adjust tenant-visible capabilities for build, quarantine, and scan operations.
-                                    </p>
-                                </div>
-                                {capabilitiesLoading ? (
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">Loading current capability assignments...</p>
-                                ) : (
-                                    <>
-                                        {Object.keys(operationCapabilities).sort().map((key) => (
-                                            <label key={key} className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
-                                                <span>{capabilityLabelForKey(key)}</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={getCapabilityValue(operationCapabilities, key)}
-                                                    onChange={(e) =>
-                                                        setOperationCapabilities((prev) => withCapabilityValue(prev, key, e.target.checked))
-                                                    }
-                                                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
-                                                />
-                                            </label>
-                                        ))}
-                                    </>
-                                )}
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Entitlement Change Reason
-                                </label>
-                                <textarea
-                                    value={capabilityChangeReason}
-                                    onChange={(e) => setCapabilityChangeReason(e.target.value)}
-                                    rows={2}
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                                    placeholder="Reason for capability entitlement changes"
-                                />
-                                {errors.capabilityChangeReason && <p className="text-xs text-red-600 mt-1">{errors.capabilityChangeReason}</p>}
-                            </div>
-                        </div>
-                    ) : null}
-
-                    {/* Buttons */}
-                    <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-                        <button
-                            type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
+                            className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                         >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {isLoading ? 'Saving...' : tenant ? 'Update Tenant' : 'Create Tenant'}
+                            ✕
                         </button>
                     </div>
-                </form>
+
+                    {/* Form */}
+                    <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+                        <div className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
+                            <button
+                                type="button"
+                                onClick={() => setActiveFormTab('details')}
+                                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${activeFormTab === 'details'
+                                    ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
+                            >
+                                Details
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveFormTab('capabilities')}
+                                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${activeFormTab === 'capabilities'
+                                    ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
+                            >
+                                Operation Capabilities
+                            </button>
+                        </div>
+
+                        {activeFormTab === 'details' ? (
+                            <>
+                                {/* Tenant Group Name */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Tenant group name *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        placeholder="e.g., Finance Team"
+                                    />
+                                    {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
+                                </div>
+
+                                {/* Slug */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Slug *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.slug}
+                                        onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase() })}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        placeholder="your-company"
+                                    />
+                                    {errors.slug && <p className="text-xs text-red-600 mt-1">{errors.slug}</p>}
+                                </div>
+
+                                {/* Description */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        placeholder="Brief description of the tenant"
+                                        rows={2}
+                                    />
+                                </div>
+
+                                {/* Status */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Status
+                                    </label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                    >
+                                        <option value="active">Active</option>
+                                        <option value="suspended">Suspended</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="archived">Archived</option>
+                                    </select>
+                                </div>
+
+                                {/* Max Builds */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Max Builds
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={formData.maxBuilds}
+                                        onChange={(e) => setFormData({ ...formData, maxBuilds: parseInt(e.target.value) })}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        min="1"
+                                    />
+                                    {errors.maxBuilds && <p className="text-xs text-red-600 mt-1">{errors.maxBuilds}</p>}
+                                </div>
+
+                                {/* Storage Limit */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Storage Limit (GB)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={formData.storageLimit}
+                                        onChange={(e) => setFormData({ ...formData, storageLimit: parseInt(e.target.value) })}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        min="1"
+                                    />
+                                    {errors.storageLimit && <p className="text-xs text-red-600 mt-1">{errors.storageLimit}</p>}
+                                </div>
+                            </>
+                        ) : null}
+
+                        {activeFormTab === 'capabilities' ? (
+                            <div className="space-y-4">
+                                <div className="rounded-md border border-slate-300 dark:border-slate-600 p-3 space-y-3">
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Operation Capability Entitlements</h4>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400">
+                                            Adjust tenant-visible capabilities for build, quarantine, and scan operations.
+                                        </p>
+                                    </div>
+                                    {capabilitiesLoading ? (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">Loading current capability assignments...</p>
+                                    ) : (
+                                        <>
+                                            {Object.keys(operationCapabilities).sort().map((key) => (
+                                                <label key={key} className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
+                                                    <span>{capabilityLabelForKey(key)}</span>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={getCapabilityValue(operationCapabilities, key)}
+                                                        onChange={(e) =>
+                                                            setOperationCapabilities((prev) => withCapabilityValue(prev, key, e.target.checked))
+                                                        }
+                                                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+                                                    />
+                                                </label>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Entitlement Change Reason
+                                    </label>
+                                    <textarea
+                                        value={capabilityChangeReason}
+                                        onChange={(e) => setCapabilityChangeReason(e.target.value)}
+                                        rows={2}
+                                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        placeholder="Reason for capability entitlement changes"
+                                    />
+                                    {errors.capabilityChangeReason && <p className="text-xs text-red-600 mt-1">{errors.capabilityChangeReason}</p>}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {/* Buttons */}
+                        <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="flex-1 px-4 py-2 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {isLoading ? 'Saving...' : tenant ? 'Update Tenant' : 'Create Tenant'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -957,17 +967,34 @@ const TenantManagementPage: React.FC = () => {
         try {
             setSubmitting(true)
             const companyId = (window as any).__companyId || null
+            // Auto-populate owner fields from ExternalTenant (APP_MGR fields)
+            const adminName = externalTenant.app_mgr_first_name && externalTenant.app_mgr_last_name
+                ? `${externalTenant.app_mgr_first_name} ${externalTenant.app_mgr_last_name}`.trim()
+                : formData.adminName;
+            const adminEmail = externalTenant.app_mgr_email || formData.adminEmail;
             const createResponse = await api.post('/tenants', {
                 ...(companyId ? { company_id: companyId } : {}),
                 external_tenant_id: externalTenant.id,
                 tenant_code: externalTenant.tenant_id,
                 name: externalTenant.name,
                 slug: externalTenant.slug,
-                admin_name: formData.adminName,
-                admin_email: formData.adminEmail,
+                admin_name: adminName,
+                admin_email: adminEmail,
                 contact_email: externalTenant.contact_email,
-                industry: externalTenant.industry,
-                country: externalTenant.country,
+                status: externalTenant.status,
+                company: externalTenant.company,
+                critical_app: externalTenant.critical_app,
+                org: externalTenant.org,
+                app_strategy: externalTenant.app_strategy,
+                record_type: externalTenant.record_type,
+                internal_flag: externalTenant.internal_flag,
+                prod_date: externalTenant.prod_date,
+                tech_exec_email: externalTenant.tech_exec_email,
+                lob_primary_email: externalTenant.lob_primary_email,
+                app_mgr_netid: externalTenant.app_mgr_netid,
+                app_mgr_first_name: externalTenant.app_mgr_first_name,
+                app_mgr_last_name: externalTenant.app_mgr_last_name,
+                app_mgr_email: externalTenant.app_mgr_email,
                 api_rate_limit: formData.apiRateLimit,
                 storage_limit: formData.storageLimit,
                 max_users: formData.maxUsers,

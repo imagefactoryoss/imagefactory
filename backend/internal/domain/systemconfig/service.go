@@ -2885,6 +2885,10 @@ func (s *Service) GetExternalService(ctx context.Context, tenantID *uuid.UUID, s
 	configKey := fmt.Sprintf("external_service_%s", strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(serviceName, " ", "_"), "-", "_")))
 
 	config, err := s.GetConfigByKey(ctx, tenantID, configKey)
+	if err != nil && tenantID != nil {
+		// Fall back to universal scope – the config may have been seeded globally
+		config, err = s.GetConfigByKey(ctx, nil, configKey)
+	}
 	if err != nil {
 		s.logger.Error("Failed to get external service config",
 			zap.String("serviceName", serviceName),
@@ -2913,6 +2917,10 @@ func (s *Service) DeleteExternalService(ctx context.Context, tenantID *uuid.UUID
 	configKey := fmt.Sprintf("external_service_%s", strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(serviceName, " ", "_"), "-", "_")))
 
 	config, err := s.GetConfigByKey(ctx, tenantID, configKey)
+	if err != nil && tenantID != nil {
+		// Fall back to universal scope – the config may have been seeded globally
+		config, err = s.GetConfigByKey(ctx, nil, configKey)
+	}
 	if err != nil {
 		s.logger.Error("Failed to find external service config for deletion",
 			zap.String("serviceName", serviceName),
