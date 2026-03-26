@@ -1,2 +1,1 @@
--- Drop external_tenants table
-DROP TABLE IF EXISTS external_tenants CASCADE;
+-- Down migration 015: no-op (external_tenants table no longer used)

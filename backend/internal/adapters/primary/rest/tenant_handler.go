@@ -214,39 +214,50 @@ type CreateTenantRequest struct {
 	AdminName        string `json:"admin_name" validate:"required"`        // Tenant administrator name
 	AdminEmail       string `json:"admin_email" validate:"required,email"` // Tenant administrator email
 	ContactEmail     string `json:"contact_email"`                         // From external tenant
-	Industry         string `json:"industry"`                              // From external tenant
-	Country          string `json:"country"`                               // From external tenant
+	Status           string `json:"status"`                                // From AppHQ (APPSTATUS)
+	Company          string `json:"company"`                               // From AppHQ (COMPANY)
 	APIRateLimit     int    `json:"api_rate_limit"`                        // Editable quota
 	StorageLimit     int    `json:"storage_limit"`                         // Editable quota in GB
 	MaxUsers         int    `json:"max_users"`                             // Editable quota
 }
 
 // CreateTenantResponse represents the response for tenant creation
-type CreateTenantResponse struct {
-	ID           string    `json:"id"`
-	NumericID    string    `json:"numericId"`
-	TenantCode   string    `json:"tenantCode"`
-	Name         string    `json:"name"`
-	Slug         string    `json:"slug"`
-	Description  string    `json:"description,omitempty"`
-	ContactEmail string    `json:"contactEmail,omitempty"`
-	Industry     string    `json:"industry,omitempty"`
-	Country      string    `json:"country,omitempty"`
-	Status       string    `json:"status"`
-	CreatedAt    string    `json:"createdAt"`
-	UpdatedAt    string    `json:"updatedAt"`
-	Version      int       `json:"version"`
-	Quota        QuotaInfo `json:"quota,omitempty"`
+type CreateTenantRequest struct {
+	CompanyID        string `json:"company_id" validate:"omitempty,uuid"`
+	ExternalTenantID string `json:"external_tenant_id"`
+	TenantCode       string `json:"tenant_code" validate:"required,max=8"`
+	Name             string `json:"name" validate:"required"`
+	Slug             string `json:"slug" validate:"required"`
+	Description      string `json:"description,omitempty"`
+	AdminName        string `json:"admin_name" validate:"required"`
+	AdminEmail       string `json:"admin_email" validate:"required,email"`
+	ContactEmail     string `json:"contact_email"`
+	Status           string `json:"status"`
+	Company          string `json:"company"`
+	CriticalApp      string `json:"critical_app"`
+	Org              string `json:"org"`
+	AppStrategy      string `json:"app_strategy"`
+	RecordType       string `json:"record_type"`
+	InternalFlag     string `json:"internal_flag"`
+	ProdDate         string `json:"prod_date"`
+	TechExecEmail    string `json:"tech_exec_email"`
+	LOBPrimaryEmail  string `json:"lob_primary_email"`
+	AppMgrNetID      string `json:"app_mgr_netid"`
+	AppMgrFirstName  string `json:"app_mgr_first_name"`
+	AppMgrLastName   string `json:"app_mgr_last_name"`
+	AppMgrEmail      string `json:"app_mgr_email"`
+	APIRateLimit     int    `json:"api_rate_limit"`
+	StorageLimit     int    `json:"storage_limit"`
+	MaxUsers         int    `json:"max_users"`
 }
-
 type externalTenantMetadata struct {
 	ContactEmail string
-	Industry     string
-	Country      string
+	Status       string
+	Company      string
 }
 
 func (h *TenantHandler) getExternalTenantMetadataByCode(tenantID uuid.UUID, tenantCode string) *externalTenantMetadata {
-	if tenantCode == "" || h.db == nil {
+	if h.db == nil {
 		return nil
 	}
 
@@ -256,23 +267,9 @@ func (h *TenantHandler) getExternalTenantMetadataByCode(tenantID uuid.UUID, tena
 	}
 
 	var contactEmail sql.NullString
-	var industry sql.NullString
-	var country sql.NullString
 
-	err := sqlxDB.QueryRow(
-		`SELECT contact_email, industry, country FROM external_tenants WHERE tenant_id = $1`,
-		tenantCode,
-	).Scan(&contactEmail, &industry, &country)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			h.logger.Warn("Failed to fetch external tenant metadata",
-				zap.String("tenant_code", tenantCode),
-				zap.Error(err))
-		}
-	}
-
-	// Fallback for prototype: derive contact from first active tenant user if external contact is unavailable.
-	if !contactEmail.Valid && tenantID != uuid.Nil {
+	// Derive contact from first active tenant user.
+	if tenantID != uuid.Nil {
 		var userEmail sql.NullString
 		userErr := sqlxDB.QueryRow(
 			`SELECT u.email
@@ -309,14 +306,12 @@ func (h *TenantHandler) getExternalTenantMetadataByCode(tenantID uuid.UUID, tena
 	}
 
 	// Nothing useful found.
-	if !contactEmail.Valid && !industry.Valid && !country.Valid {
+	if !contactEmail.Valid {
 		return nil
 	}
 
 	return &externalTenantMetadata{
 		ContactEmail: contactEmail.String,
-		Industry:     industry.String,
-		Country:      country.String,
 	}
 }
 
@@ -462,13 +457,22 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 		h.respondError(w, http.StatusBadRequest, "Slug is required")
 		return
 	}
-	if req.AdminName == "" {
-		h.logger.Warn("Tenant creation attempt with empty admin name")
+	// Prefer APP_MGR fields for owner if present
+	adminName := req.AdminName
+	if req.AppMgrFirstName != "" || req.AppMgrLastName != "" {
+		adminName = strings.TrimSpace(req.AppMgrFirstName + " " + req.AppMgrLastName)
+	}
+	adminEmail := req.AdminEmail
+	if req.AppMgrEmail != "" {
+		adminEmail = req.AppMgrEmail
+	}
+	if adminName == "" {
+		h.logger.Warn("Tenant creation attempt with empty admin name (after APP_MGR fallback)")
 		h.respondError(w, http.StatusBadRequest, "Admin name is required")
 		return
 	}
-	if req.AdminEmail == "" {
-		h.logger.Warn("Tenant creation attempt with empty admin email")
+	if adminEmail == "" {
+		h.logger.Warn("Tenant creation attempt with empty admin email (after APP_MGR fallback)")
 		h.respondError(w, http.StatusBadRequest, "Admin email is required")
 		return
 	}
@@ -685,8 +689,8 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 				ContactName:  req.Name,
 				TenantName:   req.Name,
 				TenantID:     req.TenantCode,
-				Industry:     req.Industry,
-				Country:      req.Country,
+				Status:       req.Status,
+				Company:      req.Company,
 				ContactEmail: req.ContactEmail,
 				AdminEmail:   adminEmail, // CC the admin if they have an email
 				APIRateLimit: req.APIRateLimit,
@@ -803,8 +807,7 @@ func (h *TenantHandler) GetTenant(w http.ResponseWriter, r *http.Request) {
 	}
 	if externalMeta := h.getExternalTenantMetadataByCode(tenant.ID(), tenant.TenantCode()); externalMeta != nil {
 		response.ContactEmail = externalMeta.ContactEmail
-		response.Industry = externalMeta.Industry
-		response.Country = externalMeta.Country
+		response.Company = externalMeta.Company
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -846,8 +849,7 @@ func (h *TenantHandler) GetTenantBySlug(w http.ResponseWriter, r *http.Request) 
 	}
 	if externalMeta := h.getExternalTenantMetadataByCode(tenant.ID(), tenant.TenantCode()); externalMeta != nil {
 		response.ContactEmail = externalMeta.ContactEmail
-		response.Industry = externalMeta.Industry
-		response.Country = externalMeta.Country
+		response.Company = externalMeta.Company
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1215,8 +1217,7 @@ func (h *TenantHandler) ListTenants(w http.ResponseWriter, r *http.Request) {
 		}
 		if externalMeta := h.getExternalTenantMetadataByCode(t.ID(), t.TenantCode()); externalMeta != nil {
 			tenantResp.ContactEmail = externalMeta.ContactEmail
-			tenantResp.Industry = externalMeta.Industry
-			tenantResp.Country = externalMeta.Country
+			tenantResp.Company = externalMeta.Company
 		}
 
 		response = append(response, tenantResp)
