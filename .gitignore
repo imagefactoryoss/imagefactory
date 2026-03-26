@@ -322,3 +322,5 @@ composer.phar
 # Redis dump file (generated)
 dump.rdb
 backend/external-tenant-service
+docs/reference/apphq-api-reference.md
+docs/apphq.txt
