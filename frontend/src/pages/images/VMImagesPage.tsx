@@ -298,6 +298,16 @@ const VMImagesPage: React.FC = () => {
               <p className="mt-1 text-slate-600 dark:text-slate-300">Target profile: {selected.target_profile_id || '-'}</p>
               <p className="mt-1 text-slate-600 dark:text-slate-300">Execution: {selected.execution_id}</p>
               <p className="mt-1 text-slate-600 dark:text-slate-300">Build status: {selected.build_status}</p>
+              {selected.lifecycle_last_action_at ? (
+                <p className="mt-1 text-slate-600 dark:text-slate-300">
+                  Last lifecycle action: {new Date(selected.lifecycle_last_action_at).toLocaleString()}
+                </p>
+              ) : null}
+              {selected.lifecycle_last_reason ? (
+                <p className="mt-1 text-slate-600 dark:text-slate-300">
+                  Last reason: {selected.lifecycle_last_reason}
+                </p>
+              ) : null}
             </div>
 
             <div className="rounded-md border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
@@ -342,6 +352,24 @@ const VMImagesPage: React.FC = () => {
                   {selected.artifact_values.map((value) => (
                     <li key={value} className="break-all rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                       {value}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="rounded-md border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Lifecycle History</h3>
+              {!selected.lifecycle_history || selected.lifecycle_history.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">No lifecycle transitions recorded.</p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {selected.lifecycle_history.map((entry, index) => (
+                    <li key={`${entry.state}-${entry.at || index}`} className="rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                      <div className="font-semibold">{entry.state}</div>
+                      {entry.at ? <div>{new Date(entry.at).toLocaleString()}</div> : null}
+                      {entry.reason ? <div>{entry.reason}</div> : null}
+                      {entry.actor_id ? <div className="break-all">actor: {entry.actor_id}</div> : null}
                     </li>
                   ))}
                 </ul>

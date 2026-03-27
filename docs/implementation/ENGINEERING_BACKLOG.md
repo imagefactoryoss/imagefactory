@@ -85,6 +85,11 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - VM catalog table now exposes `Promote`, `Deprecate`, and `Delete` actions with confirmation dialog UX.
     - action availability is lifecycle-aware and disables invalid transitions in UI.
     - successful actions refresh both list view and open detail drawer state.
+  - PR8 lifecycle guardrail + audit-depth hardening completed on `feature/packer-builds`:
+    - `deprecate`/`delete` transitions now require explicit reason payloads.
+    - `delete` transition now requires current lifecycle state `deprecated` (policy guardrail).
+    - lifecycle metadata now records bounded `lifecycle_history` entries with actor/reason/timestamp.
+    - VM catalog responses now expose lifecycle last-action fields and lifecycle history for operator traceability.
 
 ## Backlog Review Summary (2026-03-16)
 
