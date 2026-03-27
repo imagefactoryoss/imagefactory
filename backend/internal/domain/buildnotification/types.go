@@ -41,16 +41,19 @@ const (
 )
 
 const (
-	TriggerBuildQueued         TriggerID = "BN-001"
-	TriggerBuildStarted        TriggerID = "BN-002"
-	TriggerBuildCompleted      TriggerID = "BN-003"
-	TriggerBuildFailed         TriggerID = "BN-004"
-	TriggerBuildCancelled      TriggerID = "BN-005"
-	TriggerBuildRetryStarted   TriggerID = "BN-006"
-	TriggerBuildRetryFailed    TriggerID = "BN-007"
-	TriggerBuildRetrySucceeded TriggerID = "BN-008"
-	TriggerBuildRecovered      TriggerID = "BN-009"
-	TriggerPreflightBlocked    TriggerID = "BN-010"
+	TriggerBuildQueued          TriggerID = "BN-001"
+	TriggerBuildStarted         TriggerID = "BN-002"
+	TriggerBuildCompleted       TriggerID = "BN-003"
+	TriggerBuildFailed          TriggerID = "BN-004"
+	TriggerBuildCancelled       TriggerID = "BN-005"
+	TriggerBuildRetryStarted    TriggerID = "BN-006"
+	TriggerBuildRetryFailed     TriggerID = "BN-007"
+	TriggerBuildRetrySucceeded  TriggerID = "BN-008"
+	TriggerBuildRecovered       TriggerID = "BN-009"
+	TriggerPreflightBlocked     TriggerID = "BN-010"
+	TriggerBuildScheduledQueued TriggerID = "BN-011"
+	TriggerBuildScheduledFailed TriggerID = "BN-012"
+	TriggerBuildScheduledNoOp   TriggerID = "BN-013"
 )
 
 var AllTriggerIDs = []TriggerID{
@@ -64,6 +67,9 @@ var AllTriggerIDs = []TriggerID{
 	TriggerBuildRetrySucceeded,
 	TriggerBuildRecovered,
 	TriggerPreflightBlocked,
+	TriggerBuildScheduledQueued,
+	TriggerBuildScheduledFailed,
+	TriggerBuildScheduledNoOp,
 }
 
 var (
@@ -100,7 +106,7 @@ type TenantTriggerPreference struct {
 
 func DefaultTenantTriggerPreference(tenantID uuid.UUID, triggerID TriggerID) TenantTriggerPreference {
 	channels := []Channel{ChannelInApp}
-	if triggerID == TriggerBuildStarted || triggerID == TriggerBuildCompleted || triggerID == TriggerBuildFailed || triggerID == TriggerBuildCancelled {
+	if triggerID == TriggerBuildStarted || triggerID == TriggerBuildCompleted || triggerID == TriggerBuildFailed || triggerID == TriggerBuildCancelled || triggerID == TriggerBuildScheduledFailed {
 		channels = []Channel{ChannelInApp, ChannelEmail}
 	}
 
@@ -115,7 +121,7 @@ func DefaultTenantTriggerPreference(tenantID uuid.UUID, triggerID TriggerID) Ten
 
 func DefaultProjectTriggerPreference(tenantID, projectID uuid.UUID, triggerID TriggerID) ProjectTriggerPreference {
 	channels := []Channel{ChannelInApp}
-	if triggerID == TriggerBuildStarted || triggerID == TriggerBuildCompleted || triggerID == TriggerBuildFailed || triggerID == TriggerBuildCancelled {
+	if triggerID == TriggerBuildStarted || triggerID == TriggerBuildCompleted || triggerID == TriggerBuildFailed || triggerID == TriggerBuildCancelled || triggerID == TriggerBuildScheduledFailed {
 		channels = []Channel{ChannelInApp, ChannelEmail}
 	}
 
