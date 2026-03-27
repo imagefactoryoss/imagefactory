@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/srikarm/image-factory/internal/domain/packertarget"
 	systemconfig "github.com/srikarm/image-factory/internal/domain/systemconfig"
 )
 
@@ -24,6 +25,11 @@ type RegistryAuthResolver interface {
 	ResolveForBuild(ctx context.Context, tenantID, projectID uuid.UUID, selectedID *uuid.UUID) (*uuid.UUID, error)
 }
 
+// PackerTargetProfileLookup resolves tenant-entitled Packer target profiles.
+type PackerTargetProfileLookup interface {
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (*packertarget.Profile, error)
+}
+
 // Service defines the business logic for build management.
 type Service struct {
 	repository                 Repository
@@ -36,6 +42,7 @@ type Service struct {
 	tektonExecutorFactory      BuildMethodExecutorFactory
 	systemConfigService        SystemConfigService
 	registryAuthResolver       RegistryAuthResolver
+	packerTargetProfileLookup  PackerTargetProfileLookup
 	projectGitAuthLookup       projectGitAuthLookup
 	projectSourceGitAuthLookup projectSourceGitAuthLookup
 	projectBuildSettingsLookup projectBuildSettingsLookup
@@ -74,6 +81,10 @@ func NewService(
 // SetRegistryAuthResolver configures registry authentication validation and default resolution.
 func (s *Service) SetRegistryAuthResolver(resolver RegistryAuthResolver) {
 	s.registryAuthResolver = resolver
+}
+
+func (s *Service) SetPackerTargetProfileLookup(lookup PackerTargetProfileLookup) {
+	s.packerTargetProfileLookup = lookup
 }
 
 func (s *Service) SetProjectBuildSettingsLookup(lookup func(ctx context.Context, projectID uuid.UUID) (*ProjectBuildSettings, error)) {

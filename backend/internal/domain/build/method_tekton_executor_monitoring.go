@@ -870,6 +870,7 @@ func (e *MethodTektonExecutor) finalizeExecution(ctx context.Context, executionI
 	if len(artifacts) > 0 {
 		metadata, _ = json.Marshal(artifacts)
 	}
+	e.persistPackerArtifactMetadata(ctx, executionID, metadata)
 
 	e.service.AddLog(ctx, executionID, logLevel, message, metadata)
 
@@ -894,6 +895,45 @@ func (e *MethodTektonExecutor) finalizeExecution(ctx context.Context, executionI
 		zap.String("executionID", executionID.String()),
 		zap.String("status", string(status)),
 		zap.String("message", message))
+}
+
+func (e *MethodTektonExecutor) persistPackerArtifactMetadata(ctx context.Context, executionID uuid.UUID, artifactsPayload []byte) {
+	if e == nil || e.service == nil {
+		return
+	}
+	providerArtifacts := deriveProviderArtifactIdentifiers(artifactsPayload)
+	if len(providerArtifacts) == 0 {
+		return
+	}
+
+	execution, err := e.service.GetExecution(ctx, executionID)
+	if err != nil || execution == nil {
+		e.logger.Warn("Failed to load execution for packer artifact metadata update",
+			zap.String("execution_id", executionID.String()),
+			zap.Error(err))
+		return
+	}
+
+	metadata := parseExecutionMetadata(execution.Metadata)
+	packerMetadata, _ := metadata["packer"].(map[string]interface{})
+	if packerMetadata == nil {
+		packerMetadata = map[string]interface{}{}
+	}
+	packerMetadata["provider_artifact_identifiers"] = providerArtifacts
+	metadata["packer"] = packerMetadata
+
+	payload, err := json.Marshal(metadata)
+	if err != nil {
+		e.logger.Warn("Failed to marshal packer artifact metadata",
+			zap.String("execution_id", executionID.String()),
+			zap.Error(err))
+		return
+	}
+	if err := e.service.UpdateExecutionMetadata(ctx, executionID, payload); err != nil {
+		e.logger.Warn("Failed to update execution metadata with packer artifacts",
+			zap.String("execution_id", executionID.String()),
+			zap.Error(err))
+	}
 }
 
 func (e *MethodTektonExecutor) syncBuildStatusFromExecution(ctx context.Context, executionID uuid.UUID, status ExecutionStatus, message string) {

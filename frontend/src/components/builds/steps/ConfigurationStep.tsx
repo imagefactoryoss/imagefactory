@@ -198,6 +198,7 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
     const handlePackerConfig = (config: any) => {
         updateBuildConfig({
             packerTemplate: config.template,
+            packerTargetProfileId: config.packer_target_profile_id,
             variables: config.variables,
             buildVars: config.build_vars,
             onError: config.on_error,

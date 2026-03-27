@@ -33,6 +33,7 @@ import (
 	"github.com/srikarm/image-factory/internal/domain/imageimport"
 	"github.com/srikarm/image-factory/internal/domain/infrastructure"
 	"github.com/srikarm/image-factory/internal/domain/notification"
+	"github.com/srikarm/image-factory/internal/domain/packertarget"
 	"github.com/srikarm/image-factory/internal/domain/project"
 	"github.com/srikarm/image-factory/internal/domain/rbac"
 	"github.com/srikarm/image-factory/internal/domain/systemconfig"
@@ -370,6 +371,9 @@ func SetupRoutes(
 	notificationService := platform.notificationService
 	infrastructureService := platform.infrastructureService
 	infrastructureProviderHandler := platform.infrastructureProviderHand
+	packerTargetProfileRepo := postgres.NewPackerTargetProfileRepository(sqlxDB, logger)
+	packerTargetProfileService := packertarget.NewService(packerTargetProfileRepo)
+	packerTargetProfileHandler := NewPackerTargetProfileHandler(packerTargetProfileService, logger)
 	tenantHandler.SetNotificationService(notificationService)
 	tenantHandler.SetInfrastructureService(infrastructureService)
 
@@ -621,6 +625,7 @@ func SetupRoutes(
 		buildNotificationReplayHandler,
 		infrastructureHandler,
 		infrastructureProviderHandler,
+		packerTargetProfileHandler,
 		authHandler,
 		passwordResetHandler,
 		bootstrapHandler,

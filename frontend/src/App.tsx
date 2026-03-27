@@ -58,6 +58,7 @@ import AdminBuildsPage from '@/pages/admin/AdminBuildsPage'
 import AdminDashboardPage from '@/pages/admin/AdminDashboardPage'
 import AdminInfrastructureProviderDetailPage from '@/pages/admin/AdminInfrastructureProviderDetailPage'
 import AdminInfrastructureProvidersPage from '@/pages/admin/AdminInfrastructureProvidersPage'
+import AdminPackerTargetProfilesPage from '@/pages/admin/AdminPackerTargetProfilesPage'
 import AdminNotificationDefaultsPage from '@/pages/admin/AdminNotificationDefaultsPage'
 import AuditLogsPage from '@/pages/admin/AuditLogsPage'
 import ExternalServicesPage from '@/pages/admin/ExternalServicesPage'
@@ -363,6 +364,7 @@ function AppRoutes() {
                                             <Route path="builds/policies" element={<AdminBuildPoliciesPage />} />
                                             <Route path="infrastructure" element={<AdminInfrastructureProvidersPage />} />
                                             <Route path="infrastructure/:id" element={<AdminInfrastructureProviderDetailPage />} />
+                                            <Route path="infrastructure/packer-target-profiles" element={<AdminPackerTargetProfilesPage />} />
                                             <Route path="images/:imageId" element={<ImageDetailPage />} />
                                             <Route path="images/:imageId/edit" element={
                                                 <PermissionProtectedRoute resource="image" action="update">

@@ -8,7 +8,8 @@ Owners: Backend + Platform/Ops + Frontend
 
 - PR1 (contract hardening + canonical path guardrails): completed on `feature/packer-builds`.
 - PR2 (Tekton parity for Packer execution): completed on `feature/packer-builds`.
-- PR3+ remain pending.
+- PR3 (admin target profiles read/write/validate): completed on `feature/packer-builds`.
+- PR4+ remain pending.
 
 ## 1) Objective
 
@@ -659,6 +660,21 @@ Acceptance criteria:
 - admin can create provider profiles (VMware/AWS/Azure/GCP) with secret references.
 - validation endpoint returns deterministic pass/fail + remediation hints.
 - profile status persisted (`untested|valid|invalid`) with timestamps.
+
+Progress update (2026-03-27):
+- backend schema added via `082_packer_target_profiles` migration.
+- backend domain/service/repository added for `packer_target_profiles`.
+- admin REST routes added:
+  - `GET /api/v1/admin/packer-target-profiles`
+  - `POST /api/v1/admin/packer-target-profiles`
+  - `GET /api/v1/admin/packer-target-profiles/{id}`
+  - `PUT /api/v1/admin/packer-target-profiles/{id}`
+  - `DELETE /api/v1/admin/packer-target-profiles/{id}`
+  - `POST /api/v1/admin/packer-target-profiles/{id}/validate`
+- deterministic validation is currently configuration-driven (no live cloud/vCenter connectivity in PR3 backend slice).
+- frontend admin page/forms added for target profile list/create/edit/delete/validate:
+  - route: `/admin/infrastructure/packer-target-profiles`
+  - navigation: `Admin > Build Management > Packer Target Profiles`
 
 ### 16.5 PR4 - Tenant build wiring to target profiles (on-demand only)
 

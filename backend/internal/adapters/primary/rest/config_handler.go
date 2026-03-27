@@ -1,8 +1,11 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,14 +13,18 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/srikarm/image-factory/internal/domain/build"
+	"github.com/srikarm/image-factory/internal/domain/packertarget"
 )
 
 // ConfigHandler handles build method configuration endpoints backed by build_configs.
 type ConfigHandler struct {
-	repo     build.Repository
-	db       *sqlx.DB
-	resolver *build.DefaultConfigResolver
-	logger   *zap.Logger
+	repo                      build.Repository
+	db                        *sqlx.DB
+	resolver                  *build.DefaultConfigResolver
+	logger                    *zap.Logger
+	packerTargetProfileLookup interface {
+		GetByID(ctx context.Context, tenantID, id uuid.UUID) (*packertarget.Profile, error)
+	}
 }
 
 // NewConfigHandler creates a new config handler
@@ -30,17 +37,24 @@ func NewConfigHandler(repo build.Repository, db *sqlx.DB, logger *zap.Logger) *C
 	}
 }
 
+func (h *ConfigHandler) SetPackerTargetProfileLookup(lookup interface {
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (*packertarget.Profile, error)
+}) {
+	h.packerTargetProfileLookup = lookup
+}
+
 // ============================================================================
 // Request/Response Types
 // ============================================================================
 
 type CreatePackerConfigRequest struct {
-	BuildID   string                 `json:"build_id"`
-	Template  string                 `json:"template"`
-	Variables map[string]interface{} `json:"variables,omitempty"`
-	BuildVars map[string]string      `json:"build_vars,omitempty"`
-	OnError   string                 `json:"on_error,omitempty"`
-	Parallel  bool                   `json:"parallel,omitempty"`
+	BuildID               string                 `json:"build_id"`
+	Template              string                 `json:"template"`
+	PackerTargetProfileID string                 `json:"packer_target_profile_id"`
+	Variables             map[string]interface{} `json:"variables,omitempty"`
+	BuildVars             map[string]string      `json:"build_vars,omitempty"`
+	OnError               string                 `json:"on_error,omitempty"`
+	Parallel              bool                   `json:"parallel,omitempty"`
 }
 
 type CreateBuildxConfigRequest struct {
@@ -132,11 +146,13 @@ func (h *ConfigHandler) CreatePackerConfig(w http.ResponseWriter, r *http.Reques
 	}
 
 	config := &build.BuildConfigData{
-		BuildID:        buildID,
-		BuildMethod:    "packer",
-		PackerTemplate: req.Template,
-		Metadata:       map[string]interface{}{},
+		BuildID:               buildID,
+		BuildMethod:           "packer",
+		PackerTemplate:        req.Template,
+		PackerTargetProfileID: strings.TrimSpace(req.PackerTargetProfileID),
+		Metadata:              map[string]interface{}{},
 	}
+	config.Metadata["packer_target_profile_id"] = config.PackerTargetProfileID
 	if len(req.Variables) > 0 {
 		config.Metadata["variables"] = req.Variables
 	}
@@ -149,6 +165,10 @@ func (h *ConfigHandler) CreatePackerConfig(w http.ResponseWriter, r *http.Reques
 		config.Metadata["on_error"] = "cleanup"
 	}
 	config.Metadata["parallel"] = req.Parallel
+	if err := h.validatePackerTargetProfileForBuild(r.Context(), buildID, config.PackerTargetProfileID); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid packer target profile", err)
+		return
+	}
 
 	if err := h.repo.SaveBuildConfig(r.Context(), config); err != nil {
 		h.respondError(w, http.StatusInternalServerError, "failed to create packer config", err)
@@ -608,6 +628,13 @@ func (h *ConfigHandler) buildConfigToResponse(config *build.BuildConfigData) Con
 	switch method {
 	case "packer":
 		configMap["template"] = config.PackerTemplate
+		if profileID, ok := config.Metadata["packer_target_profile_id"].(string); ok && strings.TrimSpace(profileID) != "" {
+			configMap["packer_target_profile_id"] = strings.TrimSpace(profileID)
+		} else if profileID, ok := config.Metadata["packerTargetProfileId"].(string); ok && strings.TrimSpace(profileID) != "" {
+			configMap["packer_target_profile_id"] = strings.TrimSpace(profileID)
+		} else if profileID := strings.TrimSpace(config.PackerTargetProfileID); profileID != "" {
+			configMap["packer_target_profile_id"] = profileID
+		}
 		if vars, ok := config.Metadata["variables"]; ok {
 			configMap["variables"] = vars
 		}
@@ -737,4 +764,42 @@ func (h *ConfigHandler) respondError(w http.ResponseWriter, status int, message 
 		h.logger.Error(message, zap.Error(err))
 	}
 	h.respondJSON(w, status, response)
+}
+
+func (h *ConfigHandler) validatePackerTargetProfileForBuild(ctx context.Context, buildID uuid.UUID, profileID string) error {
+	if h.packerTargetProfileLookup == nil {
+		return nil
+	}
+
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		return fmt.Errorf("packer_target_profile_id is required")
+	}
+	profileUUID, err := uuid.Parse(profileID)
+	if err != nil {
+		return fmt.Errorf("packer_target_profile_id must be a valid UUID")
+	}
+
+	b, err := h.repo.FindByID(ctx, buildID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve build tenant: %w", err)
+	}
+	if b == nil {
+		return fmt.Errorf("build not found")
+	}
+
+	profile, err := h.packerTargetProfileLookup.GetByID(ctx, b.TenantID(), profileUUID)
+	if err != nil {
+		if err == packertarget.ErrNotFound {
+			return fmt.Errorf("packer target profile is not entitled to this tenant")
+		}
+		return fmt.Errorf("failed to resolve packer target profile: %w", err)
+	}
+	if profile == nil {
+		return fmt.Errorf("packer target profile is not entitled to this tenant")
+	}
+	if strings.TrimSpace(profile.ValidationStatus) != packertarget.ValidationStatusValid {
+		return fmt.Errorf("packer target profile must be valid before use (current status: %s)", strings.TrimSpace(profile.ValidationStatus))
+	}
+	return nil
 }

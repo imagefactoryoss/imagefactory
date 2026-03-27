@@ -3,6 +3,9 @@ package build
 import (
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
 )
 
 // validateManifest validates the build manifest.
@@ -65,6 +68,12 @@ func validateManifest(manifest BuildManifest) error {
 		}
 		if manifest.BuildConfig.PackerTemplate == "" {
 			return errors.New("packer template is required for packer builds")
+		}
+		if strings.TrimSpace(manifest.BuildConfig.PackerTargetProfileID) == "" {
+			return errors.New("packer_target_profile_id is required for packer builds")
+		}
+		if _, err := uuid.Parse(strings.TrimSpace(manifest.BuildConfig.PackerTargetProfileID)); err != nil {
+			return errors.New("packer_target_profile_id must be a valid UUID")
 		}
 	case BuildTypePaketo:
 		if manifest.BuildConfig == nil {

@@ -139,7 +139,9 @@ func (s *Service) executeBuild(ctx context.Context, build *Build, isRetry bool) 
 			return
 		}
 		if s.executionService != nil && execution != nil {
-			_ = s.executionService.CompleteExecution(ctx, execution.ID, true, "", executionArtifactsPayload(result))
+			artifactsPayload := executionArtifactsPayload(result)
+			s.persistPackerExecutionMetadata(ctx, execution.ID, currentBuild, artifactsPayload)
+			_ = s.executionService.CompleteExecution(ctx, execution.ID, true, "", artifactsPayload)
 		}
 	}
 

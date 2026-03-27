@@ -14,6 +14,7 @@ interface PackerConfigFormProps {
 
 interface FormState {
     template: string;
+    packerTargetProfileId: string;
     variables: Array<{ key: string; value: string }>;
     buildVars: Array<{ key: string; value: string }>;
     onError: string;
@@ -30,6 +31,7 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
 }) => {
     const [formState, setFormState] = useState<FormState>({
         template: initialConfig?.config.template || '',
+        packerTargetProfileId: initialConfig?.config.packer_target_profile_id || '',
         variables: initialConfig?.config.variables
             ? Object.entries(initialConfig.config.variables).map(([k, v]) => ({
                 key: k,
@@ -69,6 +71,9 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
         if (templateError) {
             return;
         }
+        if (!formState.packerTargetProfileId.trim()) {
+            return;
+        }
 
         const variables = formState.variables.reduce(
             (acc, { key, value }) => {
@@ -88,6 +93,7 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
         const request: CreatePackerConfigRequest = {
             build_id: buildId || '',
             template: formState.template,
+            packer_target_profile_id: formState.packerTargetProfileId || undefined,
             variables: Object.keys(variables).length > 0 ? variables : undefined,
             build_vars: Object.keys(buildVars).length > 0 ? buildVars : undefined,
             on_error: formState.onError || 'cleanup',
@@ -134,6 +140,22 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
                 {templateError && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{templateError}</p>}
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Enter a valid Packer template in JSON format
+                </p>
+            </div>
+
+            <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Target Profile ID *
+                </label>
+                <input
+                    type="text"
+                    value={formState.packerTargetProfileId}
+                    onChange={(e) => setFormState({ ...formState, packerTargetProfileId: e.target.value })}
+                    placeholder="UUID from Admin > Infrastructure > Packer Target Profiles"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-blue-400"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Required: builds must use a validated, tenant-entitled target profile.
                 </p>
             </div>
 
