@@ -102,6 +102,8 @@ Branch: `feature/packer-builds`
   - AWS `released` lifecycle action now supports provider-native EC2 image undeprecation when execution mode allows.
 - PR8 provider-native lifecycle metadata compatibility expansion completed:
   - AWS native lifecycle actions now use execution artifact values as fallback image lookup when provider identifiers are not present in execution metadata.
+- PR8 provider-native lifecycle artifact-shape compatibility expansion completed:
+  - execution artifact parsing now supports nested payload shapes for identifier extraction fallback, improving native lifecycle compatibility with older/non-standard artifact payloads.
 
 ## PR3 Backend Summary
 

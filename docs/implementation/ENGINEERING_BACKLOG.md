@@ -135,6 +135,8 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - AWS `released` lifecycle transitions now execute provider-native `DisableImageDeprecation` via EC2 when provider-native execution mode is enabled.
   - PR8 provider-native lifecycle metadata-compatibility expansion completed on `feature/packer-builds`:
     - AWS native lifecycle transitions now fall back to execution artifact values when `provider_artifact_identifiers.aws` is absent, improving compatibility with older build metadata payloads.
+  - PR8 provider-native lifecycle artifact-shape compatibility expansion completed on `feature/packer-builds`:
+    - execution artifact extraction now scans nested object/array payloads for string identifiers, improving native lifecycle fallback for non-array artifact shapes.
 
 ## Backlog Review Summary (2026-03-16)
 

@@ -874,6 +874,7 @@ Progress update (2026-03-27):
   - AWS `deprecate` transitions invoke EC2 `EnableImageDeprecation` with configurable deprecation window.
   - AWS `released` transitions invoke EC2 `DisableImageDeprecation` when provider-native mode is enabled.
   - AWS native transition image lookup now falls back to execution artifact payload values when provider identifier metadata is missing.
+  - artifact extraction now scans nested artifact payload shapes (object/array string leaves), improving native fallback identifier discovery for legacy/non-standard payload formats.
   - successful native execution records `lifecycle_transition_mode=provider_native`; malformed AWS artifact metadata fails request validation.
 
 ### 16.10 Cross-cutting quality gates for every PR

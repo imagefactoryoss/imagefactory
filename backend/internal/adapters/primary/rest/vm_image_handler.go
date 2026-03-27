@@ -618,8 +618,30 @@ func extractArtifactValues(raw json.RawMessage) []string {
 			appendValue(item)
 		}
 	}
+
+	if len(values) == 0 {
+		var anyPayload interface{}
+		if len(raw) > 0 && json.Unmarshal(raw, &anyPayload) == nil {
+			collectArtifactStringValues(anyPayload, appendValue)
+		}
+	}
 	sort.Strings(values)
 	return values
+}
+
+func collectArtifactStringValues(raw interface{}, appendValue func(string)) {
+	switch typed := raw.(type) {
+	case string:
+		appendValue(typed)
+	case []interface{}:
+		for _, item := range typed {
+			collectArtifactStringValues(item, appendValue)
+		}
+	case map[string]interface{}:
+		for _, value := range typed {
+			collectArtifactStringValues(value, appendValue)
+		}
+	}
 }
 
 func writeVMImageJSON(w http.ResponseWriter, status int, payload interface{}) {

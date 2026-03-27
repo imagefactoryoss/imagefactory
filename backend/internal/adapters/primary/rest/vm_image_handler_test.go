@@ -414,6 +414,30 @@ func TestExtractArtifactValues(t *testing.T) {
 	}
 }
 
+func TestExtractArtifactValues_NestedPayload(t *testing.T) {
+	raw := json.RawMessage(`{
+		"result": {
+			"image": {
+				"id": "ami-0abc1234def567890",
+				"arn": "arn:aws:ec2:us-west-2:123456789012:image/ami-0abc1234def567890"
+			},
+			"uris": [
+				"projects/demo/global/images/base-ubuntu",
+				"projects/demo/global/images/base-ubuntu"
+			]
+		}
+	}`)
+	values := extractArtifactValues(raw)
+	expected := []string{
+		"ami-0abc1234def567890",
+		"arn:aws:ec2:us-west-2:123456789012:image/ami-0abc1234def567890",
+		"projects/demo/global/images/base-ubuntu",
+	}
+	if !reflect.DeepEqual(values, expected) {
+		t.Fatalf("unexpected nested artifact values: expected %+v, got %+v", expected, values)
+	}
+}
+
 func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 	input := json.RawMessage(`{"packer":{"target_provider":"aws"}}`)
 	out, err := updatePackerLifecycleMetadata(
