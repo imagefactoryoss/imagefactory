@@ -69,13 +69,16 @@ func deriveProviderArtifactIdentifiers(raw []byte) map[string][]string {
 		if strings.Contains(lower, "/subscriptions/") && strings.Contains(lower, "/resourcegroups/") {
 			providerValues["azure"][value] = struct{}{}
 		}
-		if strings.Contains(lower, "/projects/") && strings.Contains(lower, "/global/images/") {
+		if (strings.Contains(lower, "/projects/") || strings.HasPrefix(lower, "projects/")) && strings.Contains(lower, "/global/images/") {
 			providerValues["gcp"][value] = struct{}{}
 		}
 		if strings.Contains(lower, "googleapis.com/compute") && strings.Contains(lower, "/images/") {
 			providerValues["gcp"][value] = struct{}{}
 		}
-		if strings.Contains(lower, "vsphere") || strings.Contains(lower, "vmware") || strings.Contains(lower, "template") {
+		if strings.Contains(lower, "vsphere") ||
+			(strings.Contains(lower, "vmware") && (strings.ContainsAny(lower, "/:\\") || strings.Contains(lower, "template"))) ||
+			strings.Contains(lower, "/templates/") ||
+			strings.HasSuffix(lower, ".ova") {
 			providerValues["vmware"][value] = struct{}{}
 		}
 	}
@@ -114,20 +117,20 @@ func collectArtifactValues(raw []byte) []string {
 		values = append(values, v)
 	}
 
-	var methodArtifacts []MethodArtifact
-	if err := json.Unmarshal(raw, &methodArtifacts); err == nil && len(methodArtifacts) > 0 {
-		for _, artifact := range methodArtifacts {
-			appendValue(artifact.Name)
-			appendValue(artifact.Path)
-		}
-		return values
-	}
-
 	var tektonArtifacts []Artifact
 	if err := json.Unmarshal(raw, &tektonArtifacts); err == nil && len(tektonArtifacts) > 0 {
 		for _, artifact := range tektonArtifacts {
 			appendValue(artifact.Name)
 			appendValue(artifact.Value)
+			appendValue(artifact.Path)
+		}
+		return values
+	}
+
+	var methodArtifacts []MethodArtifact
+	if err := json.Unmarshal(raw, &methodArtifacts); err == nil && len(methodArtifacts) > 0 {
+		for _, artifact := range methodArtifacts {
+			appendValue(artifact.Name)
 			appendValue(artifact.Path)
 		}
 		return values
@@ -141,5 +144,25 @@ func collectArtifactValues(raw []byte) []string {
 		return values
 	}
 
+	var payload interface{}
+	if err := json.Unmarshal(raw, &payload); err == nil {
+		collectGenericArtifactValues(payload, appendValue)
+	}
+
 	return values
+}
+
+func collectGenericArtifactValues(value interface{}, appendValue func(string)) {
+	switch typed := value.(type) {
+	case string:
+		appendValue(typed)
+	case []interface{}:
+		for _, item := range typed {
+			collectGenericArtifactValues(item, appendValue)
+		}
+	case map[string]interface{}:
+		for _, item := range typed {
+			collectGenericArtifactValues(item, appendValue)
+		}
+	}
 }

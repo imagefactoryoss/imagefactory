@@ -69,8 +69,10 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR7 frontend notification catalog parity completed on `feature/packer-builds`:
     - added `BN-011`/`BN-012`/`BN-013` trigger options in admin tenant defaults UI and tenant details notification drawer.
     - added scheduled trigger rows in project notification matrix with descriptions and payload typing updates.
-  - Remaining follow-up:
-    - keep hardening provider-specific artifact extraction coverage for edge-case output formats.
+  - Provider artifact extraction hardening completed on `feature/packer-builds`:
+    - improved identifier extraction for nested/non-array artifact payloads in execution metadata enrichment.
+    - expanded GCP pattern support for `projects/.../global/images/...` values without leading slash.
+    - reduced VMware false positives by requiring identifier-like VMware markers instead of bare labels.
 
 ## Backlog Review Summary (2026-03-16)
 

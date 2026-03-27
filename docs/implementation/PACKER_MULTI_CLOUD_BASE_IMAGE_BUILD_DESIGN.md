@@ -790,6 +790,10 @@ Progress update (2026-03-27):
   - admin tenant notification defaults panel
   - tenant details notification defaults drawer
   - project notification trigger matrix
+- provider artifact extraction hardening now covers edge-case payload shapes:
+  - nested/object artifact payload scanning (not only array payloads).
+  - GCP identifiers in both `/projects/...` and `projects/...` formats.
+  - VMware identifier filtering to reduce false positives from non-identifier labels.
 
 ### 16.9 PR8 - Lifecycle actions (promote/deprecate/delete) and policy guardrails
 
