@@ -866,6 +866,9 @@ Progress update (2026-03-27):
 - lifecycle transition execution now has an extensible backend seam:
   - lifecycle handler invokes a lifecycle executor interface before persisting metadata transition fields.
   - default executor currently returns `metadata_only` (provider-native operations still pending), enabling incremental provider implementation without handler contract churn.
+- lifecycle execution mode policy gate now exists for rollout safety:
+  - `IF_VM_LIFECYCLE_EXECUTION_MODE` supports `metadata_only` (default), `prefer_provider_native`, and `require_provider_native`.
+  - `require_provider_native` enforces fail-closed behavior (`501`) until provider-native transition executors are implemented.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

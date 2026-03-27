@@ -123,6 +123,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 provider-lifecycle execution seam foundation completed on `feature/packer-builds`:
     - VM lifecycle transitions now route through a lifecycle executor interface before metadata persistence.
     - default executor remains metadata-only (no provider-native action), but transition mode is now sourced from executor result for future provider integrations.
+  - PR8 provider-lifecycle execution-mode policy gate completed on `feature/packer-builds`:
+    - added `IF_VM_LIFECYCLE_EXECUTION_MODE` gate (`metadata_only`, `prefer_provider_native`, `require_provider_native`).
+    - `require_provider_native` now fails closed with `501` until provider-native transition implementations are added.
 
 ## Backlog Review Summary (2026-03-16)
 
