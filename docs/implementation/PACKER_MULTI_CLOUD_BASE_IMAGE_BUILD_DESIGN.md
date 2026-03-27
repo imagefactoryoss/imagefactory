@@ -9,7 +9,8 @@ Owners: Backend + Platform/Ops + Frontend
 - PR1 (contract hardening + canonical path guardrails): completed on `feature/packer-builds`.
 - PR2 (Tekton parity for Packer execution): completed on `feature/packer-builds`.
 - PR3 (admin target profiles read/write/validate): completed on `feature/packer-builds`.
-- PR4+ remain pending.
+- PR4 (tenant profile binding + preflight + execution metadata): completed on `feature/packer-builds`.
+- PR5+ remain pending.
 
 ## 1) Objective
 
@@ -76,6 +77,7 @@ We should support both:
 
 Canonical Packer config contract:
 - `template` (required)
+- `packer_target_profile_id` (required, UUID)
 - `variables` (map string->string, rendered as repeated `-var key=value`)
 - `build_vars` (optional, additional runtime vars)
 - `on_error` (optional: `cleanup`/`abort`/etc.)
@@ -272,6 +274,9 @@ On successful build completion, persist normalized artifact metadata:
 - source traceability (`git revision`, template path/hash, build execution id)
 - status (`created`, `validated`, `released`, `deprecated`, `deleted`, `failed`)
 - timestamps and actor context
+
+Current implementation note (PR4):
+- execution metadata now stores `packer.target_profile_id`, optional `packer.target_provider`, and derived `packer.provider_artifact_identifiers`.
 
 ### 11.3 When metadata is persisted
 

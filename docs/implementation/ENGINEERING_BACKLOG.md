@@ -48,6 +48,14 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - added admin page `/admin/infrastructure/packer-target-profiles` for list/create/edit/delete/validate.
     - wired `AdminLayout` navigation under `Build Management`.
     - added frontend service/types for `packer-target-profiles` API contract.
+  - PR4 tenant profile binding and preflight completed on `feature/packer-builds`:
+    - added required `build_config.packer_target_profile_id` contract for Packer builds in backend/frontend payload mapping.
+    - enforced fail-fast preflight for create/start/retry when target profile is not tenant-entitled or not `valid`.
+    - persisted Packer execution metadata with selected target profile/provider context and derived provider artifact identifiers.
+    - added/updated backend and integration tests for the PR4 scope.
+  - Remaining PR5 follow-up:
+    - replace free-form UUID input in tenant build wizard with entitled target-profile selector UX.
+    - harden artifact identifier derivation with more provider-specific structured extraction paths.
 
 ## Backlog Review Summary (2026-03-16)
 
