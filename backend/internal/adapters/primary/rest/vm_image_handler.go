@@ -115,21 +115,7 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	type vmImageListRow struct {
-		ExecutionID     uuid.UUID       `db:"execution_id"`
-		BuildID         uuid.UUID       `db:"build_id"`
-		ProjectID       uuid.UUID       `db:"project_id"`
-		ProjectName     string          `db:"project_name"`
-		BuildNumber     int             `db:"build_number"`
-		BuildStatus     string          `db:"build_status"`
-		ExecutionStatus string          `db:"execution_status"`
-		CreatedAt       time.Time       `db:"created_at"`
-		StartedAt       *time.Time      `db:"started_at"`
-		CompletedAt     *time.Time      `db:"completed_at"`
-		MetadataRaw     json.RawMessage `db:"metadata"`
-		ArtifactsRaw    json.RawMessage `db:"artifacts"`
-	}
-	rows := make([]vmImageListRow, 0, limit)
+	rows := make([]vmImageRow, 0, limit)
 	query := `
 		SELECT
 			be.id AS execution_id,
@@ -171,31 +157,7 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 
 	items := make([]vmImageCatalogItem, 0, len(rows))
 	for _, row := range rows {
-		targetProvider, targetProfileID, providerIdentifiers, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
-		artifactValues := extractArtifactValues(row.ArtifactsRaw)
-		items = append(items, vmImageCatalogItem{
-			ExecutionID:                 row.ExecutionID,
-			BuildID:                     row.BuildID,
-			ProjectID:                   row.ProjectID,
-			ProjectName:                 row.ProjectName,
-			BuildNumber:                 row.BuildNumber,
-			BuildStatus:                 row.BuildStatus,
-			ExecutionStatus:             row.ExecutionStatus,
-			CreatedAt:                   row.CreatedAt.UTC(),
-			StartedAt:                   row.StartedAt,
-			CompletedAt:                 row.CompletedAt,
-			TargetProvider:              targetProvider,
-			TargetProfileID:             targetProfileID,
-			ProviderArtifactIdentifiers: providerIdentifiers,
-			ArtifactValues:              artifactValues,
-			LifecycleState:              vmImageLifecycleState(row.ExecutionStatus, lifecycle.State),
-			LifecycleLastActionAt:       lifecycle.LastActionAt,
-			LifecycleLastActionBy:       lifecycle.LastActionBy,
-			LifecycleLastReason:         lifecycle.LastReason,
-			LifecycleTransitionMode:     lifecycle.TransitionMode,
-			LifecycleHistory:            lifecycle.History,
-			ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)),
-		})
+		items = append(items, vmImageCatalogItemFromRow(row))
 	}
 
 	writeVMImageJSON(w, http.StatusOK, vmImageCatalogListResponse{
@@ -251,30 +213,7 @@ func (h *VMImageHandler) GetTenantVMImage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	targetProvider, targetProfileID, providerIdentifiers, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
-	item := vmImageCatalogItem{
-		ExecutionID:                 row.ExecutionID,
-		BuildID:                     row.BuildID,
-		ProjectID:                   row.ProjectID,
-		ProjectName:                 row.ProjectName,
-		BuildNumber:                 row.BuildNumber,
-		BuildStatus:                 row.BuildStatus,
-		ExecutionStatus:             row.ExecutionStatus,
-		CreatedAt:                   row.CreatedAt.UTC(),
-		StartedAt:                   row.StartedAt,
-		CompletedAt:                 row.CompletedAt,
-		TargetProvider:              targetProvider,
-		TargetProfileID:             targetProfileID,
-		ProviderArtifactIdentifiers: providerIdentifiers,
-		ArtifactValues:              extractArtifactValues(row.ArtifactsRaw),
-		LifecycleState:              vmImageLifecycleState(row.ExecutionStatus, lifecycle.State),
-		LifecycleLastActionAt:       lifecycle.LastActionAt,
-		LifecycleLastActionBy:       lifecycle.LastActionBy,
-		LifecycleLastReason:         lifecycle.LastReason,
-		LifecycleTransitionMode:     lifecycle.TransitionMode,
-		LifecycleHistory:            lifecycle.History,
-		ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)),
-	}
+	item := vmImageCatalogItemFromRow(row)
 
 	writeVMImageJSON(w, http.StatusOK, map[string]vmImageCatalogItem{"data": item})
 }
@@ -537,7 +476,10 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		return
 	}
 	if currentLifecycle == targetState {
-		writeVMImageJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("vm image already in %s lifecycle state", targetState)})
+		writeVMImageJSON(w, http.StatusOK, map[string]interface{}{
+			"data":    vmImageCatalogItemFromRow(*row),
+			"message": fmt.Sprintf("vm image already in %s lifecycle state", targetState),
+		})
 		return
 	}
 
@@ -572,30 +514,7 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		writeVMImageJSON(w, http.StatusInternalServerError, map[string]string{"error": "vm image lifecycle updated but failed to reload response"})
 		return
 	}
-	targetProvider, targetProfileID, providerIdentifiers, updatedLifecycle := parsePackerMetadataFields(updatedRow.MetadataRaw)
-	item := vmImageCatalogItem{
-		ExecutionID:                 updatedRow.ExecutionID,
-		BuildID:                     updatedRow.BuildID,
-		ProjectID:                   updatedRow.ProjectID,
-		ProjectName:                 updatedRow.ProjectName,
-		BuildNumber:                 updatedRow.BuildNumber,
-		BuildStatus:                 updatedRow.BuildStatus,
-		ExecutionStatus:             updatedRow.ExecutionStatus,
-		CreatedAt:                   updatedRow.CreatedAt.UTC(),
-		StartedAt:                   updatedRow.StartedAt,
-		CompletedAt:                 updatedRow.CompletedAt,
-		TargetProvider:              targetProvider,
-		TargetProfileID:             targetProfileID,
-		ProviderArtifactIdentifiers: providerIdentifiers,
-		ArtifactValues:              extractArtifactValues(updatedRow.ArtifactsRaw),
-		LifecycleState:              vmImageLifecycleState(updatedRow.ExecutionStatus, updatedLifecycle.State),
-		LifecycleLastActionAt:       updatedLifecycle.LastActionAt,
-		LifecycleLastActionBy:       updatedLifecycle.LastActionBy,
-		LifecycleLastReason:         updatedLifecycle.LastReason,
-		LifecycleTransitionMode:     updatedLifecycle.TransitionMode,
-		LifecycleHistory:            updatedLifecycle.History,
-		ActionPermissions:           vmImageLifecycleActionPermissions(updatedRow.ExecutionStatus, vmImageLifecycleState(updatedRow.ExecutionStatus, updatedLifecycle.State)),
-	}
+	item := vmImageCatalogItemFromRow(*updatedRow)
 	writeVMImageJSON(w, http.StatusOK, map[string]interface{}{
 		"data":    item,
 		"message": fmt.Sprintf("vm image lifecycle transitioned to %s", targetState),
@@ -615,6 +534,34 @@ type vmImageRow struct {
 	CompletedAt     *time.Time      `db:"completed_at"`
 	MetadataRaw     json.RawMessage `db:"metadata"`
 	ArtifactsRaw    json.RawMessage `db:"artifacts"`
+}
+
+func vmImageCatalogItemFromRow(row vmImageRow) vmImageCatalogItem {
+	targetProvider, targetProfileID, providerIdentifiers, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
+	lifecycleState := vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)
+	return vmImageCatalogItem{
+		ExecutionID:                 row.ExecutionID,
+		BuildID:                     row.BuildID,
+		ProjectID:                   row.ProjectID,
+		ProjectName:                 row.ProjectName,
+		BuildNumber:                 row.BuildNumber,
+		BuildStatus:                 row.BuildStatus,
+		ExecutionStatus:             row.ExecutionStatus,
+		CreatedAt:                   row.CreatedAt.UTC(),
+		StartedAt:                   row.StartedAt,
+		CompletedAt:                 row.CompletedAt,
+		TargetProvider:              targetProvider,
+		TargetProfileID:             targetProfileID,
+		ProviderArtifactIdentifiers: providerIdentifiers,
+		ArtifactValues:              extractArtifactValues(row.ArtifactsRaw),
+		LifecycleState:              lifecycleState,
+		LifecycleLastActionAt:       lifecycle.LastActionAt,
+		LifecycleLastActionBy:       lifecycle.LastActionBy,
+		LifecycleLastReason:         lifecycle.LastReason,
+		LifecycleTransitionMode:     lifecycle.TransitionMode,
+		LifecycleHistory:            lifecycle.History,
+		ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, lifecycleState),
+	}
 }
 
 func (h *VMImageHandler) getTenantVMImageRow(r *http.Request, tenantID, executionID uuid.UUID) (*vmImageRow, error) {

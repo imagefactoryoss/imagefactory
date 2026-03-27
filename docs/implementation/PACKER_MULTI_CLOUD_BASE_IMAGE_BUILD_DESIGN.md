@@ -847,6 +847,9 @@ Progress update (2026-03-27):
 - lifecycle history audit depth now includes transition mode:
   - lifecycle history entries include `transition_mode` for each transition event.
   - VM catalog lifecycle history view surfaces each entry's transition mode for operator traceability.
+- lifecycle action responses now use a consistent payload shape:
+  - idempotent transitions (`already in target state`) return `data` + `message` instead of message-only payload.
+  - list/detail/action responses share the same VM catalog item builder to reduce contract drift.
 
 ### 16.10 Cross-cutting quality gates for every PR
 
