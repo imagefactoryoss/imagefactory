@@ -66,6 +66,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - added scheduled trigger outcome IDs (`BN-011`/`BN-012`/`BN-013`) and defaults (`scheduled_failed` includes email).
     - mapped scheduled status updates (`scheduled_queued`, `scheduled_failed`, `scheduled_noop`) into notification routing.
     - schedule runner now emits build status events for queue/fail/no-op outcomes to drive trigger-based delivery.
+  - PR7 frontend notification catalog parity completed on `feature/packer-builds`:
+    - added `BN-011`/`BN-012`/`BN-013` trigger options in admin tenant defaults UI and tenant details notification drawer.
+    - added scheduled trigger rows in project notification matrix with descriptions and payload typing updates.
   - Remaining follow-up:
     - keep hardening provider-specific artifact extraction coverage for edge-case output formats.
 

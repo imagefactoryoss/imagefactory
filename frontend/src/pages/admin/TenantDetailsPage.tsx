@@ -1,6 +1,6 @@
 import Drawer from '@/components/ui/Drawer'
-import { api } from '@/services/api'
 import { adminService } from '@/services/adminService'
+import { api } from '@/services/api'
 import { Tenant } from '@/types'
 import { Copy } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
@@ -27,6 +27,9 @@ type TriggerID =
     | 'BN-008'
     | 'BN-009'
     | 'BN-010'
+    | 'BN-011'
+    | 'BN-012'
+    | 'BN-013'
 
 type Channel = 'in_app' | 'email'
 type RecipientPolicy = 'initiator' | 'project_members' | 'tenant_admins' | 'custom_users'
@@ -54,6 +57,9 @@ const TRIGGER_CATALOG: Array<{ id: TriggerID; name: string }> = [
     { id: 'BN-008', name: 'Retry succeeded' },
     { id: 'BN-009', name: 'Recovered from stuck/orphaned' },
     { id: 'BN-010', name: 'Preflight blocked' },
+    { id: 'BN-011', name: 'Scheduled build queued' },
+    { id: 'BN-012', name: 'Scheduled build failed' },
+    { id: 'BN-013', name: 'Scheduled build skipped' },
 ]
 
 const TenantDetailsPage: React.FC = () => {

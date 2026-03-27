@@ -14,7 +14,10 @@ type TriggerID =
   | "BN-007"
   | "BN-008"
   | "BN-009"
-  | "BN-010";
+  | "BN-010"
+  | "BN-011"
+  | "BN-012"
+  | "BN-013";
 
 type Channel = "in_app" | "email";
 type RecipientPolicy =
@@ -51,6 +54,9 @@ const TRIGGER_CATALOG: Array<{ id: TriggerID; name: string }> = [
   { id: "BN-008", name: "Retry succeeded" },
   { id: "BN-009", name: "Recovered from stuck/orphaned" },
   { id: "BN-010", name: "Preflight blocked" },
+  { id: "BN-011", name: "Scheduled build queued" },
+  { id: "BN-012", name: "Scheduled build failed" },
+  { id: "BN-013", name: "Scheduled build skipped" },
 ];
 
 const TenantNotificationDefaultsPanel: React.FC = () => {
