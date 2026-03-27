@@ -3,7 +3,7 @@
 Last updated: 2026-03-27  
 Branch: `feature/packer-builds`
 
-## Delivered Through PR6
+## Delivered Through PR7 (backend scheduler slice)
 
 - PR1 completed:
   - Packer config contract hardening (`variables`, `build_vars`, `on_error`, `parallel`) across backend/frontend/runtime.
@@ -21,6 +21,10 @@ Branch: `feature/packer-builds`
 - PR6 completed:
   - tenant VM image catalog APIs and UI shipped (`/images/vm` list + details drawer).
   - catalog exposes provider artifact identifiers, source traceability, and lifecycle state.
+- PR7 backend scheduler slice completed:
+  - dispatcher now processes due schedule triggers and queues scheduled-origin packer builds.
+  - cron-based `next_trigger_at` calculation added for schedule create + post-fire advancement.
+  - scheduled-origin metadata + default `forbid` concurrency behavior added.
 
 ## PR3 Backend Summary
 
@@ -136,17 +140,44 @@ PR6 behavior:
 - detail drawer showing provider artifact identifiers, source build link, and lifecycle state.
 - dark-mode-ready styling for all new controls/tables/drawer sections.
 
+## PR7 Backend Summary
+
+Core backend modules touched:
+- `backend/internal/domain/build/service_scheduled_triggers.go`
+- `backend/internal/domain/build/cron_schedule.go`
+- `backend/internal/domain/build/service_triggers.go`
+- `backend/internal/adapters/secondary/postgres/trigger_repository.go`
+- `backend/internal/application/dispatcher/queue_dispatcher.go`
+
+Tests added/updated:
+- `backend/internal/domain/build/cron_schedule_test.go`
+- `backend/internal/application/dispatcher/queue_dispatcher_test.go`
+
+PR7 backend behavior:
+- dispatcher executes `ProcessScheduledTriggers(...)` each cycle before claiming queued builds.
+- due active schedule triggers are loaded from trigger repository and processed in bounded batches.
+- only packer source builds are auto-fired by schedule runner.
+- fired builds are created as queued builds with schedule metadata:
+  - `trigger_type=schedule`
+  - `trigger_mode=scheduled`
+  - `schedule_trigger_id`
+  - `schedule_fire_timestamp`
+  - `schedule_concurrency_policy=forbid`
+- `forbid` policy: skip schedule fire when another queued/running packer build exists in the same project.
+
 ## Validation Run Notes
 
 Backend:
 - `go test ./internal/adapters/primary/rest -count=1`
 - `go test ./internal/domain/build -count=1`
+- `go test ./internal/application/dispatcher -count=1`
+- `go test ./internal/adapters/secondary/postgres -run TriggerRepository -count=1`
 
 Frontend:
 - `npm run build`
 
-## Known Gap For Next PR (PR7)
+## Known Gap For Next PR (PR7 follow-up)
 
-- scheduled triggers for packer builds (schedule config + scheduler dispatch metadata).
-- expand VM catalog semantics for lifecycle actions (promote/deprecate/delete) after schedule support lands.
-- continue hardening provider-specific artifact extraction heuristics for edge-case parser coverage.
+- schedule trigger management parity (update/pause/resume surfaces + explicit audit events for those actions).
+- notification hooks for scheduled fire outcomes (success/failure/no-op) tied to build notification defaults.
+- expand VM catalog semantics for lifecycle actions (promote/deprecate/delete) after schedule UX/API parity.

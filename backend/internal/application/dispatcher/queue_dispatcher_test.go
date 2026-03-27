@@ -125,10 +125,13 @@ func (m *mockBuildRepo) UpdateInfrastructureSelection(ctx context.Context, build
 }
 
 type mockDispatchService struct {
-	mu     sync.Mutex
-	calls  []uuid.UUID
-	err    error
-	callCh chan uuid.UUID
+	mu                    sync.Mutex
+	calls                 []uuid.UUID
+	err                   error
+	callCh                chan uuid.UUID
+	scheduledProcessCalls int
+	scheduledQueued       int
+	scheduledErr          error
 }
 
 func (m *mockDispatchService) DispatchBuild(ctx context.Context, build *build.Build) error {
@@ -139,6 +142,16 @@ func (m *mockDispatchService) DispatchBuild(ctx context.Context, build *build.Bu
 		m.callCh <- build.ID()
 	}
 	return m.err
+}
+
+func (m *mockDispatchService) ProcessScheduledTriggers(ctx context.Context, limit int) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.scheduledProcessCalls++
+	if m.scheduledErr != nil {
+		return 0, m.scheduledErr
+	}
+	return m.scheduledQueued, nil
 }
 
 type mockSystemConfigService struct {
@@ -257,6 +270,29 @@ func TestQueuedBuildDispatcher_FailsAfterMaxRetries(t *testing.T) {
 	require.Len(t, repo.updateStatusCalls, 1)
 	require.Equal(t, buildID, repo.updateStatusCalls[0].id)
 	require.Equal(t, build.BuildStatusFailed, repo.updateStatusCalls[0].status)
+}
+
+func TestQueuedBuildDispatcher_ProcessesScheduledTriggersBeforeDispatch(t *testing.T) {
+	buildID := uuid.New()
+	repo := &mockBuildRepo{
+		queue: []*build.Build{newQueuedBuild(buildID)},
+	}
+	dispatcherSvc := &mockDispatchService{
+		callCh:          make(chan uuid.UUID, 1),
+		scheduledQueued: 1,
+		scheduledErr:    nil,
+	}
+
+	d := NewQueuedBuildDispatcher(repo, dispatcherSvc, nil, zap.NewNop(), QueueDispatcherConfig{
+		PollInterval:       10 * time.Millisecond,
+		MaxDispatchPerTick: 1,
+	})
+
+	_, err := d.RunOnce(context.Background())
+	require.NoError(t, err)
+	dispatcherSvc.mu.Lock()
+	defer dispatcherSvc.mu.Unlock()
+	require.Equal(t, 1, dispatcherSvc.scheduledProcessCalls)
 }
 
 func TestQueuedBuildDispatcher_FailsImmediatelyOnCapabilityEntitlementError(t *testing.T) {

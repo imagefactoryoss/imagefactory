@@ -58,8 +58,13 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR6 tenant VM image catalog read path completed on `feature/packer-builds`:
     - added tenant VM image catalog APIs (`/api/v1/images/vm` + `/api/v1/images/vm/{executionId}`) with provider/status/search filters.
     - added tenant VM image catalog UI route (`/images/vm`) with details drawer and source build traceability.
-  - Next PR7 follow-up:
-    - implement scheduled triggers for packer builds with concurrency policy and trigger metadata.
+  - PR7 backend scheduler slice completed on `feature/packer-builds`:
+    - dispatcher now processes due active schedule triggers and queues packer builds from schedule templates.
+    - schedule `next_trigger_at` is now computed from cron expression on create and after each fire.
+    - scheduled-origin metadata and default `forbid` concurrency policy are applied to scheduled build queuing.
+  - Remaining PR7 follow-up:
+    - add schedule update/pause/resume management parity and explicit audit coverage.
+    - wire notification hooks for scheduled success/failure/no-op outcomes.
     - keep hardening provider-specific artifact extraction coverage for edge-case output formats.
 
 ## Backlog Review Summary (2026-03-16)
