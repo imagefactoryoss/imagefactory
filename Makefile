@@ -22,6 +22,8 @@ RELEASE_TARGETS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 SOURCE_IMAGE ?= image-factory-source
 SOURCE_EXTRACT_DIR ?= ./dist/image-factory-source
 SOURCE_BUILD_CONTEXT ?= ./dist/source-context
+SOURCE_SERVER_CONTAINER ?= image-factory-source-server
+SOURCE_SERVER_PORT ?= 8099
 
 # Colors for output
 RED := \033[0;31m
@@ -294,6 +296,23 @@ docker-build-source: ## Build source distribution image from tracked files at HE
 	@mkdir -p $(SOURCE_BUILD_CONTEXT)
 	@git archive --format=tar HEAD | tar -xf - -C $(SOURCE_BUILD_CONTEXT)
 	$(CONTAINER_ENGINE) build -f Dockerfile.source -t $(SOURCE_IMAGE):$(IMAGE_TAG) $(SOURCE_BUILD_CONTEXT)
+
+.PHONY: docker-run-source-server
+docker-run-source-server: docker-build-source ## Run source image server (serves /source.tar on SOURCE_SERVER_PORT)
+	@echo "$(GREEN)Starting source tar server from $(SOURCE_IMAGE):$(IMAGE_TAG)...$(NC)"
+	@$(CONTAINER_ENGINE) rm -f $(SOURCE_SERVER_CONTAINER) >/dev/null 2>/dev/null || true
+	@$(CONTAINER_ENGINE) run -d --name $(SOURCE_SERVER_CONTAINER) -p $(SOURCE_SERVER_PORT):8080 $(SOURCE_IMAGE):$(IMAGE_TAG) >/dev/null
+	@echo "$(GREEN)Source tar URL: http://localhost:$(SOURCE_SERVER_PORT)/source.tar$(NC)"
+
+.PHONY: docker-stop-source-server
+docker-stop-source-server: ## Stop/remove source tar server container
+	@echo "$(YELLOW)Stopping source tar server container $(SOURCE_SERVER_CONTAINER)...$(NC)"
+	@$(CONTAINER_ENGINE) rm -f $(SOURCE_SERVER_CONTAINER) >/dev/null 2>/dev/null || true
+
+.PHONY: docker-push-source
+docker-push-source: docker-build-source ## Push source image (set SOURCE_IMAGE to dockerhub repo, e.g. docker.io/user/image-factory-source)
+	@echo "$(GREEN)Pushing source image $(SOURCE_IMAGE):$(IMAGE_TAG) with $(CONTAINER_ENGINE)...$(NC)"
+	@$(CONTAINER_ENGINE) push $(SOURCE_IMAGE):$(IMAGE_TAG)
 
 .PHONY: docker-extract-source
 docker-extract-source: ## Extract source tree from source distribution image
