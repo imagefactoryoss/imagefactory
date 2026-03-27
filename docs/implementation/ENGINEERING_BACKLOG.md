@@ -115,6 +115,8 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - backend now normalizes transition mode to an allowlist (`metadata_only`, `provider_native`, `hybrid`) with unknown values falling back to `metadata_only`.
   - PR8 lifecycle transition-mode default contract hardening completed on `feature/packer-builds`:
     - VM catalog responses now guarantee non-empty `lifecycle_transition_mode`, defaulting to `metadata_only` for empty/invalid metadata payloads.
+  - PR8 lifecycle transition-mode visibility follow-up completed on `feature/packer-builds`:
+    - VM catalog table lifecycle column now renders transition mode so operators can assess lifecycle semantics without opening details.
 
 ## Backlog Review Summary (2026-03-16)
 

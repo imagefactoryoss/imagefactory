@@ -278,6 +278,9 @@ const VMImagesPage: React.FC = () => {
                       <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                         {item.lifecycle_state}
                       </span>
+                      <p className="mt-1 text-slate-500 dark:text-slate-400">
+                        Mode: {item.lifecycle_transition_mode || 'metadata_only'}
+                      </p>
                       <p className="mt-1 text-slate-500 dark:text-slate-400">Exec: {item.execution_status}</p>
                     </td>
                     <td className="px-3 py-3 text-xs text-slate-700 dark:text-slate-200">
