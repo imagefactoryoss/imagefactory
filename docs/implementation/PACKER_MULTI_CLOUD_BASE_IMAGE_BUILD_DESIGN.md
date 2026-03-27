@@ -850,6 +850,9 @@ Progress update (2026-03-27):
 - lifecycle action responses now use a consistent payload shape:
   - idempotent transitions (`already in target state`) return `data` + `message` instead of message-only payload.
   - list/detail/action responses share the same VM catalog item builder to reduce contract drift.
+- VM catalog lifecycle UX now surfaces backend lifecycle action messages:
+  - action success toasts prefer API-provided `message` values.
+  - idempotent transition outcomes are shown with backend-authored text for operator clarity.
 
 ### 16.10 Cross-cutting quality gates for every PR
 
