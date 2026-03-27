@@ -55,6 +55,9 @@ Branch: `feature/packer-builds`
   - `delete` transitions are accepted only from `deprecated` lifecycle state.
   - metadata now persists bounded `lifecycle_history` entries (`state`, `reason`, `actor_id`, `at`).
   - VM catalog responses include lifecycle last-action fields + lifecycle history for traceability.
+- PR8 lifecycle action contract normalization completed:
+  - VM catalog list/detail API responses now include `action_permissions` booleans (`can_promote`, `can_deprecate`, `can_delete`).
+  - frontend VM lifecycle action buttons now use backend-provided permissions instead of local transition inference.
 
 ## PR3 Backend Summary
 

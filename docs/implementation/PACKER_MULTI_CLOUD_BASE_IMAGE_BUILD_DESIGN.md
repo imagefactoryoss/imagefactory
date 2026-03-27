@@ -830,6 +830,11 @@ Progress update (2026-03-27):
   - explicit reason required for `deprecate` and `delete` transitions.
   - `delete` is allowed only from `deprecated` lifecycle state.
   - bounded lifecycle history persisted in execution metadata and surfaced in VM catalog details.
+- VM catalog responses now include server-derived lifecycle action permissions:
+  - `action_permissions.can_promote`
+  - `action_permissions.can_deprecate`
+  - `action_permissions.can_delete`
+  - frontend action buttons consume these flags directly for policy-consistent UX.
 
 ### 16.10 Cross-cutting quality gates for every PR
 
