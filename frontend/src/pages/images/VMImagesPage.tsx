@@ -7,6 +7,12 @@ import { Link } from 'react-router-dom'
 
 const providerOptions = ['', 'aws', 'azure', 'gcp', 'vmware']
 const statusOptions = ['', 'success', 'running', 'pending', 'failed', 'cancelled']
+type LifecycleAction = 'promote' | 'deprecate' | 'delete'
+
+type PendingReasonAction = {
+  item: VMImageCatalogItem
+  action: Extract<LifecycleAction, 'deprecate' | 'delete'>
+}
 
 const VMImagesPage: React.FC = () => {
   const [items, setItems] = useState<VMImageCatalogItem[]>([])
@@ -19,6 +25,9 @@ const VMImagesPage: React.FC = () => {
   const [selected, setSelected] = useState<VMImageCatalogItem | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [actionExecutionID, setActionExecutionID] = useState<string | null>(null)
+  const [pendingReasonAction, setPendingReasonAction] = useState<PendingReasonAction | null>(null)
+  const [reasonInput, setReasonInput] = useState('')
+  const [reasonError, setReasonError] = useState<string | null>(null)
   const confirmDialog = useConfirmDialog()
 
   const load = useCallback(async () => {
@@ -75,24 +84,11 @@ const VMImagesPage: React.FC = () => {
     }
   }
 
-  const handleLifecycleAction = async (
+  const runLifecycleAction = async (
     item: VMImageCatalogItem,
-    action: 'promote' | 'deprecate' | 'delete',
+    action: LifecycleAction,
+    reason?: string,
   ) => {
-    let reason: string | undefined
-    if (action !== 'promote') {
-      const reasonInput = window.prompt(
-        `${action === 'deprecate' ? 'Deprecation' : 'Delete'} reason (required):`,
-        '',
-      )
-      if (reasonInput === null) return
-      reason = reasonInput.trim()
-      if (!reason) {
-        toast.error('Reason is required.')
-        return
-      }
-    }
-
     const title =
       action === 'promote'
         ? 'Promote VM Image'
@@ -142,6 +138,35 @@ const VMImagesPage: React.FC = () => {
     } finally {
       setActionExecutionID(null)
     }
+  }
+
+  const handleLifecycleAction = async (
+    item: VMImageCatalogItem,
+    action: LifecycleAction,
+  ) => {
+    if (action === 'promote') {
+      await runLifecycleAction(item, action)
+      return
+    }
+
+    setPendingReasonAction({ item, action })
+    setReasonInput('')
+    setReasonError(null)
+  }
+
+  const submitReasonAction = async () => {
+    if (!pendingReasonAction) return
+    const reason = reasonInput.trim()
+    if (!reason) {
+      setReasonError('Reason is required.')
+      return
+    }
+
+    const { item, action } = pendingReasonAction
+    setPendingReasonAction(null)
+    setReasonInput('')
+    setReasonError(null)
+    await runLifecycleAction(item, action, reason)
   }
 
   const providerIds = useMemo(() => {
@@ -387,6 +412,64 @@ const VMImagesPage: React.FC = () => {
           </div>
         ) : null}
       </Drawer>
+
+      {pendingReasonAction ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 dark:bg-slate-950/75">
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              {pendingReasonAction.action === 'deprecate' ? 'Deprecate VM Image' : 'Delete VM Image'}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              Provide an operator reason for execution {pendingReasonAction.item.execution_id}.
+            </p>
+            <label htmlFor="vm-lifecycle-reason" className="mt-4 block text-xs font-medium uppercase tracking-wide text-slate-600 dark:text-slate-300">
+              Reason
+            </label>
+            <textarea
+              id="vm-lifecycle-reason"
+              value={reasonInput}
+              onChange={(event) => {
+                setReasonInput(event.target.value)
+                if (reasonError) setReasonError(null)
+              }}
+              rows={4}
+              placeholder={
+                pendingReasonAction.action === 'deprecate'
+                  ? 'Why is this VM image being deprecated?'
+                  : 'Why should this VM image be removed from active lifecycle view?'
+              }
+              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-400 dark:focus:ring-sky-900/50"
+            />
+            {reasonError ? (
+              <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{reasonError}</p>
+            ) : null}
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingReasonAction(null)
+                  setReasonInput('')
+                  setReasonError(null)
+                }}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitReasonAction()}
+                className={`rounded-md px-3 py-2 text-sm font-medium text-white ${
+                  pendingReasonAction.action === 'delete'
+                    ? 'bg-rose-600 hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600'
+                    : 'bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600'
+                }`}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

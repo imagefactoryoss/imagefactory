@@ -59,7 +59,7 @@ Branch: `feature/packer-builds`
   - VM catalog list/detail API responses now include `action_permissions` booleans (`can_promote`, `can_deprecate`, `can_delete`).
   - frontend VM lifecycle action buttons now use backend-provided permissions instead of local transition inference.
 - PR8 frontend lifecycle reason-entry UX completed:
-  - VM catalog now prompts operator-entered reason text for `deprecate` and `delete` before transition confirmation.
+  - VM catalog now uses an in-app reason modal for `deprecate` and `delete` before transition confirmation.
   - UI now forwards typed reasons to lifecycle APIs rather than using generated default reason strings.
 
 ## PR3 Backend Summary

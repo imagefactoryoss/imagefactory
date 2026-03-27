@@ -836,7 +836,7 @@ Progress update (2026-03-27):
   - `action_permissions.can_delete`
   - frontend action buttons consume these flags directly for policy-consistent UX.
 - frontend lifecycle reason-entry UX now enforces operator-provided reasons:
-  - `deprecate` and `delete` actions prompt for explicit reason text before confirmation.
+  - `deprecate` and `delete` actions now use an in-app reason modal and require explicit reason text before confirmation.
   - typed reason values are sent to lifecycle transition APIs for audit-quality context.
 
 ### 16.10 Cross-cutting quality gates for every PR
