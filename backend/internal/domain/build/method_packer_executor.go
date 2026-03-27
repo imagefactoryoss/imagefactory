@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -91,11 +92,13 @@ func (e *MethodPackerExecutor) Execute(ctx context.Context, configID string, met
 	}
 
 	args := []string{"build", "-json"}
-	if vars, ok := config.Metadata["variables"].(map[string]interface{}); ok {
-		for key, value := range vars {
-			args = append(args, "-var", fmt.Sprintf("%s=%v", key, value))
-		}
+	if metadataBool(config.Metadata, "parallel") {
+		return nil, fmt.Errorf("parallel=true is not supported yet for packer builds")
 	}
+	if onError := metadataString(config.Metadata, "on_error", "onError"); onError != "" {
+		args = append(args, "-on-error="+onError)
+	}
+	args = append(args, packerVarArgs(config.Metadata)...)
 	args = append(args, templatePath)
 	cmd := exec.CommandContext(ctx, "packer", args...)
 	cmd.Dir = filepath.Dir(templatePath)
@@ -132,6 +135,43 @@ func (e *MethodPackerExecutor) Execute(ctx context.Context, configID string, met
 	output.Duration = int(output.EndTime - output.StartTime)
 
 	return output, nil
+}
+
+func packerVarArgs(metadata map[string]interface{}) []string {
+	if metadata == nil {
+		return nil
+	}
+
+	values := map[string]string{}
+	if rawVars, ok := metadata["variables"].(map[string]interface{}); ok {
+		for key, value := range rawVars {
+			if strings.TrimSpace(key) == "" {
+				continue
+			}
+			values[key] = fmt.Sprintf("%v", value)
+		}
+	}
+	for key, value := range metadataStringMap(metadata, "build_vars") {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		values[key] = value
+	}
+	if len(values) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	args := make([]string, 0, len(keys)*2)
+	for _, key := range keys {
+		args = append(args, "-var", fmt.Sprintf("%s=%s", key, values[key]))
+	}
+	return args
 }
 
 // Cancel stops a running Packer build

@@ -77,11 +77,21 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
             },
             {} as Record<string, unknown>
         );
+        const buildVars = formState.buildVars.reduce(
+            (acc, { key, value }) => {
+                if (key) acc[key] = value;
+                return acc;
+            },
+            {} as Record<string, string>
+        );
 
         const request: CreatePackerConfigRequest = {
             build_id: buildId || '',
             template: formState.template,
             variables: Object.keys(variables).length > 0 ? variables : undefined,
+            build_vars: Object.keys(buildVars).length > 0 ? buildVars : undefined,
+            on_error: formState.onError || 'cleanup',
+            parallel: formState.parallel,
         };
 
         if (onChange) {

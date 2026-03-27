@@ -1,8 +1,8 @@
+import { registryAuthClient } from '@/api/registryAuthClient'
+import HelpTooltip from '@/components/common/HelpTooltip'
 import { buildService } from '@/services/buildService'
 import { infrastructureService } from '@/services/infrastructureService'
 import { projectService } from '@/services/projectService'
-import { registryAuthClient } from '@/api/registryAuthClient'
-import HelpTooltip from '@/components/common/HelpTooltip'
 import { BuildConfig, BuildContextSuggestionsResponse, InfrastructureProvider, InfrastructureRecommendation, InfrastructureType, ProjectBuildSettings, ProjectSource, WizardState } from '@/types'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -198,7 +198,10 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
     const handlePackerConfig = (config: any) => {
         updateBuildConfig({
             packerTemplate: config.template,
-            variables: config.variables
+            variables: config.variables,
+            buildVars: config.build_vars,
+            onError: config.on_error,
+            parallel: config.parallel
         })
     }
 

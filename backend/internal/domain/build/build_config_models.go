@@ -46,6 +46,9 @@ type BuildConfig struct {
 	Secrets   map[string]string // Build secrets
 	// Common fields
 	Variables      map[string]interface{} // Template/build variables
+	BuildVars      map[string]string      // Packer CLI -var values
+	OnError        string                 // Packer on_error mode (ask|cleanup|abort)
+	Parallel       bool                   // Packer parallel mode toggle
 	Builders       []PackerBuilder        // Packer builders (packer only)
 	Provisioners   []VMProvisioner        // Packer provisioners (packer only)
 	PostProcessors []VMPostProcessor      // Packer post-processors (packer only)
@@ -82,6 +85,9 @@ func (c *BuildConfig) UnmarshalJSON(data []byte) error {
 		CacheFrom         []string               `json:"cache_from"`
 		Secrets           map[string]string      `json:"secrets"`
 		Variables         map[string]interface{} `json:"variables"`
+		BuildVars         map[string]string      `json:"build_vars"`
+		OnError           string                 `json:"on_error"`
+		Parallel          bool                   `json:"parallel"`
 		Builders          []PackerBuilder        `json:"builders"`
 		Provisioners      []VMProvisioner        `json:"provisioners"`
 		PostProcessors    []VMPostProcessor      `json:"post_processors"`
@@ -116,6 +122,9 @@ func (c *BuildConfig) UnmarshalJSON(data []byte) error {
 		CacheFrom         []string               `json:"cacheFrom"`
 		Secrets           map[string]string      `json:"secrets"`
 		Variables         map[string]interface{} `json:"variables"`
+		BuildVars         map[string]string      `json:"buildVars"`
+		OnError           string                 `json:"onError"`
+		Parallel          bool                   `json:"parallel"`
 		Builders          []PackerBuilder        `json:"builders"`
 		Provisioners      []VMProvisioner        `json:"provisioners"`
 		PostProcessors    []VMPostProcessor      `json:"postProcessors"`
@@ -226,6 +235,13 @@ func (c *BuildConfig) UnmarshalJSON(data []byte) error {
 	if payload.Variables == nil {
 		payload.Variables = camel.Variables
 	}
+	if payload.BuildVars == nil {
+		payload.BuildVars = camel.BuildVars
+	}
+	if payload.OnError == "" {
+		payload.OnError = camel.OnError
+	}
+	payload.Parallel = payload.Parallel || camel.Parallel
 	if payload.Builders == nil {
 		payload.Builders = camel.Builders
 	}
@@ -278,6 +294,9 @@ func (c *BuildConfig) UnmarshalJSON(data []byte) error {
 	c.Pure = payload.Pure
 	c.ShowTrace = payload.ShowTrace
 	c.Variables = payload.Variables
+	c.BuildVars = payload.BuildVars
+	c.OnError = payload.OnError
+	c.Parallel = payload.Parallel
 	c.Builders = payload.Builders
 	c.Provisioners = payload.Provisioners
 	c.PostProcessors = payload.PostProcessors
@@ -411,6 +430,43 @@ func (c *BuildConfigData) ValidatePaketoConfig() error {
 func (c *BuildConfigData) ValidatePackerConfig() error {
 	if c.PackerTemplate == "" {
 		return errors.New("packer template is required for packer builds")
+	}
+	if c.Metadata == nil {
+		return nil
+	}
+	if onErrorRaw, ok := c.Metadata["on_error"]; ok {
+		onError, ok := onErrorRaw.(string)
+		if !ok || onError == "" {
+			return errors.New("on_error must be a non-empty string when provided")
+		}
+		switch onError {
+		case "ask", "cleanup", "abort":
+		default:
+			return fmt.Errorf("invalid on_error value: %s", onError)
+		}
+	}
+	if buildVarsRaw, ok := c.Metadata["build_vars"]; ok {
+		buildVars, ok := buildVarsRaw.(map[string]interface{})
+		if !ok {
+			return errors.New("build_vars must be an object when provided")
+		}
+		for key, value := range buildVars {
+			if strings.TrimSpace(key) == "" {
+				return errors.New("build_vars keys cannot be empty")
+			}
+			if _, ok := value.(string); !ok {
+				return fmt.Errorf("build_vars value for key %q must be a string", key)
+			}
+		}
+	}
+	if parallelRaw, ok := c.Metadata["parallel"]; ok {
+		parallel, ok := parallelRaw.(bool)
+		if !ok {
+			return errors.New("parallel must be a boolean when provided")
+		}
+		if parallel {
+			return errors.New("parallel=true is not supported yet for packer builds")
+		}
 	}
 	return nil
 }

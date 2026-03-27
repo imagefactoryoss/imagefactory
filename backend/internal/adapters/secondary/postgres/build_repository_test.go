@@ -138,6 +138,32 @@ func TestBuildConfigData_Validation(t *testing.T) {
 		assert.Contains(t, config.Validate().Error(), "packer template is required")
 	})
 
+	t.Run("ValidatePackerConfig - invalid on_error", func(t *testing.T) {
+		config := &build.BuildConfigData{
+			BuildID:        buildID,
+			BuildMethod:    "packer",
+			PackerTemplate: `{"builders": [{"type": "amazon-ebs"}]}`,
+			Metadata: map[string]interface{}{
+				"on_error": "invalid",
+			},
+		}
+		assert.Error(t, config.Validate())
+		assert.Contains(t, config.Validate().Error(), "invalid on_error value")
+	})
+
+	t.Run("ValidatePackerConfig - unsupported parallel true", func(t *testing.T) {
+		config := &build.BuildConfigData{
+			BuildID:        buildID,
+			BuildMethod:    "packer",
+			PackerTemplate: `{"builders": [{"type": "amazon-ebs"}]}`,
+			Metadata: map[string]interface{}{
+				"parallel": true,
+			},
+		}
+		assert.Error(t, config.Validate())
+		assert.Contains(t, config.Validate().Error(), "parallel=true is not supported yet")
+	})
+
 	t.Run("Invalid build method", func(t *testing.T) {
 		config := &build.BuildConfigData{
 			BuildID:     buildID,

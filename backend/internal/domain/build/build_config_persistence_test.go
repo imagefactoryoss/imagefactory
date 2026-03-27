@@ -143,3 +143,65 @@ func TestBuildConfigDataFromManifest_ContainerPersistsRegistryRepoMetadata(t *te
 		t.Fatalf("expected registry_repo metadata to be persisted for container builds, got %q", got)
 	}
 }
+
+func TestBuildConfigFromManifest_PackerPersistsExtendedMetadata(t *testing.T) {
+	manifest := BuildManifest{
+		Type: BuildTypePacker,
+		BuildConfig: &BuildConfig{
+			BuildType:      BuildTypePacker,
+			PackerTemplate: `{"builders":[{"type":"amazon-ebs"}]}`,
+			Variables:      map[string]interface{}{"region": "us-east-1"},
+			BuildVars:      map[string]string{"image_name": "base-ami"},
+			OnError:        "abort",
+			Parallel:       false,
+		},
+	}
+
+	config := buildConfigFromManifest(uuid.New(), manifest)
+	if config == nil {
+		t.Fatalf("expected config to be created")
+	}
+	if config.Metadata == nil {
+		t.Fatalf("expected packer metadata to be populated")
+	}
+	if got, _ := config.Metadata["on_error"].(string); got != "abort" {
+		t.Fatalf("expected on_error to be persisted as abort, got %q", got)
+	}
+	if got, _ := config.Metadata["parallel"].(bool); got {
+		t.Fatalf("expected parallel to be false")
+	}
+	if vars, ok := config.Metadata["build_vars"].(map[string]string); ok {
+		if vars["image_name"] != "base-ami" {
+			t.Fatalf("expected build var image_name to be persisted")
+		}
+		return
+	}
+	typed, ok := config.Metadata["build_vars"].(map[string]interface{})
+	if !ok || typed["image_name"] != "base-ami" {
+		t.Fatalf("expected build_vars metadata to contain image_name")
+	}
+}
+
+func TestBuildConfigDataFromManifest_PackerDefaultsOnError(t *testing.T) {
+	manifest := BuildManifest{
+		Type: BuildTypePacker,
+		BuildConfig: &BuildConfig{
+			BuildType:      BuildTypePacker,
+			PackerTemplate: `{"builders":[{"type":"amazon-ebs"}]}`,
+		},
+	}
+
+	config := buildConfigDataFromManifest(manifest, uuid.New())
+	if config == nil {
+		t.Fatalf("expected config to be created")
+	}
+	if config.Metadata == nil {
+		t.Fatalf("expected packer metadata to be created")
+	}
+	if got, _ := config.Metadata["on_error"].(string); got != "cleanup" {
+		t.Fatalf("expected default on_error cleanup, got %q", got)
+	}
+	if got, _ := config.Metadata["parallel"].(bool); got {
+		t.Fatalf("expected default parallel to be false")
+	}
+}
