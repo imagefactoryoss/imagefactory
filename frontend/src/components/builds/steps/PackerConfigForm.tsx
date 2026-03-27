@@ -1,7 +1,10 @@
 import KeyValueForm from '@/components/common/KeyValueForm';
 import { PACKER_ON_ERROR_MODES } from '@/lib/buildMethods';
+import { packerTargetProfileService } from '@/services/packerTargetProfileService';
+import { PackerTargetProfile } from '@/types';
 import { CreatePackerConfigRequest, PackerConfig } from '@/types/buildConfig';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 
 interface PackerConfigFormProps {
     buildId?: string;
@@ -29,6 +32,8 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
     initialConfig,
     onChange,
 }) => {
+    const [profiles, setProfiles] = useState<PackerTargetProfile[]>([]);
+    const [profilesLoading, setProfilesLoading] = useState(false);
     const [formState, setFormState] = useState<FormState>({
         template: initialConfig?.config.template || '',
         packerTargetProfileId: initialConfig?.config.packer_target_profile_id || '',
@@ -49,6 +54,33 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
     });
 
     const [templateError, setTemplateError] = useState<string>('');
+    const [profileError, setProfileError] = useState<string>('');
+
+    const validProfiles = useMemo(
+        () => profiles.filter((p) => p.validation_status === 'valid'),
+        [profiles]
+    );
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadProfiles = async () => {
+            try {
+                setProfilesLoading(true);
+                const data = await packerTargetProfileService.list();
+                if (!isMounted) return;
+                setProfiles(data || []);
+            } catch (error: any) {
+                if (!isMounted) return;
+                toast.error(error?.message || 'Failed to load Packer target profiles');
+            } finally {
+                if (isMounted) setProfilesLoading(false);
+            }
+        };
+        loadProfiles();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     const handleTemplateChange = (value: string) => {
         setFormState({ ...formState, template: value });
@@ -72,8 +104,10 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
             return;
         }
         if (!formState.packerTargetProfileId.trim()) {
+            setProfileError('Target profile is required');
             return;
         }
+        setProfileError('');
 
         const variables = formState.variables.reduce(
             (acc, { key, value }) => {
@@ -147,16 +181,33 @@ export const PackerConfigForm: React.FC<PackerConfigFormProps> = ({
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Target Profile ID *
                 </label>
-                <input
-                    type="text"
+                <select
                     value={formState.packerTargetProfileId}
-                    onChange={(e) => setFormState({ ...formState, packerTargetProfileId: e.target.value })}
-                    placeholder="UUID from Admin > Infrastructure > Packer Target Profiles"
+                    onChange={(e) => {
+                        setFormState({ ...formState, packerTargetProfileId: e.target.value });
+                        if (e.target.value.trim()) setProfileError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-blue-400"
-                />
+                    disabled={profilesLoading}
+                >
+                    <option value="">
+                        {profilesLoading ? 'Loading profiles...' : 'Select a validated target profile'}
+                    </option>
+                    {validProfiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                            {profile.name} ({profile.provider}) - {profile.id}
+                        </option>
+                    ))}
+                </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Required: builds must use a validated, tenant-entitled target profile.
+                    Required: choose a tenant-entitled profile with `valid` status.
                 </p>
+                {!profilesLoading && validProfiles.length === 0 && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                        No validated target profiles found. Ask an admin to validate at least one profile.
+                    </p>
+                )}
+                {profileError && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{profileError}</p>}
             </div>
 
             {/* Template Variables */}

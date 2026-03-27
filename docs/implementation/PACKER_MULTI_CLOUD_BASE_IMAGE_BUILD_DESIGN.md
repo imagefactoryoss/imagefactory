@@ -9,7 +9,11 @@ Owners: Backend + Platform/Ops + Frontend
 - PR1 (contract hardening + canonical path guardrails): completed on `feature/packer-builds`.
 - PR2 (Tekton parity for Packer execution): completed on `feature/packer-builds`.
 - PR3 (admin target profiles read/write/validate): completed on `feature/packer-builds`.
-- PR4+ remain pending.
+- PR4 (tenant profile binding + preflight + execution metadata): completed on `feature/packer-builds`.
+- PR5 (tenant profile selector UX): completed on `feature/packer-builds`.
+- PR6 (tenant VM image catalog read path): completed on `feature/packer-builds`.
+- PR7 backend scheduler slice (scheduled trigger execution + metadata): completed on `feature/packer-builds`.
+- PR7 UX/management follow-up + PR8 remain pending.
 
 ## 1) Objective
 
@@ -76,6 +80,7 @@ We should support both:
 
 Canonical Packer config contract:
 - `template` (required)
+- `packer_target_profile_id` (required, UUID)
 - `variables` (map string->string, rendered as repeated `-var key=value`)
 - `build_vars` (optional, additional runtime vars)
 - `on_error` (optional: `cleanup`/`abort`/etc.)
@@ -272,6 +277,9 @@ On successful build completion, persist normalized artifact metadata:
 - source traceability (`git revision`, template path/hash, build execution id)
 - status (`created`, `validated`, `released`, `deprecated`, `deleted`, `failed`)
 - timestamps and actor context
+
+Current implementation note (PR4):
+- execution metadata now stores `packer.target_profile_id`, optional `packer.target_provider`, and derived `packer.provider_artifact_identifiers`.
 
 ### 11.3 When metadata is persisted
 
@@ -724,6 +732,19 @@ Acceptance criteria:
 - tenant can filter and inspect VM artifacts across supported providers.
 - details include provider-native artifact IDs, source build links, and lifecycle state.
 
+Progress update (2026-03-27):
+- backend tenant VM image catalog APIs added:
+  - `GET /api/v1/images/vm`
+  - `GET /api/v1/images/vm/{executionId}`
+- API exposes packer execution traceability and lifecycle context:
+  - build/execution/project IDs, build number/status, execution status/lifecycle state.
+  - `packer.target_provider`, `packer.target_profile_id`.
+  - `packer.provider_artifact_identifiers`.
+  - captured artifact values from execution payloads.
+- frontend tenant page added at `/images/vm`:
+  - filterable VM image catalog table (`provider`, `status`, `search`).
+  - details drawer with source build link + provider identifier sections.
+
 ### 16.8 PR7 - Scheduled triggers for Packer builds
 
 Scope:
@@ -739,6 +760,18 @@ Acceptance criteria:
 - schedule create/update/pause/resume works with audit trail.
 - scheduled runs honor concurrency policy (`forbid` default).
 - trigger metadata clearly identifies scheduled origin.
+
+Progress update (2026-03-27):
+- dispatcher now processes due active `schedule` triggers before queue dispatch.
+- schedule triggers now compute and persist `next_trigger_at` from cron expression on create and after each fire.
+- scheduled trigger firing currently scoped to `BuildTypePacker` (PR7 scope alignment).
+- scheduled-origin metadata is now stamped into queued build manifests:
+  - `trigger_type=schedule`
+  - `trigger_mode=scheduled`
+  - `schedule_trigger_id`
+  - `schedule_fire_timestamp`
+  - `schedule_concurrency_policy=forbid`
+- default `forbid` policy is enforced by skipping schedule fire when another queued/running packer build exists in the project.
 
 ### 16.9 PR8 - Lifecycle actions (promote/deprecate/delete) and policy guardrails
 

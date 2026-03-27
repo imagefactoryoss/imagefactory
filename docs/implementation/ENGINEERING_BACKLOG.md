@@ -48,6 +48,24 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - added admin page `/admin/infrastructure/packer-target-profiles` for list/create/edit/delete/validate.
     - wired `AdminLayout` navigation under `Build Management`.
     - added frontend service/types for `packer-target-profiles` API contract.
+  - PR4 tenant profile binding and preflight completed on `feature/packer-builds`:
+    - added required `build_config.packer_target_profile_id` contract for Packer builds in backend/frontend payload mapping.
+    - enforced fail-fast preflight for create/start/retry when target profile is not tenant-entitled or not `valid`.
+    - persisted Packer execution metadata with selected target profile/provider context and derived provider artifact identifiers.
+    - added/updated backend and integration tests for the PR4 scope.
+  - PR5 tenant profile selector UX completed on `feature/packer-builds`:
+    - replaced free-form UUID entry with entitled target-profile selector in tenant wizard.
+  - PR6 tenant VM image catalog read path completed on `feature/packer-builds`:
+    - added tenant VM image catalog APIs (`/api/v1/images/vm` + `/api/v1/images/vm/{executionId}`) with provider/status/search filters.
+    - added tenant VM image catalog UI route (`/images/vm`) with details drawer and source build traceability.
+  - PR7 backend scheduler slice completed on `feature/packer-builds`:
+    - dispatcher now processes due active schedule triggers and queues packer builds from schedule templates.
+    - schedule `next_trigger_at` is now computed from cron expression on create and after each fire.
+    - scheduled-origin metadata and default `forbid` concurrency policy are applied to scheduled build queuing.
+  - Remaining PR7 follow-up:
+    - add schedule update/pause/resume management parity and explicit audit coverage.
+    - wire notification hooks for scheduled success/failure/no-op outcomes.
+    - keep hardening provider-specific artifact extraction coverage for edge-case output formats.
 
 ## Backlog Review Summary (2026-03-16)
 
