@@ -35,6 +35,7 @@ type vmLifecycleTransitionRequest struct {
 	TenantID                    uuid.UUID
 	TargetProvider              string
 	ProviderArtifactIdentifiers map[string][]string
+	ArtifactValues              []string
 	TargetState                 string
 	Reason                      string
 }
@@ -93,7 +94,7 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
 	}
 
-	ref, err := selectAWSLifecycleImageReference(req.ProviderArtifactIdentifiers, strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AWS_REGION")))
+	ref, err := selectAWSLifecycleImageReference(req.ProviderArtifactIdentifiers, req.ArtifactValues, strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AWS_REGION")))
 	if err != nil {
 		return vmLifecycleTransitionResult{}, err
 	}
@@ -140,8 +141,10 @@ func newVMAWSLifecycleClient(ctx context.Context, region string) (vmAWSLifecycle
 	return ec2.NewFromConfig(cfg), nil
 }
 
-func selectAWSLifecycleImageReference(providerArtifactIdentifiers map[string][]string, defaultRegion string) (awsLifecycleImageReference, error) {
-	candidates := providerArtifactIdentifiers["aws"]
+func selectAWSLifecycleImageReference(providerArtifactIdentifiers map[string][]string, artifactValues []string, defaultRegion string) (awsLifecycleImageReference, error) {
+	candidates := make([]string, 0, len(providerArtifactIdentifiers["aws"])+len(artifactValues))
+	candidates = append(candidates, providerArtifactIdentifiers["aws"]...)
+	candidates = append(candidates, artifactValues...)
 	if len(candidates) == 0 {
 		return awsLifecycleImageReference{}, fmt.Errorf("%w: aws image identifier", errInvalidProviderLifecycleTransitionInput)
 	}
@@ -714,6 +717,7 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 			TenantID:                    authCtx.TenantID,
 			TargetProvider:              targetProvider,
 			ProviderArtifactIdentifiers: providerIdentifiers,
+			ArtifactValues:              extractArtifactValues(row.ArtifactsRaw),
 			TargetState:                 targetState,
 			Reason:                      reason,
 		})
