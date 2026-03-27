@@ -118,16 +118,18 @@ const VMImagesPage: React.FC = () => {
 
     setActionExecutionID(item.execution_id)
     try {
+      let responseMessage: string | undefined
       if (action === 'promote') {
-        await vmImageService.promote(item.execution_id)
+        const response = await vmImageService.promote(item.execution_id)
+        responseMessage = response.message
       } else if (action === 'deprecate') {
-        await vmImageService.deprecate(item.execution_id, reason as string)
+        const response = await vmImageService.deprecate(item.execution_id, reason as string)
+        responseMessage = response.message
       } else {
-        await vmImageService.remove(item.execution_id, reason as string)
+        const response = await vmImageService.remove(item.execution_id, reason as string)
+        responseMessage = response.message
       }
-      toast.success(
-        `VM image ${action === 'delete' ? 'deleted' : `${action}d`} successfully`,
-      )
+      toast.success(responseMessage || `VM image ${action === 'delete' ? 'deleted' : `${action}d`} successfully`)
       await load()
       await refreshSelected(item.execution_id)
     } catch (err: any) {

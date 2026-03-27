@@ -108,6 +108,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 lifecycle action response contract hardening completed on `feature/packer-builds`:
     - idempotent lifecycle transitions (already in target state) now return `data` + `message`, matching successful transition response shape.
     - VM catalog item mapping now uses a shared backend builder to keep list/detail/action payload fields consistent.
+  - PR8 lifecycle action UX parity follow-up completed on `feature/packer-builds`:
+    - frontend VM lifecycle toasts now display backend-provided action messages.
+    - idempotent transition messaging is now surfaced directly in UI (for example, already-in-state responses).
 
 ## Backlog Review Summary (2026-03-16)
 

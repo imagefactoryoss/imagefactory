@@ -73,6 +73,9 @@ Branch: `feature/packer-builds`
 - PR8 lifecycle action response contract hardening completed:
   - idempotent lifecycle transitions now return VM catalog `data` payload plus message (not message-only).
   - backend now uses a shared VM catalog item builder across list/detail/action responses for payload consistency.
+- PR8 lifecycle action UX parity follow-up completed:
+  - VM catalog action toasts now prioritize backend action messages.
+  - idempotent lifecycle outcomes are now presented with backend-provided messaging in UI.
 
 ## PR3 Backend Summary
 
