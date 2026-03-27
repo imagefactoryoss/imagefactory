@@ -112,7 +112,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if decodeErr := json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&req); decodeErr != nil {
-		h.logger.Error("Failed to decode login request", zap.Error(decodeErr), zap.String("body", string(bodyBytes)))
+		h.logger.Error("Failed to decode login request", zap.Error(decodeErr), zap.Int("body_bytes", len(bodyBytes)))
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}

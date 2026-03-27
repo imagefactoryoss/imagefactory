@@ -259,6 +259,15 @@ func (u *User) SetAuthMethod(method AuthMethod) {
 	u.version++
 }
 
+// ClearPasswordHash clears locally stored password credentials.
+// This should be used for externally authenticated users (LDAP/OIDC).
+func (u *User) ClearPasswordHash() {
+	u.passwordHash = ""
+	u.mustChangePassword = false
+	u.updatedAt = time.Now().UTC()
+	u.version++
+}
+
 // IsEmailVerified returns true if the user's email is verified
 func (u *User) IsEmailVerified() bool {
 	return u.emailVerified

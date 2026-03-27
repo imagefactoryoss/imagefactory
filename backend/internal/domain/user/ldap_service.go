@@ -87,7 +87,7 @@ func (s *LDAPService) LDAPLogin(ctx context.Context, req LoginRequest) (*AuthRes
 
 	// If user doesn't exist locally, create them
 	if err == ErrUserNotFound {
-		localUser, err = s.createUserFromLDAP(ctx, req.Email, ldapUser, req.Password)
+		localUser, err = s.createUserFromLDAP(ctx, req.Email, ldapUser)
 		if err != nil {
 			s.logger.Error("Failed to create user from LDAP",
 				zap.String("email", req.Email),
@@ -102,6 +102,9 @@ func (s *LDAPService) LDAPLogin(ctx context.Context, req LoginRequest) (*AuthRes
 				zap.Error(err))
 			// Don't fail login if update fails
 		}
+		// Ensure LDAP users never persist local password credentials.
+		localUser.SetAuthMethod(AuthMethodLDAP)
+		localUser.ClearPasswordHash()
 	}
 
 	// Check if account is active
@@ -144,9 +147,9 @@ func (s *LDAPService) LDAPLogin(ctx context.Context, req LoginRequest) (*AuthRes
 
 // createUserFromLDAP creates a local user from LDAP user info
 // Users are created without a tenant - they will be assigned via group membership
-func (s *LDAPService) createUserFromLDAP(ctx context.Context, email string, ldapUser *ldap.UserInfo, password string) (*User, error) {
-	// Use a dummy password hash since LDAP authentication will be used
-	// The actual password validation happens against LDAP
+func (s *LDAPService) createUserFromLDAP(ctx context.Context, email string, ldapUser *ldap.UserInfo) (*User, error) {
+	// NewUser requires a password, but LDAP users do not use local password auth.
+	// We immediately clear the stored hash before persisting.
 	dummyPassword := uuid.New().String()
 
 	// Create user without tenant (tenantID = uuid.Nil)
@@ -172,6 +175,7 @@ func (s *LDAPService) createUserFromLDAP(ctx context.Context, email string, ldap
 
 	// Set auth method to LDAP
 	user.SetAuthMethod(AuthMethodLDAP)
+	user.ClearPasswordHash()
 
 	if err := s.repository.Save(ctx, user); err != nil {
 		return nil, err
@@ -253,7 +257,7 @@ func (s *LDAPService) EnsureLocalUser(ctx context.Context, email string) (*User,
 		return existingUser, nil
 	}
 
-	return s.createUserFromLDAP(ctx, email, ldapUser, "")
+	return s.createUserFromLDAP(ctx, email, ldapUser)
 }
 
 // GetLDAPUserInfo retrieves user information from LDAP without authentication
