@@ -210,6 +210,35 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 			t.Fatalf("expected no deprecate call for release flow, got %q", fake.lastDeprecateImageID)
 		}
 	})
+
+	t.Run("prefer_provider_native uses artifact fallback when provider identifiers missing", func(t *testing.T) {
+		fake := &fakeVMAWSLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			awsClientFactory: func(ctx context.Context, region string) (vmAWSLifecycleClient, error) {
+				if region != "us-west-2" {
+					t.Fatalf("expected region us-west-2, got %q", region)
+				}
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "deleted",
+			ArtifactValues: []string{
+				"arn:aws:ec2:us-west-2:123456789012:image/ami-0123456789abcdef0",
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastImageID != "ami-0123456789abcdef0" {
+			t.Fatalf("expected deregister image id ami-0123456789abcdef0, got %q", fake.lastImageID)
+		}
+	})
 }
 
 func TestParseAWSLifecycleImageReference(t *testing.T) {
