@@ -37,6 +37,14 @@ Branch: `feature/packer-builds`
   - extraction now scans nested/object artifact payloads in addition to array payloads.
   - GCP artifact capture supports both `/projects/...` and `projects/...` identifier forms.
   - VMware capture now prefers identifier-like values and avoids bare label false positives.
+- PR8 backend lifecycle action foundation completed:
+  - added lifecycle action routes for VM catalog executions:
+    - `POST /api/v1/images/vm/{executionId}/promote`
+    - `POST /api/v1/images/vm/{executionId}/deprecate`
+    - `DELETE /api/v1/images/vm/{executionId}`
+  - lifecycle transitions now persist `metadata.packer.lifecycle_state` (+ action metadata fields).
+  - VM catalog list/detail lifecycle responses now honor metadata overrides (`released`, `deprecated`, `deleted`).
+  - guardrails block lifecycle transitions for active/failed/cancelled executions.
 
 ## PR3 Backend Summary
 
@@ -203,4 +211,4 @@ Frontend:
 
 ## Known Gap For Next PR
 
-- expand VM catalog semantics for lifecycle actions (promote/deprecate/delete) after schedule UX/API parity.
+- add frontend VM catalog action controls (promote/deprecate/delete) with permission-aware gating and confirmation UX.
