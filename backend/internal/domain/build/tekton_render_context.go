@@ -28,6 +28,7 @@ type TektonRenderContext struct {
 	Platforms              string
 	PackerTemplate         string
 	PackerVars             []string
+	PackerOnError          string
 	IncludeGitAuth         bool
 	IncludeSignKey         bool
 	TrivyCacheMode         string
@@ -44,6 +45,7 @@ func newTektonRenderContext(build *Build, cfg BuildMethodConfig, method BuildMet
 		BuildContext:          ".",
 		Platforms:             "linux/amd64",
 		PackerVars:            []string{},
+		PackerOnError:         "cleanup",
 		EnableScan:            "true",
 		EnableSBOM:            "true",
 		EnableSign:            "false",
@@ -133,7 +135,10 @@ func newTektonRenderContext(build *Build, cfg BuildMethodConfig, method BuildMet
 		}
 	case *PackerConfig:
 		ctx.PackerTemplate = c.Template()
-		ctx.PackerVars = flattenPackerVars(c.Variables())
+		ctx.PackerVars = flattenPackerVars(c.Variables(), c.BuildVars())
+		if onError := strings.TrimSpace(c.OnError()); onError != "" {
+			ctx.PackerOnError = onError
+		}
 	}
 
 	if ctx.DockerfilePath == "" {
@@ -352,19 +357,27 @@ func extractGitURL(manifest BuildManifest) string {
 	return ""
 }
 
-func flattenPackerVars(vars map[string]interface{}) []string {
-	if len(vars) == 0 {
+func flattenPackerVars(vars map[string]interface{}, buildVars map[string]string) []string {
+	if len(vars) == 0 && len(buildVars) == 0 {
 		return []string{}
 	}
-	keys := make([]string, 0, len(vars))
-	for key := range vars {
+	merged := make(map[string]string, len(vars)+len(buildVars))
+	for key, value := range vars {
+		merged[key] = fmt.Sprintf("%v", value)
+	}
+	for key, value := range buildVars {
+		merged[key] = value
+	}
+
+	keys := make([]string, 0, len(merged))
+	for key := range merged {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
 	result := make([]string, 0, len(keys))
 	for _, key := range keys {
-		result = append(result, fmt.Sprintf("%s=%v", key, vars[key]))
+		result = append(result, fmt.Sprintf("%s=%s", key, merged[key]))
 	}
 	return result
 }

@@ -234,6 +234,8 @@ spec:
     value: "{{ default \"\" .GitURL }}"
   - name: packer-template
     value: "{{ default \"\" .PackerTemplate }}"
+  - name: on-error
+    value: "{{ default \"cleanup\" .PackerOnError }}"
   - name: vars
     value:
     {{- if .PackerVars }}

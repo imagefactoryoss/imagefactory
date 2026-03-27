@@ -34,6 +34,11 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - added explicit validation for invalid `on_error` and unsupported `parallel=true`.
     - aligned local executor argument rendering with deterministic `-var` assembly + `-on-error` support.
     - wired frontend build wizard payload mapping for the extended Packer contract.
+  - PR2 Tekton parity slice completed on `feature/packer-builds`:
+    - updated Tekton Packer task/pipeline contracts to carry `on-error` explicitly.
+    - normalized Tekton Packer command assembly to emit repeated `-var` flags.
+    - aligned Tekton render context with merged `variables + build_vars` handling and deterministic ordering.
+    - added render-context tests for merged vars and `on_error` default/override behavior.
 
 ## Backlog Review Summary (2026-03-16)
 

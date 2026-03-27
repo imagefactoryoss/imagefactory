@@ -6,6 +6,9 @@ spec:
   params:
     - name: TEMPLATE
       type: string
+    - name: ON_ERROR
+      type: string
+      default: cleanup
     - name: VARS
       type: array
       default: []
@@ -15,7 +18,24 @@ spec:
     - name: packer-build
       image: docker.io/hashicorp/packer:1.10.2
       workingDir: /workspace/source
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+        TEMPLATE="$1"
+        ON_ERROR="$2"
+        shift 2
+        VARS_INPUT="$*"
+
+        set -- build "-on-error=${ON_ERROR}"
+        for VAR in $VARS_INPUT; do
+          if [ -n "${VAR}" ]; then
+            set -- "$@" -var "${VAR}"
+          fi
+        done
+        set -- "$@" "${TEMPLATE}"
+        echo "packer $*"
+        packer "$@"
       args:
-        - build
         - "$(params.TEMPLATE)"
+        - "$(params.ON_ERROR)"
         - "$(params.VARS[*])"

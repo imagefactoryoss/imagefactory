@@ -209,3 +209,44 @@ func TestNewTektonRenderContext_BuildxNormalizesDuplicatePlatforms(t *testing.T)
 		t.Fatalf("expected deduplicated platforms, got %q", ctx.Platforms)
 	}
 }
+
+func TestNewTektonRenderContext_PackerMergesVariablesAndBuildVars(t *testing.T) {
+	cfg, err := NewPackerConfig(uuid.New(), "templates/base.pkr.hcl")
+	if err != nil {
+		t.Fatalf("failed creating packer config: %v", err)
+	}
+	if err := cfg.SetVariable("region", "us-east-1"); err != nil {
+		t.Fatalf("failed setting variable: %v", err)
+	}
+	if err := cfg.SetBuildVar("image_name", "base-ami"); err != nil {
+		t.Fatalf("failed setting build var: %v", err)
+	}
+
+	ctx := newTektonRenderContext(nil, cfg, BuildMethodPacker)
+	if len(ctx.PackerVars) != 2 {
+		t.Fatalf("expected 2 packer vars, got %d (%v)", len(ctx.PackerVars), ctx.PackerVars)
+	}
+	if ctx.PackerVars[0] != "image_name=base-ami" || ctx.PackerVars[1] != "region=us-east-1" {
+		t.Fatalf("expected deterministic sorted packer vars, got %v", ctx.PackerVars)
+	}
+}
+
+func TestNewTektonRenderContext_PackerOnErrorDefaultsAndOverride(t *testing.T) {
+	cfg, err := NewPackerConfig(uuid.New(), "templates/base.pkr.hcl")
+	if err != nil {
+		t.Fatalf("failed creating packer config: %v", err)
+	}
+
+	ctx := newTektonRenderContext(nil, cfg, BuildMethodPacker)
+	if ctx.PackerOnError != "cleanup" {
+		t.Fatalf("expected default on_error cleanup, got %q", ctx.PackerOnError)
+	}
+
+	if err := cfg.SetOnError("abort"); err != nil {
+		t.Fatalf("failed setting on_error: %v", err)
+	}
+	ctx = newTektonRenderContext(nil, cfg, BuildMethodPacker)
+	if ctx.PackerOnError != "abort" {
+		t.Fatalf("expected on_error override abort, got %q", ctx.PackerOnError)
+	}
+}

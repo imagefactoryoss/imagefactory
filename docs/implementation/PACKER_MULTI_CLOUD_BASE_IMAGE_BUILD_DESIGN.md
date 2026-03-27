@@ -7,7 +7,8 @@ Owners: Backend + Platform/Ops + Frontend
 ## Implementation status (2026-03-27)
 
 - PR1 (contract hardening + canonical path guardrails): completed on `feature/packer-builds`.
-- PR2+ remain pending.
+- PR2 (Tekton parity for Packer execution): completed on `feature/packer-builds`.
+- PR3+ remain pending.
 
 ## 1) Objective
 
