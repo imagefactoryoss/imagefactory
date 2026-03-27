@@ -42,6 +42,7 @@ type vmImageCatalogItem struct {
 	LifecycleLastActionAt       string                   `json:"lifecycle_last_action_at,omitempty"`
 	LifecycleLastActionBy       string                   `json:"lifecycle_last_action_by,omitempty"`
 	LifecycleLastReason         string                   `json:"lifecycle_last_reason,omitempty"`
+	LifecycleTransitionMode     string                   `json:"lifecycle_transition_mode"`
 	LifecycleHistory            []vmLifecycleHistory     `json:"lifecycle_history,omitempty"`
 	ActionPermissions           vmImageActionPermissions `json:"action_permissions"`
 }
@@ -190,6 +191,7 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 			LifecycleLastActionAt:       lifecycle.LastActionAt,
 			LifecycleLastActionBy:       lifecycle.LastActionBy,
 			LifecycleLastReason:         lifecycle.LastReason,
+			LifecycleTransitionMode:     lifecycle.TransitionMode,
 			LifecycleHistory:            lifecycle.History,
 			ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)),
 		})
@@ -268,6 +270,7 @@ func (h *VMImageHandler) GetTenantVMImage(w http.ResponseWriter, r *http.Request
 		LifecycleLastActionAt:       lifecycle.LastActionAt,
 		LifecycleLastActionBy:       lifecycle.LastActionBy,
 		LifecycleLastReason:         lifecycle.LastReason,
+		LifecycleTransitionMode:     lifecycle.TransitionMode,
 		LifecycleHistory:            lifecycle.History,
 		ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)),
 	}
@@ -346,11 +349,12 @@ func vmImageLifecycleActionPermissions(executionStatus, lifecycleState string) v
 }
 
 type vmImageLifecycleMetadata struct {
-	State        string
-	LastActionAt string
-	LastActionBy string
-	LastReason   string
-	History      []vmLifecycleHistory
+	State          string
+	LastActionAt   string
+	LastActionBy   string
+	LastReason     string
+	TransitionMode string
+	History        []vmLifecycleHistory
 }
 
 func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfileID string, providerIdentifiers map[string][]string, lifecycle vmImageLifecycleMetadata) {
@@ -362,6 +366,7 @@ func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfi
 		LifecycleLastActionAt       string               `json:"lifecycle_last_action_at"`
 		LifecycleLastActionBy       string               `json:"lifecycle_last_action_by"`
 		LifecycleLastReason         string               `json:"lifecycle_last_reason"`
+		LifecycleTransitionMode     string               `json:"lifecycle_transition_mode"`
 		LifecycleHistory            []vmLifecycleHistory `json:"lifecycle_history"`
 	}
 	type executionMetadata struct {
@@ -374,11 +379,12 @@ func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfi
 	targetProvider = strings.TrimSpace(parsed.Packer.TargetProvider)
 	targetProfileID = strings.TrimSpace(parsed.Packer.TargetProfileID)
 	lifecycle = vmImageLifecycleMetadata{
-		State:        strings.TrimSpace(parsed.Packer.LifecycleState),
-		LastActionAt: strings.TrimSpace(parsed.Packer.LifecycleLastActionAt),
-		LastActionBy: strings.TrimSpace(parsed.Packer.LifecycleLastActionBy),
-		LastReason:   strings.TrimSpace(parsed.Packer.LifecycleLastReason),
-		History:      sanitizeLifecycleHistory(parsed.Packer.LifecycleHistory),
+		State:          strings.TrimSpace(parsed.Packer.LifecycleState),
+		LastActionAt:   strings.TrimSpace(parsed.Packer.LifecycleLastActionAt),
+		LastActionBy:   strings.TrimSpace(parsed.Packer.LifecycleLastActionBy),
+		LastReason:     strings.TrimSpace(parsed.Packer.LifecycleLastReason),
+		TransitionMode: vmImageLifecycleTransitionMode(parsed.Packer.LifecycleTransitionMode),
+		History:        sanitizeLifecycleHistory(parsed.Packer.LifecycleHistory),
 	}
 	out := make(map[string][]string, len(parsed.Packer.ProviderArtifactIdentifiers))
 	for provider, values := range parsed.Packer.ProviderArtifactIdentifiers {
@@ -396,6 +402,14 @@ func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfi
 		out[strings.ToLower(strings.TrimSpace(provider))] = normalized
 	}
 	return targetProvider, targetProfileID, out, lifecycle
+}
+
+func vmImageLifecycleTransitionMode(raw string) string {
+	mode := strings.ToLower(strings.TrimSpace(raw))
+	if mode == "" {
+		return "metadata_only"
+	}
+	return mode
 }
 
 func extractArtifactValues(raw json.RawMessage) []string {
@@ -577,6 +591,7 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		LifecycleLastActionAt:       updatedLifecycle.LastActionAt,
 		LifecycleLastActionBy:       updatedLifecycle.LastActionBy,
 		LifecycleLastReason:         updatedLifecycle.LastReason,
+		LifecycleTransitionMode:     updatedLifecycle.TransitionMode,
 		LifecycleHistory:            updatedLifecycle.History,
 		ActionPermissions:           vmImageLifecycleActionPermissions(updatedRow.ExecutionStatus, vmImageLifecycleState(updatedRow.ExecutionStatus, updatedLifecycle.State)),
 	}
@@ -646,6 +661,7 @@ func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason stri
 		packer = map[string]interface{}{}
 	}
 	packer["lifecycle_state"] = strings.ToLower(strings.TrimSpace(targetState))
+	packer["lifecycle_transition_mode"] = "metadata_only"
 	packer["lifecycle_last_action_at"] = at.UTC().Format(time.RFC3339)
 	packer["lifecycle_last_action_by"] = userID.String()
 	if strings.TrimSpace(reason) != "" {

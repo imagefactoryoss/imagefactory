@@ -337,6 +337,9 @@ const VMImagesPage: React.FC = () => {
               <p className="mt-1 text-slate-600 dark:text-slate-300">Target profile: {selected.target_profile_id || '-'}</p>
               <p className="mt-1 text-slate-600 dark:text-slate-300">Execution: {selected.execution_id}</p>
               <p className="mt-1 text-slate-600 dark:text-slate-300">Build status: {selected.build_status}</p>
+              <p className="mt-1 text-slate-600 dark:text-slate-300">
+                Transition mode: {selected.lifecycle_transition_mode || 'metadata_only'}
+              </p>
               {selected.lifecycle_last_action_at ? (
                 <p className="mt-1 text-slate-600 dark:text-slate-300">
                   Last lifecycle action: {new Date(selected.lifecycle_last_action_at).toLocaleString()}
