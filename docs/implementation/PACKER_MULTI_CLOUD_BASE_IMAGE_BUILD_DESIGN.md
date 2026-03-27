@@ -810,6 +810,19 @@ Acceptance criteria:
 - authorized users can promote/deprecate with full audit trail.
 - delete operations are policy-gated and blocked when protections apply.
 
+Progress update (2026-03-27):
+- backend lifecycle action foundation added for tenant VM catalog executions:
+  - `POST /api/v1/images/vm/{executionId}/promote`
+  - `POST /api/v1/images/vm/{executionId}/deprecate`
+  - `DELETE /api/v1/images/vm/{executionId}`
+- lifecycle state transitions persist under execution metadata:
+  - `metadata.packer.lifecycle_state`
+  - `metadata.packer.lifecycle_last_action_at`
+  - `metadata.packer.lifecycle_last_action_by`
+  - `metadata.packer.lifecycle_last_reason`
+- catalog list/detail now prefer lifecycle override when present (`released`, `deprecated`, `deleted`).
+- guardrails currently block transitions for active (`pending`/`running`) and non-releasable (`failed`/`cancelled`) executions.
+
 ### 16.10 Cross-cutting quality gates for every PR
 
 - unit + integration tests for changed modules.

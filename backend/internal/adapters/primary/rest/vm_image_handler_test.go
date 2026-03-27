@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -44,9 +46,16 @@ func TestVMImageLifecycleState(t *testing.T) {
 		"":          "unknown",
 	}
 	for input, want := range cases {
-		if got := vmImageLifecycleState(input); got != want {
+		if got := vmImageLifecycleState(input, ""); got != want {
 			t.Fatalf("vmImageLifecycleState(%q): expected %q, got %q", input, want, got)
 		}
+	}
+}
+
+func TestVMImageLifecycleState_UsesOverride(t *testing.T) {
+	got := vmImageLifecycleState("success", "released")
+	if got != "released" {
+		t.Fatalf("expected released lifecycle override, got %q", got)
 	}
 }
 
@@ -55,13 +64,14 @@ func TestParsePackerMetadataFields(t *testing.T) {
 		"packer": {
 			"target_provider": "aws",
 			"target_profile_id": "11111111-1111-1111-1111-111111111111",
+			"lifecycle_state": "released",
 			"provider_artifact_identifiers": {
 				"aws": ["ami-b", "ami-a"],
 				"gcp": ["projects/demo/global/images/example"]
 			}
 		}
 	}`)
-	provider, profileID, identifiers := parsePackerMetadataFields(raw)
+	provider, profileID, identifiers, lifecycleOverride := parsePackerMetadataFields(raw)
 	if provider != "aws" {
 		t.Fatalf("expected provider aws, got %q", provider)
 	}
@@ -70,6 +80,9 @@ func TestParsePackerMetadataFields(t *testing.T) {
 	}
 	if !reflect.DeepEqual(identifiers["aws"], []string{"ami-a", "ami-b"}) {
 		t.Fatalf("unexpected aws identifiers: %+v", identifiers["aws"])
+	}
+	if lifecycleOverride != "released" {
+		t.Fatalf("expected lifecycle override released, got %q", lifecycleOverride)
 	}
 }
 
@@ -82,5 +95,23 @@ func TestExtractArtifactValues(t *testing.T) {
 	expected := []string{"ami-123", "artifact-a", "artifact-b", "path-a", "path-b"}
 	if !reflect.DeepEqual(values, expected) {
 		t.Fatalf("unexpected artifact values: expected %+v, got %+v", expected, values)
+	}
+}
+
+func TestUpdatePackerLifecycleMetadata(t *testing.T) {
+	input := json.RawMessage(`{"packer":{"target_provider":"aws"}}`)
+	out, err := updatePackerLifecycleMetadata(
+		input,
+		"deprecated",
+		"stale image",
+		uuid.MustParse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		time.Date(2026, 3, 27, 20, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("updatePackerLifecycleMetadata returned error: %v", err)
+	}
+	_, _, _, lifecycle := parsePackerMetadataFields(out)
+	if lifecycle != "deprecated" {
+		t.Fatalf("expected lifecycle override deprecated, got %q", lifecycle)
 	}
 }

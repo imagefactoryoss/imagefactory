@@ -73,6 +73,14 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - improved identifier extraction for nested/non-array artifact payloads in execution metadata enrichment.
     - expanded GCP pattern support for `projects/.../global/images/...` values without leading slash.
     - reduced VMware false positives by requiring identifier-like VMware markers instead of bare labels.
+  - PR8 backend lifecycle action foundation completed on `feature/packer-builds`:
+    - added tenant VM image lifecycle endpoints:
+      - `POST /api/v1/images/vm/{executionId}/promote`
+      - `POST /api/v1/images/vm/{executionId}/deprecate`
+      - `DELETE /api/v1/images/vm/{executionId}`
+    - lifecycle transitions persist metadata overrides under `metadata.packer.lifecycle_state`.
+    - list/get VM catalog responses now honor persisted lifecycle overrides (`released`, `deprecated`, `deleted`).
+    - added guardrails to block lifecycle transitions for active/failed/cancelled executions.
 
 ## Backlog Review Summary (2026-03-16)
 
