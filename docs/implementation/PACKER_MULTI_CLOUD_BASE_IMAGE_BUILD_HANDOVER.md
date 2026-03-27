@@ -120,6 +120,12 @@ Branch: `feature/packer-builds`
     - `IF_VM_LIFECYCLE_AZURE_BEARER_TOKEN`
     - optional `IF_VM_LIFECYCLE_AZURE_API_VERSION`
     - optional `IF_VM_LIFECYCLE_AZURE_DEPRECATION_HOURS`
+- PR8 GCP provider-native lifecycle execution completed:
+  - GCP lifecycle actions now support provider-native execution for `released` / `deprecated` / `deleted` transitions via Compute API-backed executor path.
+  - GCP image identifiers are resolved from provider metadata and execution artifacts with strict validation (`400` on missing/invalid identifier input).
+  - GCP executor configuration uses:
+    - `IF_VM_LIFECYCLE_GCP_BEARER_TOKEN`
+    - optional `IF_VM_LIFECYCLE_GCP_BASE_URL`
 
 ## PR3 Backend Summary
 

@@ -886,6 +886,11 @@ Progress update (2026-03-27):
   - Azure `deprecate` / `released` transitions execute provider-native ARM `PATCH` updates for image lifecycle publication state.
   - Azure identifier resolution supports provider metadata plus execution artifact fallback (Azure resource ID forms).
   - Azure lifecycle execution is configured via `IF_VM_LIFECYCLE_AZURE_BEARER_TOKEN`, optional `IF_VM_LIFECYCLE_AZURE_API_VERSION`, and optional `IF_VM_LIFECYCLE_AZURE_DEPRECATION_HOURS`.
+- provider-native lifecycle execution now includes GCP implementation:
+  - GCP `delete` transitions execute provider-native Compute API `DELETE` for resolved image resource identifiers.
+  - GCP `deprecate` / `released` transitions execute provider-native Compute API `deprecate` actions (`DEPRECATED` / `ACTIVE` state transitions).
+  - GCP identifier resolution supports provider metadata plus execution artifact fallback (`projects/.../global/images/...` and full Compute API URL forms).
+  - GCP lifecycle execution is configured via `IF_VM_LIFECYCLE_GCP_BEARER_TOKEN` and optional `IF_VM_LIFECYCLE_GCP_BASE_URL`.
 
 ### 16.10 Cross-cutting quality gates for every PR
 
