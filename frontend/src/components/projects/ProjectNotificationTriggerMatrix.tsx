@@ -35,6 +35,9 @@ const TRIGGER_CATALOG: TriggerCatalogItem[] = [
   { id: 'BN-008', name: 'Retry succeeded', description: 'Retry execution succeeds.' },
   { id: 'BN-009', name: 'Recovered from stuck/orphaned', description: 'Sweeper/subscriber recovered stale state.' },
   { id: 'BN-010', name: 'Preflight blocked', description: 'Build blocked by preflight validation.' },
+  { id: 'BN-011', name: 'Scheduled build queued', description: 'Scheduled trigger successfully queued a build.' },
+  { id: 'BN-012', name: 'Scheduled build failed', description: 'Scheduled trigger failed before queuing a build.' },
+  { id: 'BN-013', name: 'Scheduled build skipped', description: 'Scheduled trigger skipped due to policy (for example, forbid concurrency).' },
 ]
 
 const RECIPIENT_OPTIONS: { value: BuildNotificationRecipientPolicy; label: string }[] = [

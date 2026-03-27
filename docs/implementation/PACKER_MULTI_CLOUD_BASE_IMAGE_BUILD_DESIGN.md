@@ -786,6 +786,10 @@ Progress update (2026-03-27):
   - `scheduled_failed` -> `BN-012` (`build_scheduled_failed`)
   - `scheduled_noop` -> `BN-013` (`build_scheduled_noop`)
 - notification defaults now include scheduled failure email delivery by default.
+- frontend notification catalogs now include `BN-011`/`BN-012`/`BN-013` in:
+  - admin tenant notification defaults panel
+  - tenant details notification defaults drawer
+  - project notification trigger matrix
 
 ### 16.9 PR8 - Lifecycle actions (promote/deprecate/delete) and policy guardrails
 
