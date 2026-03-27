@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -21,6 +22,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/srikarm/image-factory/internal/infrastructure/middleware"
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
 	"go.uber.org/zap"
 )
 
@@ -44,6 +51,8 @@ type vmLifecycleTransitionResult struct {
 	TransitionMode string
 }
 
+const vmwareLifecycleDeprecationMarker = "[image-factory:deprecated]"
+
 type vmLifecycleExecutor interface {
 	ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error)
 }
@@ -61,6 +70,7 @@ var errInvalidProviderLifecycleTransitionInput = errors.New("provider lifecycle 
 
 var awsAMIIDPattern = regexp.MustCompile(`\bami-[0-9a-fA-F]{8,17}\b`)
 var awsImageARNPattern = regexp.MustCompile(`^arn:aws[a-zA-Z-]*:ec2:([a-z0-9-]+):[0-9]*:image/(ami-[0-9a-fA-F]{8,17})$`)
+var vmwareManagedObjectPattern = regexp.MustCompile(`^vm-\d+$`)
 
 type awsLifecycleImageReference struct {
 	Region  string
@@ -74,8 +84,15 @@ type vmAWSLifecycleClient interface {
 }
 
 type vmDispatchLifecycleExecutor struct {
-	mode             vmLifecycleExecutionMode
-	awsClientFactory func(ctx context.Context, region string) (vmAWSLifecycleClient, error)
+	mode                vmLifecycleExecutionMode
+	awsClientFactory    func(ctx context.Context, region string) (vmAWSLifecycleClient, error)
+	vmwareClientFactory func(ctx context.Context) (vmVMwareLifecycleClient, error)
+}
+
+type vmVMwareLifecycleClient interface {
+	DeleteImage(ctx context.Context, identifier string) error
+	DeprecateImage(ctx context.Context, identifier, reason string) error
+	ReleaseImage(ctx context.Context, identifier string) error
 }
 
 func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error) {
@@ -84,7 +101,77 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
 	}
 
-	if provider != "aws" || (req.TargetState != "deleted" && req.TargetState != "deprecated" && req.TargetState != "released") {
+	if provider == "aws" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
+		ref, err := selectAWSLifecycleImageReference(req.ProviderArtifactIdentifiers, req.ArtifactValues, strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AWS_REGION")))
+		if err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+
+		clientFactory := e.awsClientFactory
+		if clientFactory == nil {
+			clientFactory = newVMAWSLifecycleClient
+		}
+		client, err := clientFactory(ctx, ref.Region)
+		if err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+		if req.TargetState == "deleted" {
+			if _, err := client.DeregisterImage(ctx, &ec2.DeregisterImageInput{ImageId: awscore.String(ref.ImageID)}); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		}
+
+		if req.TargetState == "deprecated" {
+			deprecateAt := resolveVMAWSDeprecationTimestamp()
+			if _, err := client.EnableImageDeprecation(ctx, &ec2.EnableImageDeprecationInput{
+				ImageId:     awscore.String(ref.ImageID),
+				DeprecateAt: awscore.Time(deprecateAt),
+			}); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		}
+		if req.TargetState == "released" {
+			if _, err := client.DisableImageDeprecation(ctx, &ec2.DisableImageDeprecationInput{
+				ImageId: awscore.String(ref.ImageID),
+			}); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		}
+
+		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+	}
+
+	if provider == "vmware" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
+		identifier, err := selectVMwareLifecycleIdentifier(req.ProviderArtifactIdentifiers, req.ArtifactValues)
+		if err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+		clientFactory := e.vmwareClientFactory
+		if clientFactory == nil {
+			clientFactory = newVMVMwareLifecycleClient
+		}
+		client, err := clientFactory(ctx)
+		if err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+		switch req.TargetState {
+		case "deleted":
+			if err := client.DeleteImage(ctx, identifier); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		case "deprecated":
+			if err := client.DeprecateImage(ctx, identifier, req.Reason); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		case "released":
+			if err := client.ReleaseImage(ctx, identifier); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		}
+		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+	}
+
+	if provider != "aws" && provider != "vmware" {
 		if e.mode == vmLifecycleExecutionModeRequireProviderNative {
 			if provider == "" {
 				provider = "unknown"
@@ -93,44 +180,10 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		}
 		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
 	}
-
-	ref, err := selectAWSLifecycleImageReference(req.ProviderArtifactIdentifiers, req.ArtifactValues, strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AWS_REGION")))
-	if err != nil {
-		return vmLifecycleTransitionResult{}, err
+	if e.mode == vmLifecycleExecutionModeRequireProviderNative {
+		return vmLifecycleTransitionResult{}, fmt.Errorf("%w for provider %s state %s", errUnsupportedProviderLifecycleTransition, provider, req.TargetState)
 	}
-
-	clientFactory := e.awsClientFactory
-	if clientFactory == nil {
-		clientFactory = newVMAWSLifecycleClient
-	}
-	client, err := clientFactory(ctx, ref.Region)
-	if err != nil {
-		return vmLifecycleTransitionResult{}, err
-	}
-	if req.TargetState == "deleted" {
-		if _, err := client.DeregisterImage(ctx, &ec2.DeregisterImageInput{ImageId: awscore.String(ref.ImageID)}); err != nil {
-			return vmLifecycleTransitionResult{}, err
-		}
-	}
-
-	if req.TargetState == "deprecated" {
-		deprecateAt := resolveVMAWSDeprecationTimestamp()
-		if _, err := client.EnableImageDeprecation(ctx, &ec2.EnableImageDeprecationInput{
-			ImageId:     awscore.String(ref.ImageID),
-			DeprecateAt: awscore.Time(deprecateAt),
-		}); err != nil {
-			return vmLifecycleTransitionResult{}, err
-		}
-	}
-	if req.TargetState == "released" {
-		if _, err := client.DisableImageDeprecation(ctx, &ec2.DisableImageDeprecationInput{
-			ImageId: awscore.String(ref.ImageID),
-		}); err != nil {
-			return vmLifecycleTransitionResult{}, err
-		}
-	}
-
-	return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+	return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
 }
 
 func newVMAWSLifecycleClient(ctx context.Context, region string) (vmAWSLifecycleClient, error) {
@@ -139,6 +192,128 @@ func newVMAWSLifecycleClient(ctx context.Context, region string) (vmAWSLifecycle
 		return nil, err
 	}
 	return ec2.NewFromConfig(cfg), nil
+}
+
+type vmVMwareLifecycleSOAPClient struct {
+	client *govmomi.Client
+	finder *find.Finder
+}
+
+func newVMVMwareLifecycleClient(ctx context.Context) (vmVMwareLifecycleClient, error) {
+	rawURL := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_VMWARE_VCENTER_URL"))
+	if rawURL == "" {
+		return nil, fmt.Errorf("%w: vmware vcenter url", errInvalidProviderLifecycleTransitionInput)
+	}
+	u, err := soap.ParseURL(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: vmware vcenter url parse failed", errInvalidProviderLifecycleTransitionInput)
+	}
+	username := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_VMWARE_USERNAME"))
+	password := os.Getenv("IF_VM_LIFECYCLE_VMWARE_PASSWORD")
+	if username != "" {
+		u.User = url.UserPassword(username, password)
+	}
+	if u.User == nil {
+		return nil, fmt.Errorf("%w: vmware credentials missing", errInvalidProviderLifecycleTransitionInput)
+	}
+	client, err := govmomi.NewClient(ctx, u, resolveVMwareLifecycleInsecureFlag())
+	if err != nil {
+		return nil, err
+	}
+	finder := find.NewFinder(client.Client, true)
+	if datacenter := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_VMWARE_DATACENTER")); datacenter != "" {
+		dc, err := finder.Datacenter(ctx, datacenter)
+		if err != nil {
+			return nil, err
+		}
+		finder.SetDatacenter(dc)
+	}
+	return vmVMwareLifecycleSOAPClient{
+		client: client,
+		finder: finder,
+	}, nil
+}
+
+func resolveVMwareLifecycleInsecureFlag() bool {
+	raw := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_VMWARE_INSECURE"))
+	if raw == "" {
+		return true
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		return true
+	}
+	return parsed
+}
+
+func (c vmVMwareLifecycleSOAPClient) DeleteImage(ctx context.Context, identifier string) error {
+	vm, err := c.findVirtualMachine(ctx, identifier)
+	if err != nil {
+		return err
+	}
+	task, err := vm.Destroy(ctx)
+	if err != nil {
+		return err
+	}
+	return task.Wait(ctx)
+}
+
+func (c vmVMwareLifecycleSOAPClient) DeprecateImage(ctx context.Context, identifier, reason string) error {
+	return c.updateLifecycleAnnotation(ctx, identifier, reason, true)
+}
+
+func (c vmVMwareLifecycleSOAPClient) ReleaseImage(ctx context.Context, identifier string) error {
+	return c.updateLifecycleAnnotation(ctx, identifier, "", false)
+}
+
+func (c vmVMwareLifecycleSOAPClient) updateLifecycleAnnotation(ctx context.Context, identifier, reason string, deprecated bool) error {
+	vm, err := c.findVirtualMachine(ctx, identifier)
+	if err != nil {
+		return err
+	}
+	var vmProps mo.VirtualMachine
+	if err := vm.Properties(ctx, vm.Reference(), []string{"config.annotation"}, &vmProps); err != nil {
+		return err
+	}
+	current := ""
+	if vmProps.Config != nil {
+		current = strings.TrimSpace(vmProps.Config.Annotation)
+	}
+	next := updateVMwareLifecycleAnnotation(current, strings.TrimSpace(reason), time.Now().UTC(), deprecated)
+	spec := types.VirtualMachineConfigSpec{Annotation: next}
+	task, err := vm.Reconfigure(ctx, spec)
+	if err != nil {
+		return err
+	}
+	return task.Wait(ctx)
+}
+
+func (c vmVMwareLifecycleSOAPClient) findVirtualMachine(ctx context.Context, identifier string) (*object.VirtualMachine, error) {
+	normalized, ok := parseVMwareLifecycleImageReference(identifier)
+	if !ok {
+		return nil, fmt.Errorf("%w: vmware image identifier parse failed", errInvalidProviderLifecycleTransitionInput)
+	}
+	lower := strings.ToLower(normalized)
+	if strings.HasPrefix(lower, "moref:") {
+		moid := strings.TrimSpace(normalized[len("moref:"):])
+		if vmwareManagedObjectPattern.MatchString(strings.ToLower(moid)) {
+			return object.NewVirtualMachine(c.client.Client, types.ManagedObjectReference{
+				Type:  "VirtualMachine",
+				Value: moid,
+			}), nil
+		}
+	}
+	if vmwareManagedObjectPattern.MatchString(lower) {
+		return object.NewVirtualMachine(c.client.Client, types.ManagedObjectReference{
+			Type:  "VirtualMachine",
+			Value: normalized,
+		}), nil
+	}
+	vm, err := c.finder.VirtualMachine(ctx, normalized)
+	if err == nil {
+		return vm, nil
+	}
+	return nil, err
 }
 
 func selectAWSLifecycleImageReference(providerArtifactIdentifiers map[string][]string, artifactValues []string, defaultRegion string) (awsLifecycleImageReference, error) {
@@ -195,6 +370,60 @@ func parseAWSLifecycleImageReference(raw, defaultRegion string) (awsLifecycleIma
 	}
 
 	return awsLifecycleImageReference{}, false
+}
+
+func selectVMwareLifecycleIdentifier(providerArtifactIdentifiers map[string][]string, artifactValues []string) (string, error) {
+	candidates := make([]string, 0, len(providerArtifactIdentifiers["vmware"])+len(artifactValues))
+	candidates = append(candidates, providerArtifactIdentifiers["vmware"]...)
+	candidates = append(candidates, artifactValues...)
+	for _, candidate := range candidates {
+		if normalized, ok := parseVMwareLifecycleImageReference(candidate); ok {
+			return normalized, nil
+		}
+	}
+	return "", fmt.Errorf("%w: vmware image identifier", errInvalidProviderLifecycleTransitionInput)
+}
+
+func parseVMwareLifecycleImageReference(raw string) (string, bool) {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return "", false
+	}
+	lower := strings.ToLower(candidate)
+	if strings.HasPrefix(lower, "vsphere://") ||
+		strings.Contains(lower, "/vm/") ||
+		strings.Contains(lower, "/templates/") ||
+		strings.Contains(lower, "template") ||
+		strings.HasSuffix(lower, ".ova") ||
+		strings.HasPrefix(lower, "moref:") ||
+		vmwareManagedObjectPattern.MatchString(lower) {
+		return candidate, true
+	}
+	return "", false
+}
+
+func updateVMwareLifecycleAnnotation(current, reason string, at time.Time, deprecated bool) string {
+	lines := strings.Split(strings.TrimSpace(current), "\n")
+	cleaned := make([]string, 0, len(lines)+1)
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.Contains(strings.ToLower(trimmed), vmwareLifecycleDeprecationMarker) {
+			continue
+		}
+		cleaned = append(cleaned, trimmed)
+	}
+	if deprecated {
+		entry := fmt.Sprintf("%s at=%s", vmwareLifecycleDeprecationMarker, at.UTC().Format(time.RFC3339))
+		reason = strings.TrimSpace(reason)
+		if reason != "" {
+			entry = fmt.Sprintf("%s reason=%s", entry, reason)
+		}
+		cleaned = append(cleaned, entry)
+	}
+	return strings.Join(cleaned, "\n")
 }
 
 func resolveVMAWSDeprecationTimestamp() time.Time {
@@ -276,8 +505,9 @@ func NewVMImageHandler(db *sqlx.DB, logger *zap.Logger) *VMImageHandler {
 		db:     db,
 		logger: logger,
 		lifecycleExecutor: vmDispatchLifecycleExecutor{
-			mode:             mode,
-			awsClientFactory: newVMAWSLifecycleClient,
+			mode:                mode,
+			awsClientFactory:    newVMAWSLifecycleClient,
+			vmwareClientFactory: newVMVMwareLifecycleClient,
 		},
 	}
 }

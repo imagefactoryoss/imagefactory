@@ -137,6 +137,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - AWS native lifecycle transitions now fall back to execution artifact values when `provider_artifact_identifiers.aws` is absent, improving compatibility with older build metadata payloads.
   - PR8 provider-native lifecycle artifact-shape compatibility expansion completed on `feature/packer-builds`:
     - execution artifact extraction now scans nested object/array payloads for string identifiers, improving native lifecycle fallback for non-array artifact shapes.
+  - PR8 VMware provider-native lifecycle execution completed on `feature/packer-builds`:
+    - VMware `released` / `deprecated` / `deleted` lifecycle transitions now support provider-native execution through vCenter when execution mode enables provider-native transitions.
+    - VMware native lifecycle supports identifier fallback from both provider metadata and execution artifacts; invalid/missing VMware identifiers fail with `400`.
 
 ## Backlog Review Summary (2026-03-16)
 

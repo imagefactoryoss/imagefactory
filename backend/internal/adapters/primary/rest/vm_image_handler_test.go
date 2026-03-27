@@ -103,6 +103,17 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		}
 	})
 
+	t.Run("require_provider_native vmware requires identifiers", func(t *testing.T) {
+		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
+		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "vmware",
+			TargetState:    "deleted",
+		})
+		if !errors.Is(err, errInvalidProviderLifecycleTransitionInput) {
+			t.Fatalf("expected invalid provider lifecycle input error, got %v", err)
+		}
+	})
+
 	t.Run("prefer_provider_native executes aws delete", func(t *testing.T) {
 		fake := &fakeVMAWSLifecycleClient{}
 		exec := vmDispatchLifecycleExecutor{
@@ -239,6 +250,63 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 			t.Fatalf("expected deregister image id ami-0123456789abcdef0, got %q", fake.lastImageID)
 		}
 	})
+
+	t.Run("prefer_provider_native executes vmware delete", func(t *testing.T) {
+		fake := &fakeVMwareLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			vmwareClientFactory: func(ctx context.Context) (vmVMwareLifecycleClient, error) {
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "vmware",
+			TargetState:    "deleted",
+			ProviderArtifactIdentifiers: map[string][]string{
+				"vmware": {"vsphere://dc-1/vm/Templates/base-template"},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastAction != "delete" {
+			t.Fatalf("expected vmware delete action, got %q", fake.lastAction)
+		}
+		if fake.lastIdentifier != "vsphere://dc-1/vm/Templates/base-template" {
+			t.Fatalf("unexpected vmware identifier %q", fake.lastIdentifier)
+		}
+	})
+
+	t.Run("prefer_provider_native executes vmware deprecate", func(t *testing.T) {
+		fake := &fakeVMwareLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			vmwareClientFactory: func(ctx context.Context) (vmVMwareLifecycleClient, error) {
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "vmware",
+			TargetState:    "deprecated",
+			Reason:         "superseded template",
+			ArtifactValues: []string{"/dc1/vm/Templates/base-template"},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastAction != "deprecate" {
+			t.Fatalf("expected vmware deprecate action, got %q", fake.lastAction)
+		}
+		if fake.lastReason != "superseded template" {
+			t.Fatalf("unexpected vmware deprecate reason %q", fake.lastReason)
+		}
+	})
 }
 
 func TestParseAWSLifecycleImageReference(t *testing.T) {
@@ -273,11 +341,73 @@ func TestParseAWSLifecycleImageReference(t *testing.T) {
 	})
 }
 
+func TestParseVMwareLifecycleImageReference(t *testing.T) {
+	t.Run("accepts vsphere uri", func(t *testing.T) {
+		ref, ok := parseVMwareLifecycleImageReference("vsphere://dc-1/vm/Templates/base-template")
+		if !ok || ref == "" {
+			t.Fatal("expected parse success for vsphere uri")
+		}
+	})
+
+	t.Run("accepts inventory path", func(t *testing.T) {
+		ref, ok := parseVMwareLifecycleImageReference("/dc1/vm/Templates/base-template")
+		if !ok || ref == "" {
+			t.Fatal("expected parse success for inventory path")
+		}
+	})
+
+	t.Run("rejects unrelated string", func(t *testing.T) {
+		if _, ok := parseVMwareLifecycleImageReference("hello-world"); ok {
+			t.Fatal("expected parse failure for unrelated string")
+		}
+	})
+}
+
+func TestUpdateVMwareLifecycleAnnotation(t *testing.T) {
+	at := time.Date(2026, 3, 27, 21, 0, 0, 0, time.UTC)
+	withDeprecation := updateVMwareLifecycleAnnotation("baseline\n", "stale template", at, true)
+	if !strings.Contains(withDeprecation, "baseline") {
+		t.Fatalf("expected annotation to preserve existing content, got %q", withDeprecation)
+	}
+	if !strings.Contains(withDeprecation, vmwareLifecycleDeprecationMarker) {
+		t.Fatalf("expected deprecation marker in annotation, got %q", withDeprecation)
+	}
+	cleared := updateVMwareLifecycleAnnotation(withDeprecation, "", at, false)
+	if strings.Contains(strings.ToLower(cleared), vmwareLifecycleDeprecationMarker) {
+		t.Fatalf("expected deprecation marker removed, got %q", cleared)
+	}
+}
+
 type fakeVMAWSLifecycleClient struct {
 	lastImageID                 string
 	lastDeprecateImageID        string
 	lastDisableDeprecateImageID string
 	lastDeprecateAt             time.Time
+}
+
+type fakeVMwareLifecycleClient struct {
+	lastAction     string
+	lastIdentifier string
+	lastReason     string
+}
+
+func (f *fakeVMwareLifecycleClient) DeleteImage(ctx context.Context, identifier string) error {
+	f.lastAction = "delete"
+	f.lastIdentifier = identifier
+	return nil
+}
+
+func (f *fakeVMwareLifecycleClient) DeprecateImage(ctx context.Context, identifier, reason string) error {
+	f.lastAction = "deprecate"
+	f.lastIdentifier = identifier
+	f.lastReason = reason
+	return nil
+}
+
+func (f *fakeVMwareLifecycleClient) ReleaseImage(ctx context.Context, identifier string) error {
+	f.lastAction = "release"
+	f.lastIdentifier = identifier
+	return nil
 }
 
 func (f *fakeVMAWSLifecycleClient) DeregisterImage(ctx context.Context, params *ec2.DeregisterImageInput, optFns ...func(*ec2.Options)) (*ec2.DeregisterImageOutput, error) {
