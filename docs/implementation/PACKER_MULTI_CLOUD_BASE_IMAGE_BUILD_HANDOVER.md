@@ -33,6 +33,10 @@ Branch: `feature/packer-builds`
   - admin tenant defaults panel includes `BN-011`/`BN-012`/`BN-013`.
   - tenant details notification drawer includes `BN-011`/`BN-012`/`BN-013`.
   - project notification trigger matrix includes scheduled trigger rows and descriptions.
+- Provider artifact extraction hardening completed:
+  - extraction now scans nested/object artifact payloads in addition to array payloads.
+  - GCP artifact capture supports both `/projects/...` and `projects/...` identifier forms.
+  - VMware capture now prefers identifier-like values and avoids bare label false positives.
 
 ## PR3 Backend Summary
 
