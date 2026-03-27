@@ -111,6 +111,8 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 lifecycle action UX parity follow-up completed on `feature/packer-builds`:
     - frontend VM lifecycle toasts now display backend-provided action messages.
     - idempotent transition messaging is now surfaced directly in UI (for example, already-in-state responses).
+  - PR8 lifecycle transition-mode normalization hardening completed on `feature/packer-builds`:
+    - backend now normalizes transition mode to an allowlist (`metadata_only`, `provider_native`, `hybrid`) with unknown values falling back to `metadata_only`.
 
 ## Backlog Review Summary (2026-03-16)
 

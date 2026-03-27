@@ -76,6 +76,9 @@ Branch: `feature/packer-builds`
 - PR8 lifecycle action UX parity follow-up completed:
   - VM catalog action toasts now prioritize backend action messages.
   - idempotent lifecycle outcomes are now presented with backend-provided messaging in UI.
+- PR8 lifecycle transition-mode normalization hardening completed:
+  - backend now enforces allowlisted transition modes (`metadata_only`, `provider_native`, `hybrid`) when parsing metadata.
+  - unknown transition-mode values now safely normalize to `metadata_only`.
 
 ## PR3 Backend Summary
 
