@@ -428,6 +428,21 @@ func (e *MethodTektonExecutor) persistPipelineRunMetadata(ctx context.Context, e
 		tektonMetadata["provider_id"] = build.InfrastructureProviderID().String()
 	}
 	metadata["tekton"] = tektonMetadata
+	if method == BuildMethodPacker && build != nil && build.Config() != nil {
+		packerMetadata, _ := metadata["packer"].(map[string]interface{})
+		if packerMetadata == nil {
+			packerMetadata = map[string]interface{}{}
+		}
+		if profileID := packerTargetProfileIDFromConfig(build.Config()); profileID != "" {
+			packerMetadata["target_profile_id"] = profileID
+		}
+		if provider := packerTargetProviderFromConfig(build.Config()); provider != "" {
+			packerMetadata["target_provider"] = provider
+		}
+		if len(packerMetadata) > 0 {
+			metadata["packer"] = packerMetadata
+		}
+	}
 
 	payload, err := json.Marshal(metadata)
 	if err != nil {

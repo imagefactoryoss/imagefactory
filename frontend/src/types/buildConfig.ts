@@ -15,6 +15,7 @@ export interface BuildMethodConfig {
 export interface PackerConfig extends BuildMethodConfig {
     config: {
         template: string;
+        packer_target_profile_id?: string;
         variables?: Record<string, unknown>;
         build_vars?: Record<string, string>;
         on_error?: string;
@@ -114,6 +115,7 @@ export interface PresetConfig {
 export interface CreatePackerConfigRequest {
     build_id: string;
     template: string;
+    packer_target_profile_id?: string;
     variables?: Record<string, unknown>;
     build_vars?: Record<string, string>;
     on_error?: string;

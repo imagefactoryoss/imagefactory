@@ -122,9 +122,10 @@ func TestBuildConfigData_Validation(t *testing.T) {
 
 	t.Run("ValidatePackerConfig - valid", func(t *testing.T) {
 		config := &build.BuildConfigData{
-			BuildID:        buildID,
-			BuildMethod:    "packer",
-			PackerTemplate: `{"builders": [{"type": "amazon-ebs"}]}`,
+			BuildID:               buildID,
+			BuildMethod:           "packer",
+			PackerTemplate:        `{"builders": [{"type": "amazon-ebs"}]}`,
+			PackerTargetProfileID: uuid.New().String(),
 		}
 		assert.NoError(t, config.Validate())
 	})
@@ -140,9 +141,10 @@ func TestBuildConfigData_Validation(t *testing.T) {
 
 	t.Run("ValidatePackerConfig - invalid on_error", func(t *testing.T) {
 		config := &build.BuildConfigData{
-			BuildID:        buildID,
-			BuildMethod:    "packer",
-			PackerTemplate: `{"builders": [{"type": "amazon-ebs"}]}`,
+			BuildID:               buildID,
+			BuildMethod:           "packer",
+			PackerTemplate:        `{"builders": [{"type": "amazon-ebs"}]}`,
+			PackerTargetProfileID: uuid.New().String(),
 			Metadata: map[string]interface{}{
 				"on_error": "invalid",
 			},
@@ -153,9 +155,10 @@ func TestBuildConfigData_Validation(t *testing.T) {
 
 	t.Run("ValidatePackerConfig - unsupported parallel true", func(t *testing.T) {
 		config := &build.BuildConfigData{
-			BuildID:        buildID,
-			BuildMethod:    "packer",
-			PackerTemplate: `{"builders": [{"type": "amazon-ebs"}]}`,
+			BuildID:               buildID,
+			BuildMethod:           "packer",
+			PackerTemplate:        `{"builders": [{"type": "amazon-ebs"}]}`,
+			PackerTargetProfileID: uuid.New().String(),
 			Metadata: map[string]interface{}{
 				"parallel": true,
 			},

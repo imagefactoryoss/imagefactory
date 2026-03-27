@@ -2,6 +2,7 @@ package build
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -126,7 +127,11 @@ func buildConfigFromManifest(buildID uuid.UUID, manifest BuildManifest) *BuildCo
 
 	case BuildTypePacker:
 		config.PackerTemplate = manifest.BuildConfig.PackerTemplate
+		config.PackerTargetProfileID = strings.TrimSpace(manifest.BuildConfig.PackerTargetProfileID)
 		config.Metadata = packerMetadataFromBuildConfig(manifest.BuildConfig)
+		if config.PackerTargetProfileID == "" {
+			config.PackerTargetProfileID = metadataString(config.Metadata, "packer_target_profile_id", "packerTargetProfileId")
+		}
 	case BuildTypeNix:
 		config.Metadata = map[string]interface{}{
 			"nix_expression": manifest.BuildConfig.NixExpression,

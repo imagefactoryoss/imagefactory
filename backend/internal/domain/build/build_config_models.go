@@ -18,7 +18,8 @@ type BuildConfig struct {
 	RegistryType      RegistryType      // "s3", "harbor", "quay", "artifactory"
 	SecretManagerType SecretManagerType // "vault", "aws_secretsmanager", "azure_keyvault", "gcp_secretmanager"
 	// Packer-specific fields
-	PackerTemplate string // Packer HCL template (for packer builds)
+	PackerTemplate        string // Packer HCL template (for packer builds)
+	PackerTargetProfileID string // Admin-managed packer_target_profiles.id selected by tenant
 	// Buildpack-specific fields
 	PaketoConfig *PaketoConfig // Paketo buildpack configuration (for paketo builds)
 	// Dockerfile-based fields
@@ -57,77 +58,79 @@ type BuildConfig struct {
 // UnmarshalJSON allows dockerfile to be provided as a string or a structured object.
 func (c *BuildConfig) UnmarshalJSON(data []byte) error {
 	type snakePayload struct {
-		BuildType         BuildType              `json:"build_type"`
-		SBOMTool          SBOMTool               `json:"sbom_tool"`
-		ScanTool          ScanTool               `json:"scan_tool"`
-		RegistryType      RegistryType           `json:"registry_type"`
-		SecretManagerType SecretManagerType      `json:"secret_manager_type"`
-		PackerTemplate    string                 `json:"packer_template"`
-		PaketoConfig      *PaketoConfig          `json:"paketo_config"`
-		Dockerfile        json.RawMessage        `json:"dockerfile"`
-		BuildContext      string                 `json:"build_context"`
-		BuildArgs         map[string]string      `json:"build_args"`
-		Target            string                 `json:"target"`
-		Cache             bool                   `json:"cache"`
-		CacheRepo         string                 `json:"cache_repo"`
-		RegistryRepo      string                 `json:"registry_repo"`
-		RegistryAuthID    string                 `json:"registry_auth_id"`
-		SkipUnusedStages  bool                   `json:"skip_unused_stages"`
-		NixExpression     string                 `json:"nix_expression"`
-		FlakeURI          string                 `json:"flake_uri"`
-		Attributes        []string               `json:"attributes"`
-		Outputs           map[string]string      `json:"outputs"`
-		CacheDir          string                 `json:"cache_dir"`
-		Pure              bool                   `json:"pure"`
-		ShowTrace         bool                   `json:"show_trace"`
-		Platforms         []string               `json:"platforms"`
-		CacheTo           string                 `json:"cache_to"`
-		CacheFrom         []string               `json:"cache_from"`
-		Secrets           map[string]string      `json:"secrets"`
-		Variables         map[string]interface{} `json:"variables"`
-		BuildVars         map[string]string      `json:"build_vars"`
-		OnError           string                 `json:"on_error"`
-		Parallel          bool                   `json:"parallel"`
-		Builders          []PackerBuilder        `json:"builders"`
-		Provisioners      []VMProvisioner        `json:"provisioners"`
-		PostProcessors    []VMPostProcessor      `json:"post_processors"`
+		BuildType             BuildType              `json:"build_type"`
+		SBOMTool              SBOMTool               `json:"sbom_tool"`
+		ScanTool              ScanTool               `json:"scan_tool"`
+		RegistryType          RegistryType           `json:"registry_type"`
+		SecretManagerType     SecretManagerType      `json:"secret_manager_type"`
+		PackerTemplate        string                 `json:"packer_template"`
+		PackerTargetProfileID string                 `json:"packer_target_profile_id"`
+		PaketoConfig          *PaketoConfig          `json:"paketo_config"`
+		Dockerfile            json.RawMessage        `json:"dockerfile"`
+		BuildContext          string                 `json:"build_context"`
+		BuildArgs             map[string]string      `json:"build_args"`
+		Target                string                 `json:"target"`
+		Cache                 bool                   `json:"cache"`
+		CacheRepo             string                 `json:"cache_repo"`
+		RegistryRepo          string                 `json:"registry_repo"`
+		RegistryAuthID        string                 `json:"registry_auth_id"`
+		SkipUnusedStages      bool                   `json:"skip_unused_stages"`
+		NixExpression         string                 `json:"nix_expression"`
+		FlakeURI              string                 `json:"flake_uri"`
+		Attributes            []string               `json:"attributes"`
+		Outputs               map[string]string      `json:"outputs"`
+		CacheDir              string                 `json:"cache_dir"`
+		Pure                  bool                   `json:"pure"`
+		ShowTrace             bool                   `json:"show_trace"`
+		Platforms             []string               `json:"platforms"`
+		CacheTo               string                 `json:"cache_to"`
+		CacheFrom             []string               `json:"cache_from"`
+		Secrets               map[string]string      `json:"secrets"`
+		Variables             map[string]interface{} `json:"variables"`
+		BuildVars             map[string]string      `json:"build_vars"`
+		OnError               string                 `json:"on_error"`
+		Parallel              bool                   `json:"parallel"`
+		Builders              []PackerBuilder        `json:"builders"`
+		Provisioners          []VMProvisioner        `json:"provisioners"`
+		PostProcessors        []VMPostProcessor      `json:"post_processors"`
 	}
 
 	type camelPayload struct {
-		BuildType         BuildType              `json:"buildType"`
-		SBOMTool          SBOMTool               `json:"sbomTool"`
-		ScanTool          ScanTool               `json:"scanTool"`
-		RegistryType      RegistryType           `json:"registryType"`
-		SecretManagerType SecretManagerType      `json:"secretManagerType"`
-		PackerTemplate    string                 `json:"packerTemplate"`
-		PaketoConfig      *PaketoConfig          `json:"paketoConfig"`
-		Dockerfile        json.RawMessage        `json:"dockerfile"`
-		BuildContext      string                 `json:"buildContext"`
-		BuildArgs         map[string]string      `json:"buildArgs"`
-		Target            string                 `json:"target"`
-		Cache             bool                   `json:"cache"`
-		CacheRepo         string                 `json:"cacheRepo"`
-		RegistryRepo      string                 `json:"registryRepo"`
-		RegistryAuthID    string                 `json:"registryAuthId"`
-		SkipUnusedStages  bool                   `json:"skipUnusedStages"`
-		NixExpression     string                 `json:"nixExpression"`
-		FlakeURI          string                 `json:"flakeUri"`
-		Attributes        []string               `json:"attributes"`
-		Outputs           map[string]string      `json:"outputs"`
-		CacheDir          string                 `json:"cacheDir"`
-		Pure              bool                   `json:"pure"`
-		ShowTrace         bool                   `json:"showTrace"`
-		Platforms         []string               `json:"platforms"`
-		CacheTo           string                 `json:"cacheTo"`
-		CacheFrom         []string               `json:"cacheFrom"`
-		Secrets           map[string]string      `json:"secrets"`
-		Variables         map[string]interface{} `json:"variables"`
-		BuildVars         map[string]string      `json:"buildVars"`
-		OnError           string                 `json:"onError"`
-		Parallel          bool                   `json:"parallel"`
-		Builders          []PackerBuilder        `json:"builders"`
-		Provisioners      []VMProvisioner        `json:"provisioners"`
-		PostProcessors    []VMPostProcessor      `json:"postProcessors"`
+		BuildType             BuildType              `json:"buildType"`
+		SBOMTool              SBOMTool               `json:"sbomTool"`
+		ScanTool              ScanTool               `json:"scanTool"`
+		RegistryType          RegistryType           `json:"registryType"`
+		SecretManagerType     SecretManagerType      `json:"secretManagerType"`
+		PackerTemplate        string                 `json:"packerTemplate"`
+		PackerTargetProfileID string                 `json:"packerTargetProfileId"`
+		PaketoConfig          *PaketoConfig          `json:"paketoConfig"`
+		Dockerfile            json.RawMessage        `json:"dockerfile"`
+		BuildContext          string                 `json:"buildContext"`
+		BuildArgs             map[string]string      `json:"buildArgs"`
+		Target                string                 `json:"target"`
+		Cache                 bool                   `json:"cache"`
+		CacheRepo             string                 `json:"cacheRepo"`
+		RegistryRepo          string                 `json:"registryRepo"`
+		RegistryAuthID        string                 `json:"registryAuthId"`
+		SkipUnusedStages      bool                   `json:"skipUnusedStages"`
+		NixExpression         string                 `json:"nixExpression"`
+		FlakeURI              string                 `json:"flakeUri"`
+		Attributes            []string               `json:"attributes"`
+		Outputs               map[string]string      `json:"outputs"`
+		CacheDir              string                 `json:"cacheDir"`
+		Pure                  bool                   `json:"pure"`
+		ShowTrace             bool                   `json:"showTrace"`
+		Platforms             []string               `json:"platforms"`
+		CacheTo               string                 `json:"cacheTo"`
+		CacheFrom             []string               `json:"cacheFrom"`
+		Secrets               map[string]string      `json:"secrets"`
+		Variables             map[string]interface{} `json:"variables"`
+		BuildVars             map[string]string      `json:"buildVars"`
+		OnError               string                 `json:"onError"`
+		Parallel              bool                   `json:"parallel"`
+		Builders              []PackerBuilder        `json:"builders"`
+		Provisioners          []VMProvisioner        `json:"provisioners"`
+		PostProcessors        []VMPostProcessor      `json:"postProcessors"`
 	}
 
 	parseDockerfile := func(raw json.RawMessage) (string, error) {
@@ -181,6 +184,9 @@ func (c *BuildConfig) UnmarshalJSON(data []byte) error {
 	}
 	if payload.PackerTemplate == "" {
 		payload.PackerTemplate = camel.PackerTemplate
+	}
+	if payload.PackerTargetProfileID == "" {
+		payload.PackerTargetProfileID = camel.PackerTargetProfileID
 	}
 	if payload.PaketoConfig == nil {
 		payload.PaketoConfig = camel.PaketoConfig
@@ -266,6 +272,7 @@ func (c *BuildConfig) UnmarshalJSON(data []byte) error {
 	c.RegistryType = payload.RegistryType
 	c.SecretManagerType = payload.SecretManagerType
 	c.PackerTemplate = payload.PackerTemplate
+	c.PackerTargetProfileID = payload.PackerTargetProfileID
 	c.PaketoConfig = payload.PaketoConfig
 	c.Dockerfile = dockerfile
 	c.BuildContext = payload.BuildContext
@@ -356,7 +363,8 @@ type BuildConfigData struct {
 	Buildpacks []string `json:"buildpacks,omitempty"`
 
 	// Packer-specific
-	PackerTemplate string `json:"packer_template,omitempty"`
+	PackerTemplate        string `json:"packer_template,omitempty"`
+	PackerTargetProfileID string `json:"packer_target_profile_id,omitempty"`
 
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
@@ -431,6 +439,22 @@ func (c *BuildConfigData) ValidatePackerConfig() error {
 	if c.PackerTemplate == "" {
 		return errors.New("packer template is required for packer builds")
 	}
+	packerTargetProfileID := strings.TrimSpace(c.PackerTargetProfileID)
+	if packerTargetProfileID == "" && c.Metadata != nil {
+		packerTargetProfileID = strings.TrimSpace(metadataString(c.Metadata, "packer_target_profile_id", "packerTargetProfileId"))
+	}
+	if packerTargetProfileID == "" {
+		return errors.New("packer_target_profile_id is required for packer builds")
+	}
+	if _, err := uuid.Parse(packerTargetProfileID); err != nil {
+		return errors.New("packer_target_profile_id must be a valid UUID")
+	}
+	c.PackerTargetProfileID = packerTargetProfileID
+	if c.Metadata == nil {
+		c.Metadata = map[string]interface{}{}
+	}
+	c.Metadata["packer_target_profile_id"] = packerTargetProfileID
+
 	if c.Metadata == nil {
 		return nil
 	}
