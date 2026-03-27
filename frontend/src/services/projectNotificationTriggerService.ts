@@ -11,6 +11,9 @@ export type BuildNotificationTriggerID =
   | 'BN-008'
   | 'BN-009'
   | 'BN-010'
+  | 'BN-011'
+  | 'BN-012'
+  | 'BN-013'
 
 export type BuildNotificationChannel = 'in_app' | 'email'
 export type BuildNotificationRecipientPolicy =

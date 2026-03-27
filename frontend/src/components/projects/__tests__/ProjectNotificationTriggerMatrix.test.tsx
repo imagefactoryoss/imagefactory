@@ -46,6 +46,9 @@ const triggerIDs = [
   "BN-008",
   "BN-009",
   "BN-010",
+  "BN-011",
+  "BN-012",
+  "BN-013",
 ] as const;
 
 const buildPrefs = (

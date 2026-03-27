@@ -29,6 +29,10 @@ Branch: `feature/packer-builds`
   - schedule runner now publishes scheduled outcome statuses (`scheduled_queued`, `scheduled_failed`, `scheduled_noop`).
   - build notification mapping includes trigger IDs `BN-011`, `BN-012`, `BN-013`.
   - scheduled failure trigger defaults include email channel alongside in-app.
+- PR7 frontend notification catalog parity completed:
+  - admin tenant defaults panel includes `BN-011`/`BN-012`/`BN-013`.
+  - tenant details notification drawer includes `BN-011`/`BN-012`/`BN-013`.
+  - project notification trigger matrix includes scheduled trigger rows and descriptions.
 
 ## PR3 Backend Summary
 
@@ -191,6 +195,7 @@ Backend:
 
 Frontend:
 - `npm run build`
+- `npm test -- --run src/components/projects/__tests__/ProjectNotificationTriggerMatrix.test.tsx`
 
 ## Known Gap For Next PR
 
