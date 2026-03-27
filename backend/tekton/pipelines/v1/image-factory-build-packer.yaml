@@ -11,6 +11,9 @@ spec:
     - name: vars
       type: array
       default: []
+    - name: on-error
+      type: string
+      default: cleanup
   workspaces:
     - name: source
     - name: git-auth
@@ -34,6 +37,8 @@ spec:
       params:
         - name: TEMPLATE
           value: $(params.packer-template)
+        - name: ON_ERROR
+          value: $(params.on-error)
         - name: VARS
           value:
             - "$(params.vars[*])"
