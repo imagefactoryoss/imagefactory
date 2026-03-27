@@ -881,6 +881,11 @@ Progress update (2026-03-27):
   - VMware `deprecate` / `released` transitions execute provider-native vCenter annotation updates to mark and clear deprecation state.
   - VMware identifier resolution supports provider metadata plus execution artifact fallback (`vsphere://`, inventory-path, and VM managed object reference forms).
   - vCenter connection is configured via `IF_VM_LIFECYCLE_VMWARE_VCENTER_URL`, `IF_VM_LIFECYCLE_VMWARE_USERNAME`, `IF_VM_LIFECYCLE_VMWARE_PASSWORD`, optional `IF_VM_LIFECYCLE_VMWARE_DATACENTER`, and `IF_VM_LIFECYCLE_VMWARE_INSECURE`.
+- provider-native lifecycle execution now includes Azure implementation:
+  - Azure `delete` transitions execute provider-native ARM `DELETE` for resolved image resource identifiers.
+  - Azure `deprecate` / `released` transitions execute provider-native ARM `PATCH` updates for image lifecycle publication state.
+  - Azure identifier resolution supports provider metadata plus execution artifact fallback (Azure resource ID forms).
+  - Azure lifecycle execution is configured via `IF_VM_LIFECYCLE_AZURE_BEARER_TOKEN`, optional `IF_VM_LIFECYCLE_AZURE_API_VERSION`, and optional `IF_VM_LIFECYCLE_AZURE_DEPRECATION_HOURS`.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

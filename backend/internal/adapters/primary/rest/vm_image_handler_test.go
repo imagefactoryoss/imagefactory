@@ -114,6 +114,17 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		}
 	})
 
+	t.Run("require_provider_native azure requires identifiers", func(t *testing.T) {
+		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
+		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "azure",
+			TargetState:    "deleted",
+		})
+		if !errors.Is(err, errInvalidProviderLifecycleTransitionInput) {
+			t.Fatalf("expected invalid provider lifecycle input error, got %v", err)
+		}
+	})
+
 	t.Run("prefer_provider_native executes aws delete", func(t *testing.T) {
 		fake := &fakeVMAWSLifecycleClient{}
 		exec := vmDispatchLifecycleExecutor{
@@ -307,6 +318,60 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 			t.Fatalf("unexpected vmware deprecate reason %q", fake.lastReason)
 		}
 	})
+
+	t.Run("prefer_provider_native executes azure delete", func(t *testing.T) {
+		fake := &fakeAzureLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			azureClientFactory: func(ctx context.Context) (vmAzureLifecycleClient, error) {
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "azure",
+			TargetState:    "deleted",
+			ProviderArtifactIdentifiers: map[string][]string{
+				"azure": {"/subscriptions/000/resourceGroups/rg/providers/Microsoft.Compute/galleries/gal/images/img/versions/1.0.0"},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastAction != "delete" {
+			t.Fatalf("expected azure delete action, got %q", fake.lastAction)
+		}
+	})
+
+	t.Run("prefer_provider_native executes azure deprecate", func(t *testing.T) {
+		fake := &fakeAzureLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			azureClientFactory: func(ctx context.Context) (vmAzureLifecycleClient, error) {
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "azure",
+			TargetState:    "deprecated",
+			Reason:         "superseded azure image",
+			ArtifactValues: []string{"/subscriptions/000/resourceGroups/rg/providers/Microsoft.Compute/galleries/gal/images/img/versions/1.0.1"},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastAction != "deprecate" {
+			t.Fatalf("expected azure deprecate action, got %q", fake.lastAction)
+		}
+		if fake.lastReason != "superseded azure image" {
+			t.Fatalf("unexpected azure reason %q", fake.lastReason)
+		}
+	})
 }
 
 func TestParseAWSLifecycleImageReference(t *testing.T) {
@@ -363,6 +428,21 @@ func TestParseVMwareLifecycleImageReference(t *testing.T) {
 	})
 }
 
+func TestParseAzureLifecycleImageReference(t *testing.T) {
+	t.Run("accepts resource id", func(t *testing.T) {
+		ref, ok := parseAzureLifecycleImageReference("/subscriptions/000/resourceGroups/rg/providers/Microsoft.Compute/galleries/gal/images/img/versions/1.0.0")
+		if !ok || ref == "" {
+			t.Fatal("expected parse success for azure resource id")
+		}
+	})
+
+	t.Run("rejects unrelated string", func(t *testing.T) {
+		if _, ok := parseAzureLifecycleImageReference("ami-123"); ok {
+			t.Fatal("expected parse failure for unrelated string")
+		}
+	})
+}
+
 func TestUpdateVMwareLifecycleAnnotation(t *testing.T) {
 	at := time.Date(2026, 3, 27, 21, 0, 0, 0, time.UTC)
 	withDeprecation := updateVMwareLifecycleAnnotation("baseline\n", "stale template", at, true)
@@ -389,6 +469,31 @@ type fakeVMwareLifecycleClient struct {
 	lastAction     string
 	lastIdentifier string
 	lastReason     string
+}
+
+type fakeAzureLifecycleClient struct {
+	lastAction     string
+	lastIdentifier string
+	lastReason     string
+}
+
+func (f *fakeAzureLifecycleClient) DeleteImage(ctx context.Context, identifier string) error {
+	f.lastAction = "delete"
+	f.lastIdentifier = identifier
+	return nil
+}
+
+func (f *fakeAzureLifecycleClient) DeprecateImage(ctx context.Context, identifier, reason string) error {
+	f.lastAction = "deprecate"
+	f.lastIdentifier = identifier
+	f.lastReason = reason
+	return nil
+}
+
+func (f *fakeAzureLifecycleClient) ReleaseImage(ctx context.Context, identifier string) error {
+	f.lastAction = "release"
+	f.lastIdentifier = identifier
+	return nil
 }
 
 func (f *fakeVMwareLifecycleClient) DeleteImage(ctx context.Context, identifier string) error {

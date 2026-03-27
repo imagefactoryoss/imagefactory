@@ -140,6 +140,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 VMware provider-native lifecycle execution completed on `feature/packer-builds`:
     - VMware `released` / `deprecated` / `deleted` lifecycle transitions now support provider-native execution through vCenter when execution mode enables provider-native transitions.
     - VMware native lifecycle supports identifier fallback from both provider metadata and execution artifacts; invalid/missing VMware identifiers fail with `400`.
+  - PR8 Azure provider-native lifecycle execution completed on `feature/packer-builds`:
+    - Azure `released` / `deprecated` / `deleted` lifecycle transitions now support provider-native execution through Azure ARM API when execution mode enables provider-native transitions.
+    - Azure native lifecycle supports identifier fallback from both provider metadata and execution artifacts; invalid/missing Azure identifiers fail with `400`.
 
 ## Backlog Review Summary (2026-03-16)
 

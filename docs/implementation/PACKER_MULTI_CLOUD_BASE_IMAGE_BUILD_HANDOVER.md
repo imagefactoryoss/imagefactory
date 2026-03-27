@@ -113,6 +113,13 @@ Branch: `feature/packer-builds`
     - `IF_VM_LIFECYCLE_VMWARE_PASSWORD`
     - optional `IF_VM_LIFECYCLE_VMWARE_DATACENTER`
     - optional `IF_VM_LIFECYCLE_VMWARE_INSECURE`
+- PR8 Azure provider-native lifecycle execution completed:
+  - Azure lifecycle actions now support provider-native execution for `released` / `deprecated` / `deleted` transitions via ARM API-backed executor path.
+  - Azure image identifiers are resolved from provider metadata and execution artifacts with strict validation (`400` on missing/invalid identifier input).
+  - Azure executor configuration uses:
+    - `IF_VM_LIFECYCLE_AZURE_BEARER_TOKEN`
+    - optional `IF_VM_LIFECYCLE_AZURE_API_VERSION`
+    - optional `IF_VM_LIFECYCLE_AZURE_DEPRECATION_HOURS`
 
 ## PR3 Backend Summary
 
