@@ -298,10 +298,13 @@ docker-build-source: ## Build source distribution image from tracked files at HE
 .PHONY: docker-extract-source
 docker-extract-source: ## Extract source tree from source distribution image
 	@echo "$(GREEN)Extracting source from $(SOURCE_IMAGE):$(IMAGE_TAG) to $(SOURCE_EXTRACT_DIR)...$(NC)"
+	@rm -rf $(SOURCE_EXTRACT_DIR)
 	@mkdir -p $(SOURCE_EXTRACT_DIR)
 	@CONTAINER_ID=$$($(CONTAINER_ENGINE) create $(SOURCE_IMAGE):$(IMAGE_TAG)); \
-	$(CONTAINER_ENGINE) cp $$CONTAINER_ID:/src/. $(SOURCE_EXTRACT_DIR); \
-	$(CONTAINER_ENGINE) rm $$CONTAINER_ID >/dev/null
+		trap "$(CONTAINER_ENGINE) rm -f $$CONTAINER_ID >/dev/null 2>/dev/null || true" EXIT; \
+		$(CONTAINER_ENGINE) cp $$CONTAINER_ID:/src/. $(SOURCE_EXTRACT_DIR); \
+		$(CONTAINER_ENGINE) rm $$CONTAINER_ID >/dev/null; \
+		trap - EXIT
 
 .PHONY: build-all-images docker-build-all
 build-all-images: docker-build docker-build-workers ## Build app and worker container images
