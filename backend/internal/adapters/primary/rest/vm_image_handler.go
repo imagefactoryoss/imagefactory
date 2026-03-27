@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -71,6 +72,7 @@ var errInvalidProviderLifecycleTransitionInput = errors.New("provider lifecycle 
 var awsAMIIDPattern = regexp.MustCompile(`\bami-[0-9a-fA-F]{8,17}\b`)
 var awsImageARNPattern = regexp.MustCompile(`^arn:aws[a-zA-Z-]*:ec2:([a-z0-9-]+):[0-9]*:image/(ami-[0-9a-fA-F]{8,17})$`)
 var vmwareManagedObjectPattern = regexp.MustCompile(`^vm-\d+$`)
+var azureResourceIDPattern = regexp.MustCompile(`(?i)^/subscriptions/[^/]+/resourcegroups/[^/]+/providers/[^/]+/.+`)
 
 type awsLifecycleImageReference struct {
 	Region  string
@@ -87,9 +89,16 @@ type vmDispatchLifecycleExecutor struct {
 	mode                vmLifecycleExecutionMode
 	awsClientFactory    func(ctx context.Context, region string) (vmAWSLifecycleClient, error)
 	vmwareClientFactory func(ctx context.Context) (vmVMwareLifecycleClient, error)
+	azureClientFactory  func(ctx context.Context) (vmAzureLifecycleClient, error)
 }
 
 type vmVMwareLifecycleClient interface {
+	DeleteImage(ctx context.Context, identifier string) error
+	DeprecateImage(ctx context.Context, identifier, reason string) error
+	ReleaseImage(ctx context.Context, identifier string) error
+}
+
+type vmAzureLifecycleClient interface {
 	DeleteImage(ctx context.Context, identifier string) error
 	DeprecateImage(ctx context.Context, identifier, reason string) error
 	ReleaseImage(ctx context.Context, identifier string) error
@@ -171,7 +180,37 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
 	}
 
-	if provider != "aws" && provider != "vmware" {
+	if provider == "azure" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
+		identifier, err := selectAzureLifecycleIdentifier(req.ProviderArtifactIdentifiers, req.ArtifactValues)
+		if err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+		clientFactory := e.azureClientFactory
+		if clientFactory == nil {
+			clientFactory = newVMAzureLifecycleClient
+		}
+		client, err := clientFactory(ctx)
+		if err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+		switch req.TargetState {
+		case "deleted":
+			if err := client.DeleteImage(ctx, identifier); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		case "deprecated":
+			if err := client.DeprecateImage(ctx, identifier, req.Reason); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		case "released":
+			if err := client.ReleaseImage(ctx, identifier); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		}
+		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+	}
+
+	if provider != "aws" && provider != "vmware" && provider != "azure" {
 		if e.mode == vmLifecycleExecutionModeRequireProviderNative {
 			if provider == "" {
 				provider = "unknown"
@@ -192,6 +231,90 @@ func newVMAWSLifecycleClient(ctx context.Context, region string) (vmAWSLifecycle
 		return nil, err
 	}
 	return ec2.NewFromConfig(cfg), nil
+}
+
+type vmAzureLifecycleRESTClient struct {
+	httpClient  *http.Client
+	apiVersion  string
+	bearerToken string
+}
+
+func newVMAzureLifecycleClient(ctx context.Context) (vmAzureLifecycleClient, error) {
+	_ = ctx
+	token := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AZURE_BEARER_TOKEN"))
+	if token == "" {
+		return nil, fmt.Errorf("%w: azure bearer token", errInvalidProviderLifecycleTransitionInput)
+	}
+	apiVersion := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AZURE_API_VERSION"))
+	if apiVersion == "" {
+		apiVersion = "2024-03-03"
+	}
+	return vmAzureLifecycleRESTClient{
+		httpClient:  &http.Client{Timeout: 30 * time.Second},
+		apiVersion:  apiVersion,
+		bearerToken: token,
+	}, nil
+}
+
+func (c vmAzureLifecycleRESTClient) DeleteImage(ctx context.Context, identifier string) error {
+	_, err := c.doAzureRequest(ctx, http.MethodDelete, identifier, nil)
+	return err
+}
+
+func (c vmAzureLifecycleRESTClient) DeprecateImage(ctx context.Context, identifier, reason string) error {
+	eolAt := resolveVMAzureDeprecationTimestamp().Format(time.RFC3339)
+	body := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"publishingProfile": map[string]interface{}{
+				"endOfLifeDate": eolAt,
+			},
+		},
+	}
+	_ = strings.TrimSpace(reason)
+	_, err := c.doAzureRequest(ctx, http.MethodPatch, identifier, body)
+	return err
+}
+
+func (c vmAzureLifecycleRESTClient) ReleaseImage(ctx context.Context, identifier string) error {
+	body := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"publishingProfile": map[string]interface{}{
+				"endOfLifeDate": nil,
+			},
+		},
+	}
+	_, err := c.doAzureRequest(ctx, http.MethodPatch, identifier, body)
+	return err
+}
+
+func (c vmAzureLifecycleRESTClient) doAzureRequest(ctx context.Context, method, identifier string, body interface{}) (*http.Response, error) {
+	normalized, ok := parseAzureLifecycleImageReference(identifier)
+	if !ok {
+		return nil, fmt.Errorf("%w: azure image identifier parse failed", errInvalidProviderLifecycleTransitionInput)
+	}
+	endpoint := "https://management.azure.com" + normalized + "?api-version=" + url.QueryEscape(c.apiVersion)
+	var payload []byte
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		payload = encoded
+	}
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return resp, nil
+	}
+	return resp, fmt.Errorf("azure lifecycle request failed status=%d", resp.StatusCode)
 }
 
 type vmVMwareLifecycleSOAPClient struct {
@@ -402,6 +525,29 @@ func parseVMwareLifecycleImageReference(raw string) (string, bool) {
 	return "", false
 }
 
+func selectAzureLifecycleIdentifier(providerArtifactIdentifiers map[string][]string, artifactValues []string) (string, error) {
+	candidates := make([]string, 0, len(providerArtifactIdentifiers["azure"])+len(artifactValues))
+	candidates = append(candidates, providerArtifactIdentifiers["azure"]...)
+	candidates = append(candidates, artifactValues...)
+	for _, candidate := range candidates {
+		if normalized, ok := parseAzureLifecycleImageReference(candidate); ok {
+			return normalized, nil
+		}
+	}
+	return "", fmt.Errorf("%w: azure image identifier", errInvalidProviderLifecycleTransitionInput)
+}
+
+func parseAzureLifecycleImageReference(raw string) (string, bool) {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return "", false
+	}
+	if azureResourceIDPattern.MatchString(candidate) {
+		return candidate, true
+	}
+	return "", false
+}
+
 func updateVMwareLifecycleAnnotation(current, reason string, at time.Time, deprecated bool) string {
 	lines := strings.Split(strings.TrimSpace(current), "\n")
 	cleaned := make([]string, 0, len(lines)+1)
@@ -429,6 +575,16 @@ func updateVMwareLifecycleAnnotation(current, reason string, at time.Time, depre
 func resolveVMAWSDeprecationTimestamp() time.Time {
 	hours := 24
 	if raw := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AWS_DEPRECATION_HOURS")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= 24*365 {
+			hours = parsed
+		}
+	}
+	return time.Now().UTC().Add(time.Duration(hours) * time.Hour)
+}
+
+func resolveVMAzureDeprecationTimestamp() time.Time {
+	hours := 24
+	if raw := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AZURE_DEPRECATION_HOURS")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= 24*365 {
 			hours = parsed
 		}
@@ -508,6 +664,7 @@ func NewVMImageHandler(db *sqlx.DB, logger *zap.Logger) *VMImageHandler {
 			mode:                mode,
 			awsClientFactory:    newVMAWSLifecycleClient,
 			vmwareClientFactory: newVMVMwareLifecycleClient,
+			azureClientFactory:  newVMAzureLifecycleClient,
 		},
 	}
 }
