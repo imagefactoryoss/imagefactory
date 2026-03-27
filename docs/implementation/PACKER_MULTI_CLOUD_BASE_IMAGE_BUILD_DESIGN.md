@@ -822,6 +822,10 @@ Progress update (2026-03-27):
   - `metadata.packer.lifecycle_last_reason`
 - catalog list/detail now prefer lifecycle override when present (`released`, `deprecated`, `deleted`).
 - guardrails currently block transitions for active (`pending`/`running`) and non-releasable (`failed`/`cancelled`) executions.
+- frontend VM catalog now includes lifecycle action controls:
+  - `Promote`, `Deprecate`, `Delete` actions on each VM image row.
+  - confirmation dialog + toast feedback + post-action list/detail refresh behavior.
+  - lifecycle-aware button disabling to avoid invalid transitions from UI.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

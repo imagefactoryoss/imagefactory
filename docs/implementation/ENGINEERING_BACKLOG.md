@@ -81,6 +81,10 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - lifecycle transitions persist metadata overrides under `metadata.packer.lifecycle_state`.
     - list/get VM catalog responses now honor persisted lifecycle overrides (`released`, `deprecated`, `deleted`).
     - added guardrails to block lifecycle transitions for active/failed/cancelled executions.
+  - PR8 frontend lifecycle action controls completed on `feature/packer-builds`:
+    - VM catalog table now exposes `Promote`, `Deprecate`, and `Delete` actions with confirmation dialog UX.
+    - action availability is lifecycle-aware and disables invalid transitions in UI.
+    - successful actions refresh both list view and open detail drawer state.
 
 ## Backlog Review Summary (2026-03-16)
 

@@ -45,6 +45,11 @@ Branch: `feature/packer-builds`
   - lifecycle transitions now persist `metadata.packer.lifecycle_state` (+ action metadata fields).
   - VM catalog list/detail lifecycle responses now honor metadata overrides (`released`, `deprecated`, `deleted`).
   - guardrails block lifecycle transitions for active/failed/cancelled executions.
+- PR8 frontend lifecycle action controls completed:
+  - VM catalog row actions now include `Promote`, `Deprecate`, and `Delete`.
+  - actions use confirmation-dialog flow with success/error toast feedback.
+  - lifecycle-aware action disabling prevents invalid UI transitions.
+  - list and detail drawer are refreshed after action completion.
 
 ## PR3 Backend Summary
 
@@ -211,4 +216,4 @@ Frontend:
 
 ## Known Gap For Next PR
 
-- add frontend VM catalog action controls (promote/deprecate/delete) with permission-aware gating and confirmation UX.
+- enforce stricter policy/permission guardrails + audit trail depth for lifecycle delete semantics (currently metadata-state transition, not provider-side deletion).
