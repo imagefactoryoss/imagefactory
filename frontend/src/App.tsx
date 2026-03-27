@@ -34,6 +34,7 @@ import CreateImagePage from '@/pages/images/CreateImagePage'
 import ImageDetailPage from '@/pages/images/ImageDetailPage'
 import ImagesPage from '@/pages/images/ImagesPage'
 import OnDemandScansPage from '@/pages/images/OnDemandScansPage'
+import VMImagesPage from '@/pages/images/VMImagesPage'
 import ReleasedArtifactsPage from '@/pages/quarantine/ReleasedArtifactsPage'
 import QuarantineRequestDetailPage from '@/pages/quarantine/QuarantineRequestDetailPage'
 import QuarantineRequestsPage from '@/pages/quarantine/QuarantineRequestsPage.tsx'
@@ -555,6 +556,7 @@ function AppRoutes() {
 
                                                 {/* Image routes */}
                                                 <Route path="/images" element={<ImagesPage />} />
+                                                <Route path="/images/vm" element={<VMImagesPage />} />
                                                 <Route
                                                     path="/images/scans"
                                                     element={
