@@ -79,6 +79,20 @@ const VMImagesPage: React.FC = () => {
     item: VMImageCatalogItem,
     action: 'promote' | 'deprecate' | 'delete',
   ) => {
+    let reason: string | undefined
+    if (action !== 'promote') {
+      const reasonInput = window.prompt(
+        `${action === 'deprecate' ? 'Deprecation' : 'Delete'} reason (required):`,
+        '',
+      )
+      if (reasonInput === null) return
+      reason = reasonInput.trim()
+      if (!reason) {
+        toast.error('Reason is required.')
+        return
+      }
+    }
+
     const title =
       action === 'promote'
         ? 'Promote VM Image'
@@ -107,16 +121,12 @@ const VMImagesPage: React.FC = () => {
 
     setActionExecutionID(item.execution_id)
     try {
-      const reason =
-        action === 'promote'
-          ? undefined
-          : `action initiated from vm catalog ui (${action})`
       if (action === 'promote') {
         await vmImageService.promote(item.execution_id)
       } else if (action === 'deprecate') {
-        await vmImageService.deprecate(item.execution_id, reason)
+        await vmImageService.deprecate(item.execution_id, reason as string)
       } else {
-        await vmImageService.remove(item.execution_id, reason)
+        await vmImageService.remove(item.execution_id, reason as string)
       }
       toast.success(
         `VM image ${action === 'delete' ? 'deleted' : `${action}d`} successfully`,
