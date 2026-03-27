@@ -863,6 +863,9 @@ Progress update (2026-03-27):
 - VM catalog filtering now includes transition mode:
   - list endpoint accepts `transition_mode` filter with normalized mode matching.
   - frontend filter bar includes transition mode selector for rapid metadata-only/provider-native segmentation.
+- lifecycle transition execution now has an extensible backend seam:
+  - lifecycle handler invokes a lifecycle executor interface before persisting metadata transition fields.
+  - default executor currently returns `metadata_only` (provider-native operations still pending), enabling incremental provider implementation without handler contract churn.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

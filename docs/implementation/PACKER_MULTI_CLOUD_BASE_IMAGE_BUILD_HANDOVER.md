@@ -87,6 +87,9 @@ Branch: `feature/packer-builds`
 - PR8 lifecycle transition-mode filterability follow-up completed:
   - VM catalog list API now supports `transition_mode` filtering.
   - VM catalog UI now includes transition-mode filter dropdown for list narrowing.
+- PR8 provider-lifecycle execution seam foundation completed:
+  - lifecycle transitions now pass through a backend lifecycle executor interface before metadata update.
+  - default executor remains metadata-only and returns `metadata_only` transition mode (provider-native action wiring remains the next step).
 
 ## PR3 Backend Summary
 
