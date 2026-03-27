@@ -838,6 +838,9 @@ Progress update (2026-03-27):
 - frontend lifecycle reason-entry UX now enforces operator-provided reasons:
   - `deprecate` and `delete` actions now use an in-app reason modal and require explicit reason text before confirmation.
   - typed reason values are sent to lifecycle transition APIs for audit-quality context.
+- lifecycle reason payload hardening now enforces bounded reason size:
+  - backend rejects lifecycle reason payloads longer than 500 characters.
+  - frontend reason modal constrains input to 500 characters and shows inline character count.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

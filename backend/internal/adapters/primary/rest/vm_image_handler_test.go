@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,4 +158,40 @@ func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 	if len(lifecycle.History) != 1 || lifecycle.History[0].State != "deprecated" {
 		t.Fatalf("expected lifecycle history to include deprecated entry, got %+v", lifecycle.History)
 	}
+}
+
+func TestValidateVMLifecycleReason(t *testing.T) {
+	t.Run("required reason missing", func(t *testing.T) {
+		_, err := validateVMLifecycleReason("   ", true)
+		if err == nil || err.Error() != "reason is required for this lifecycle transition" {
+			t.Fatalf("expected required reason error, got %v", err)
+		}
+	})
+
+	t.Run("reason length exceeds max", func(t *testing.T) {
+		_, err := validateVMLifecycleReason(strings.Repeat("a", vmImageLifecycleReasonMaxLength+1), true)
+		if err == nil || err.Error() != "reason must be 500 characters or fewer" {
+			t.Fatalf("expected max length error, got %v", err)
+		}
+	})
+
+	t.Run("valid required reason", func(t *testing.T) {
+		reason, err := validateVMLifecycleReason("  stale provider image  ", true)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if reason != "stale provider image" {
+			t.Fatalf("unexpected reason value %q", reason)
+		}
+	})
+
+	t.Run("optional empty reason allowed", func(t *testing.T) {
+		reason, err := validateVMLifecycleReason("  ", false)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if reason != "" {
+			t.Fatalf("expected empty reason, got %q", reason)
+		}
+	})
 }

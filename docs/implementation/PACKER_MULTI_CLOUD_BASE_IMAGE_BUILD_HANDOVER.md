@@ -61,6 +61,9 @@ Branch: `feature/packer-builds`
 - PR8 frontend lifecycle reason-entry UX completed:
   - VM catalog now uses an in-app reason modal for `deprecate` and `delete` before transition confirmation.
   - UI now forwards typed reasons to lifecycle APIs rather than using generated default reason strings.
+- PR8 lifecycle reason payload hardening completed:
+  - backend now enforces max lifecycle reason length at 500 characters.
+  - VM catalog reason modal now applies the same 500-character limit with inline count feedback.
 
 ## PR3 Backend Summary
 
