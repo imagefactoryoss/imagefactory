@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -19,8 +20,31 @@ import (
 )
 
 type VMImageHandler struct {
-	db     *sqlx.DB
-	logger *zap.Logger
+	db                *sqlx.DB
+	logger            *zap.Logger
+	lifecycleExecutor vmLifecycleExecutor
+}
+
+type vmLifecycleTransitionRequest struct {
+	ExecutionID    uuid.UUID
+	TenantID       uuid.UUID
+	TargetProvider string
+	TargetState    string
+	Reason         string
+}
+
+type vmLifecycleTransitionResult struct {
+	TransitionMode string
+}
+
+type vmLifecycleExecutor interface {
+	ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error)
+}
+
+type vmMetadataOnlyLifecycleExecutor struct{}
+
+func (e vmMetadataOnlyLifecycleExecutor) ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error) {
+	return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
 }
 
 type vmImageCatalogItem struct {
@@ -69,7 +93,11 @@ type vmImageCatalogListResponse struct {
 }
 
 func NewVMImageHandler(db *sqlx.DB, logger *zap.Logger) *VMImageHandler {
-	return &VMImageHandler{db: db, logger: logger}
+	return &VMImageHandler{
+		db:                db,
+		logger:            logger,
+		lifecycleExecutor: vmMetadataOnlyLifecycleExecutor{},
+	}
 }
 
 func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Request) {
@@ -474,7 +502,7 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		return
 	}
 
-	_, _, _, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
+	targetProvider, _, _, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
 	currentLifecycle := vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)
 	if strings.EqualFold(row.ExecutionStatus, "running") || strings.EqualFold(row.ExecutionStatus, "pending") {
 		writeVMImageJSON(w, http.StatusConflict, map[string]string{"error": "cannot transition lifecycle while build execution is active"})
@@ -500,7 +528,29 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		return
 	}
 
-	nextMetadata, err := updatePackerLifecycleMetadata(row.MetadataRaw, targetState, reason, authCtx.UserID, time.Now().UTC())
+	transitionMode := "metadata_only"
+	if h.lifecycleExecutor != nil {
+		result, execErr := h.lifecycleExecutor.ExecuteTransition(r.Context(), vmLifecycleTransitionRequest{
+			ExecutionID:    executionID,
+			TenantID:       authCtx.TenantID,
+			TargetProvider: targetProvider,
+			TargetState:    targetState,
+			Reason:         reason,
+		})
+		if execErr != nil {
+			h.logger.Error("Failed provider lifecycle transition execution",
+				zap.String("execution_id", executionID.String()),
+				zap.String("tenant_id", authCtx.TenantID.String()),
+				zap.String("target_state", targetState),
+				zap.String("target_provider", targetProvider),
+				zap.Error(execErr))
+			writeVMImageJSON(w, http.StatusBadGateway, map[string]string{"error": "failed to execute provider lifecycle transition"})
+			return
+		}
+		transitionMode = vmImageLifecycleTransitionMode(result.TransitionMode)
+	}
+
+	nextMetadata, err := updatePackerLifecycleMetadata(row.MetadataRaw, targetState, reason, transitionMode, authCtx.UserID, time.Now().UTC())
 	if err != nil {
 		writeVMImageJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to prepare lifecycle metadata"})
 		return
@@ -612,7 +662,7 @@ func (h *VMImageHandler) getTenantVMImageRow(r *http.Request, tenantID, executio
 	return &row, nil
 }
 
-func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason string, userID uuid.UUID, at time.Time) (json.RawMessage, error) {
+func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason, transitionMode string, userID uuid.UUID, at time.Time) (json.RawMessage, error) {
 	metadata := map[string]interface{}{}
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &metadata); err != nil {
@@ -626,8 +676,9 @@ func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason stri
 	if packer == nil {
 		packer = map[string]interface{}{}
 	}
+	transitionMode = vmImageLifecycleTransitionMode(transitionMode)
 	packer["lifecycle_state"] = strings.ToLower(strings.TrimSpace(targetState))
-	packer["lifecycle_transition_mode"] = "metadata_only"
+	packer["lifecycle_transition_mode"] = transitionMode
 	packer["lifecycle_last_action_at"] = at.UTC().Format(time.RFC3339)
 	packer["lifecycle_last_action_by"] = userID.String()
 	if strings.TrimSpace(reason) != "" {
@@ -639,7 +690,7 @@ func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason stri
 		Reason:         strings.TrimSpace(reason),
 		ActorID:        userID.String(),
 		At:             at.UTC().Format(time.RFC3339),
-		TransitionMode: "metadata_only",
+		TransitionMode: transitionMode,
 	})
 	if len(history) > 25 {
 		history = history[len(history)-25:]

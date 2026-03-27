@@ -153,6 +153,7 @@ func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 		input,
 		"deprecated",
 		"stale image",
+		"provider_native",
 		uuid.MustParse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
 		time.Date(2026, 3, 27, 20, 0, 0, 0, time.UTC),
 	)
@@ -166,11 +167,11 @@ func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 	if len(lifecycle.History) != 1 || lifecycle.History[0].State != "deprecated" {
 		t.Fatalf("expected lifecycle history to include deprecated entry, got %+v", lifecycle.History)
 	}
-	if lifecycle.TransitionMode != "metadata_only" {
-		t.Fatalf("expected lifecycle transition mode metadata_only, got %q", lifecycle.TransitionMode)
+	if lifecycle.TransitionMode != "provider_native" {
+		t.Fatalf("expected lifecycle transition mode provider_native, got %q", lifecycle.TransitionMode)
 	}
-	if lifecycle.History[0].TransitionMode != "metadata_only" {
-		t.Fatalf("expected lifecycle history mode metadata_only, got %q", lifecycle.History[0].TransitionMode)
+	if lifecycle.History[0].TransitionMode != "provider_native" {
+		t.Fatalf("expected lifecycle history mode provider_native, got %q", lifecycle.History[0].TransitionMode)
 	}
 }
 
