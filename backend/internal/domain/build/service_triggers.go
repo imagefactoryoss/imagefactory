@@ -199,6 +199,7 @@ func (s *Service) UpdateProjectWebhookTrigger(
 	ctx context.Context,
 	projectID, triggerID uuid.UUID,
 	name, description, webhookURL, webhookSecret *string,
+	cronExpr, timezone *string,
 	events []string,
 	isActive *bool,
 ) (*BuildTrigger, error) {
@@ -213,46 +214,87 @@ func (s *Service) UpdateProjectWebhookTrigger(
 	if trigger.ProjectID != projectID {
 		return nil, errors.New("trigger does not belong to this project")
 	}
-	if trigger.Type != TriggerTypeWebhook {
-		return nil, errors.New("only webhook triggers are editable via this endpoint")
-	}
-
-	if name != nil {
-		trimmed := strings.TrimSpace(*name)
-		if trimmed == "" {
-			return nil, errors.New("trigger name is required")
-		}
-		trigger.Name = trimmed
-	}
-	if description != nil {
-		trigger.Description = strings.TrimSpace(*description)
-	}
-	if webhookURL != nil {
-		trimmed := strings.TrimSpace(*webhookURL)
-		if trimmed == "" {
-			return nil, errors.New("webhook URL is required")
-		}
-		trigger.WebhookURL = trimmed
-	}
-	if webhookSecret != nil {
-		trigger.WebhookSecret = strings.TrimSpace(*webhookSecret)
-	}
-	if events != nil {
-		filteredEvents := make([]string, 0, len(events))
-		for _, event := range events {
-			trimmed := strings.TrimSpace(event)
+	previousActive := trigger.IsActive
+	switch trigger.Type {
+	case TriggerTypeWebhook:
+		if name != nil {
+			trimmed := strings.TrimSpace(*name)
 			if trimmed == "" {
-				continue
+				return nil, errors.New("trigger name is required")
 			}
-			filteredEvents = append(filteredEvents, trimmed)
+			trigger.Name = trimmed
 		}
-		if len(filteredEvents) == 0 {
-			return nil, errors.New("at least one webhook event is required")
+		if description != nil {
+			trigger.Description = strings.TrimSpace(*description)
 		}
-		trigger.WebhookEvents = filteredEvents
-	}
-	if isActive != nil {
-		trigger.IsActive = *isActive
+		if webhookURL != nil {
+			trimmed := strings.TrimSpace(*webhookURL)
+			if trimmed == "" {
+				return nil, errors.New("webhook URL is required")
+			}
+			trigger.WebhookURL = trimmed
+		}
+		if webhookSecret != nil {
+			trigger.WebhookSecret = strings.TrimSpace(*webhookSecret)
+		}
+		if events != nil {
+			filteredEvents := make([]string, 0, len(events))
+			for _, event := range events {
+				trimmed := strings.TrimSpace(event)
+				if trimmed == "" {
+					continue
+				}
+				filteredEvents = append(filteredEvents, trimmed)
+			}
+			if len(filteredEvents) == 0 {
+				return nil, errors.New("at least one webhook event is required")
+			}
+			trigger.WebhookEvents = filteredEvents
+		}
+		if isActive != nil {
+			trigger.IsActive = *isActive
+		}
+	case TriggerTypeSchedule:
+		if name != nil {
+			trimmed := strings.TrimSpace(*name)
+			if trimmed == "" {
+				return nil, errors.New("trigger name is required")
+			}
+			trigger.Name = trimmed
+		}
+		if description != nil {
+			trigger.Description = strings.TrimSpace(*description)
+		}
+		if cronExpr != nil {
+			trimmed := strings.TrimSpace(*cronExpr)
+			if trimmed == "" {
+				return nil, errors.New("cron expression is required")
+			}
+			trigger.CronExpr = trimmed
+		}
+		if timezone != nil {
+			trimmed := strings.TrimSpace(*timezone)
+			if trimmed == "" {
+				return nil, errors.New("timezone is required")
+			}
+			trigger.Timezone = trimmed
+		}
+		if trigger.Timezone == "" {
+			trigger.Timezone = "UTC"
+		}
+		if trigger.CronExpr == "" {
+			return nil, errors.New("cron expression is required")
+		}
+		next, nextErr := nextTriggerTimeFromCron(trigger.CronExpr, trigger.Timezone, time.Now().UTC())
+		if nextErr != nil {
+			return nil, fmt.Errorf("invalid schedule trigger timing: %w", nextErr)
+		}
+		trigger.NextTrigger = next
+		if isActive != nil {
+			trigger.IsActive = *isActive
+		}
+	default:
+		return nil, errors.New("only webhook and schedule triggers are editable via this endpoint")
 	}
 	trigger.UpdatedAt = time.Now().UTC()
 
@@ -260,6 +302,7 @@ func (s *Service) UpdateProjectWebhookTrigger(
 		s.logger.Error("Failed to update trigger", zap.Error(err), zap.String("trigger_id", triggerID.String()))
 		return nil, fmt.Errorf("failed to update trigger: %w", err)
 	}
+	s.publishTriggerAuditEvent(ctx, trigger, previousActive)
 	return trigger, nil
 }
 
@@ -278,6 +321,7 @@ func (s *Service) DeactivateTrigger(ctx context.Context, triggerID uuid.UUID) er
 	}
 
 	// Deactivate
+	previousActive := trigger.IsActive
 	trigger.Deactivate()
 
 	// Update in repository
@@ -285,6 +329,7 @@ func (s *Service) DeactivateTrigger(ctx context.Context, triggerID uuid.UUID) er
 		s.logger.Error("Failed to update trigger", zap.Error(err), zap.String("trigger_id", triggerID.String()))
 		return fmt.Errorf("failed to deactivate trigger: %w", err)
 	}
+	s.publishTriggerAuditEvent(ctx, trigger, previousActive)
 
 	s.logger.Info("Trigger deactivated successfully", zap.String("trigger_id", triggerID.String()))
 	return nil
@@ -301,4 +346,27 @@ func (s *Service) DeleteTrigger(ctx context.Context, triggerID uuid.UUID) error 
 
 	s.logger.Info("Trigger deleted successfully", zap.String("trigger_id", triggerID.String()))
 	return nil
+}
+
+func (s *Service) publishTriggerAuditEvent(ctx context.Context, trigger *BuildTrigger, previousActive bool) {
+	if s == nil || s.eventPublisher == nil || trigger == nil {
+		return
+	}
+	status := "trigger.updated"
+	if trigger.Type == TriggerTypeSchedule && previousActive != trigger.IsActive {
+		if trigger.IsActive {
+			status = "trigger.schedule.resumed"
+		} else {
+			status = "trigger.schedule.paused"
+		}
+	}
+	event := NewBuildStatusUpdated(trigger.BuildID, trigger.TenantID, status, "Build trigger updated", map[string]interface{}{
+		"trigger_id":   trigger.ID.String(),
+		"trigger_type": string(trigger.Type),
+		"is_active":    trigger.IsActive,
+		"project_id":   trigger.ProjectID.String(),
+	})
+	if err := s.eventPublisher.PublishBuildStatusUpdated(ctx, event); err != nil {
+		s.logger.Warn("Failed to publish trigger audit event", zap.Error(err), zap.String("trigger_id", trigger.ID.String()))
+	}
 }

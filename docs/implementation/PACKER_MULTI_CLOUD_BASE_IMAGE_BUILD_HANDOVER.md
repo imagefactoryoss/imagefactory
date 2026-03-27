@@ -164,6 +164,13 @@ PR7 backend behavior:
   - `schedule_fire_timestamp`
   - `schedule_concurrency_policy=forbid`
 - `forbid` policy: skip schedule fire when another queued/running packer build exists in the same project.
+- schedule trigger update endpoint now supports schedule fields and pause/resume:
+  - `PATCH /api/v1/projects/{projectID}/triggers/{triggerID}`
+  - accepted fields for schedule triggers: `name`, `description`, `cron_expression`, `timezone`, `is_active`.
+- trigger update and schedule pause/resume now emit build status audit events:
+  - `trigger.updated`
+  - `trigger.schedule.paused`
+  - `trigger.schedule.resumed`
 
 ## Validation Run Notes
 
@@ -178,6 +185,5 @@ Frontend:
 
 ## Known Gap For Next PR (PR7 follow-up)
 
-- schedule trigger management parity (update/pause/resume surfaces + explicit audit events for those actions).
 - notification hooks for scheduled fire outcomes (success/failure/no-op) tied to build notification defaults.
 - expand VM catalog semantics for lifecycle actions (promote/deprecate/delete) after schedule UX/API parity.

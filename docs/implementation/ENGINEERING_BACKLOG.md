@@ -63,7 +63,6 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - schedule `next_trigger_at` is now computed from cron expression on create and after each fire.
     - scheduled-origin metadata and default `forbid` concurrency policy are applied to scheduled build queuing.
   - Remaining PR7 follow-up:
-    - add schedule update/pause/resume management parity and explicit audit coverage.
     - wire notification hooks for scheduled success/failure/no-op outcomes.
     - keep hardening provider-specific artifact extraction coverage for edge-case output formats.
 
