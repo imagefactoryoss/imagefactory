@@ -56,6 +56,7 @@ export const vmImageService = {
     offset?: number
     provider?: string
     status?: string
+    transition_mode?: string
     search?: string
   }): Promise<VMImageCatalogListResponse> {
     const response = await api.get('/images/vm', { params })

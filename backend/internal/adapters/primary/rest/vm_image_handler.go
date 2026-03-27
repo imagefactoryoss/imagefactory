@@ -87,6 +87,10 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 	offset := clampIntQuery(r.URL.Query().Get("offset"), 0, 0, 10000)
 	providerFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("provider")))
 	statusFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("status")))
+	transitionModeFilter := vmImageLifecycleTransitionMode(r.URL.Query().Get("transition_mode"))
+	if strings.TrimSpace(r.URL.Query().Get("transition_mode")) == "" {
+		transitionModeFilter = ""
+	}
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
 
 	countQuery := `
@@ -99,17 +103,18 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 		  AND bc.build_method = 'packer'
 		  AND ($2 = '' OR LOWER(COALESCE(be.metadata #>> '{packer,target_provider}', '')) = $2)
 		  AND ($3 = '' OR LOWER(be.status::text) = $3)
+		  AND ($4 = '' OR LOWER(COALESCE(NULLIF(TRIM(be.metadata #>> '{packer,lifecycle_transition_mode}'), ''), 'metadata_only')) = $4)
 		  AND (
-		        $4 = ''
-		        OR p.name ILIKE '%' || $4 || '%'
-		        OR COALESCE(be.metadata #>> '{packer,target_provider}', '') ILIKE '%' || $4 || '%'
-		        OR COALESCE(be.metadata #>> '{packer,target_profile_id}', '') ILIKE '%' || $4 || '%'
-		        OR COALESCE(be.metadata::text, '') ILIKE '%' || $4 || '%'
-		        OR COALESCE(be.artifacts::text, '') ILIKE '%' || $4 || '%'
+		        $5 = ''
+		        OR p.name ILIKE '%' || $5 || '%'
+		        OR COALESCE(be.metadata #>> '{packer,target_provider}', '') ILIKE '%' || $5 || '%'
+		        OR COALESCE(be.metadata #>> '{packer,target_profile_id}', '') ILIKE '%' || $5 || '%'
+		        OR COALESCE(be.metadata::text, '') ILIKE '%' || $5 || '%'
+		        OR COALESCE(be.artifacts::text, '') ILIKE '%' || $5 || '%'
 		      )
 	`
 	var total int
-	if err := h.db.GetContext(r.Context(), &total, countQuery, authCtx.TenantID, providerFilter, statusFilter, search); err != nil {
+	if err := h.db.GetContext(r.Context(), &total, countQuery, authCtx.TenantID, providerFilter, statusFilter, transitionModeFilter, search); err != nil {
 		h.logger.Error("Failed to count tenant VM images", zap.Error(err), zap.String("tenant_id", authCtx.TenantID.String()))
 		writeVMImageJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list vm images"})
 		return
@@ -138,18 +143,19 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 		  AND bc.build_method = 'packer'
 		  AND ($2 = '' OR LOWER(COALESCE(be.metadata #>> '{packer,target_provider}', '')) = $2)
 		  AND ($3 = '' OR LOWER(be.status::text) = $3)
+		  AND ($4 = '' OR LOWER(COALESCE(NULLIF(TRIM(be.metadata #>> '{packer,lifecycle_transition_mode}'), ''), 'metadata_only')) = $4)
 		  AND (
-		        $4 = ''
-		        OR p.name ILIKE '%' || $4 || '%'
-		        OR COALESCE(be.metadata #>> '{packer,target_provider}', '') ILIKE '%' || $4 || '%'
-		        OR COALESCE(be.metadata #>> '{packer,target_profile_id}', '') ILIKE '%' || $4 || '%'
-		        OR COALESCE(be.metadata::text, '') ILIKE '%' || $4 || '%'
-		        OR COALESCE(be.artifacts::text, '') ILIKE '%' || $4 || '%'
+		        $5 = ''
+		        OR p.name ILIKE '%' || $5 || '%'
+		        OR COALESCE(be.metadata #>> '{packer,target_provider}', '') ILIKE '%' || $5 || '%'
+		        OR COALESCE(be.metadata #>> '{packer,target_profile_id}', '') ILIKE '%' || $5 || '%'
+		        OR COALESCE(be.metadata::text, '') ILIKE '%' || $5 || '%'
+		        OR COALESCE(be.artifacts::text, '') ILIKE '%' || $5 || '%'
 		      )
 		ORDER BY COALESCE(be.completed_at, be.created_at) DESC
-		LIMIT $5 OFFSET $6
+		LIMIT $6 OFFSET $7
 	`
-	if err := h.db.SelectContext(r.Context(), &rows, query, authCtx.TenantID, providerFilter, statusFilter, search, limit, offset); err != nil {
+	if err := h.db.SelectContext(r.Context(), &rows, query, authCtx.TenantID, providerFilter, statusFilter, transitionModeFilter, search, limit, offset); err != nil {
 		h.logger.Error("Failed to list tenant VM images", zap.Error(err), zap.String("tenant_id", authCtx.TenantID.String()))
 		writeVMImageJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list vm images"})
 		return

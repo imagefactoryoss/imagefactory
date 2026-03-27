@@ -117,6 +117,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - VM catalog responses now guarantee non-empty `lifecycle_transition_mode`, defaulting to `metadata_only` for empty/invalid metadata payloads.
   - PR8 lifecycle transition-mode visibility follow-up completed on `feature/packer-builds`:
     - VM catalog table lifecycle column now renders transition mode so operators can assess lifecycle semantics without opening details.
+  - PR8 lifecycle transition-mode filterability follow-up completed on `feature/packer-builds`:
+    - VM catalog list API now supports filtering by `transition_mode`.
+    - VM catalog filter bar now includes transition-mode selector (`All`, `metadata_only`, `provider_native`, `hybrid`).
 
 ## Backlog Review Summary (2026-03-16)
 
