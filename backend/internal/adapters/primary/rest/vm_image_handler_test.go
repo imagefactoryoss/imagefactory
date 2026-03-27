@@ -1,7 +1,9 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -35,6 +37,59 @@ func TestVMImageHandler_GetTenantVMImage_RequiresAuthContext(t *testing.T) {
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, w.Code)
 	}
+}
+
+func TestResolveVMLifecycleExecutionMode(t *testing.T) {
+	t.Run("defaults to metadata_only", func(t *testing.T) {
+		t.Setenv("IF_VM_LIFECYCLE_EXECUTION_MODE", "")
+		got := resolveVMLifecycleExecutionMode(zap.NewNop())
+		if got != vmLifecycleExecutionModeMetadataOnly {
+			t.Fatalf("expected metadata_only default, got %q", got)
+		}
+	})
+
+	t.Run("accepts require_provider_native", func(t *testing.T) {
+		t.Setenv("IF_VM_LIFECYCLE_EXECUTION_MODE", "require_provider_native")
+		got := resolveVMLifecycleExecutionMode(zap.NewNop())
+		if got != vmLifecycleExecutionModeRequireProviderNative {
+			t.Fatalf("expected require_provider_native mode, got %q", got)
+		}
+	})
+
+	t.Run("invalid mode falls back", func(t *testing.T) {
+		t.Setenv("IF_VM_LIFECYCLE_EXECUTION_MODE", "bad-value")
+		got := resolveVMLifecycleExecutionMode(zap.NewNop())
+		if got != vmLifecycleExecutionModeMetadataOnly {
+			t.Fatalf("expected metadata_only fallback, got %q", got)
+		}
+	})
+}
+
+func TestVMDispatchLifecycleExecutor(t *testing.T) {
+	t.Run("metadata_only mode returns metadata_only transition", func(t *testing.T) {
+		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeMetadataOnly}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "deprecated",
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "metadata_only" {
+			t.Fatalf("expected metadata_only transition mode, got %q", result.TransitionMode)
+		}
+	})
+
+	t.Run("require_provider_native fails closed", func(t *testing.T) {
+		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
+		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "deprecated",
+		})
+		if !errors.Is(err, errUnsupportedProviderLifecycleTransition) {
+			t.Fatalf("expected unsupported provider transition error, got %v", err)
+		}
+	})
 }
 
 func TestVMImageLifecycleState(t *testing.T) {

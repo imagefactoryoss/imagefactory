@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,10 +42,47 @@ type vmLifecycleExecutor interface {
 	ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error)
 }
 
-type vmMetadataOnlyLifecycleExecutor struct{}
+type vmLifecycleExecutionMode string
 
-func (e vmMetadataOnlyLifecycleExecutor) ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error) {
+const (
+	vmLifecycleExecutionModeMetadataOnly        vmLifecycleExecutionMode = "metadata_only"
+	vmLifecycleExecutionModePreferProviderNative vmLifecycleExecutionMode = "prefer_provider_native"
+	vmLifecycleExecutionModeRequireProviderNative vmLifecycleExecutionMode = "require_provider_native"
+)
+
+var errUnsupportedProviderLifecycleTransition = errors.New("provider lifecycle transition is not implemented")
+
+type vmDispatchLifecycleExecutor struct {
+	mode vmLifecycleExecutionMode
+}
+
+func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error) {
+	provider := strings.ToLower(strings.TrimSpace(req.TargetProvider))
+	if e.mode == vmLifecycleExecutionModeRequireProviderNative {
+		if provider == "" {
+			provider = "unknown"
+		}
+		return vmLifecycleTransitionResult{}, fmt.Errorf("%w for provider %s", errUnsupportedProviderLifecycleTransition, provider)
+	}
 	return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
+}
+
+func resolveVMLifecycleExecutionMode(logger *zap.Logger) vmLifecycleExecutionMode {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_EXECUTION_MODE")))
+	switch vmLifecycleExecutionMode(raw) {
+	case "", vmLifecycleExecutionModeMetadataOnly:
+		return vmLifecycleExecutionModeMetadataOnly
+	case vmLifecycleExecutionModePreferProviderNative:
+		return vmLifecycleExecutionModePreferProviderNative
+	case vmLifecycleExecutionModeRequireProviderNative:
+		return vmLifecycleExecutionModeRequireProviderNative
+	default:
+		if logger != nil {
+			logger.Warn("Invalid IF_VM_LIFECYCLE_EXECUTION_MODE; defaulting to metadata_only",
+				zap.String("value", raw))
+		}
+		return vmLifecycleExecutionModeMetadataOnly
+	}
 }
 
 type vmImageCatalogItem struct {
@@ -93,10 +131,11 @@ type vmImageCatalogListResponse struct {
 }
 
 func NewVMImageHandler(db *sqlx.DB, logger *zap.Logger) *VMImageHandler {
+	mode := resolveVMLifecycleExecutionMode(logger)
 	return &VMImageHandler{
 		db:                db,
 		logger:            logger,
-		lifecycleExecutor: vmMetadataOnlyLifecycleExecutor{},
+		lifecycleExecutor: vmDispatchLifecycleExecutor{mode: mode},
 	}
 }
 
@@ -538,6 +577,10 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 			Reason:         reason,
 		})
 		if execErr != nil {
+			if errors.Is(execErr, errUnsupportedProviderLifecycleTransition) {
+				writeVMImageJSON(w, http.StatusNotImplemented, map[string]string{"error": execErr.Error()})
+				return
+			}
 			h.logger.Error("Failed provider lifecycle transition execution",
 				zap.String("execution_id", executionID.String()),
 				zap.String("tenant_id", authCtx.TenantID.String()),

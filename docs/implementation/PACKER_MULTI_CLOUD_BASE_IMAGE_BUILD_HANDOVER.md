@@ -90,6 +90,9 @@ Branch: `feature/packer-builds`
 - PR8 provider-lifecycle execution seam foundation completed:
   - lifecycle transitions now pass through a backend lifecycle executor interface before metadata update.
   - default executor remains metadata-only and returns `metadata_only` transition mode (provider-native action wiring remains the next step).
+- PR8 provider-lifecycle execution-mode policy gate completed:
+  - added `IF_VM_LIFECYCLE_EXECUTION_MODE` with `metadata_only` (default), `prefer_provider_native`, and `require_provider_native`.
+  - `require_provider_native` now returns `501` for lifecycle actions until provider-native executors are shipped.
 
 ## PR3 Backend Summary
 
