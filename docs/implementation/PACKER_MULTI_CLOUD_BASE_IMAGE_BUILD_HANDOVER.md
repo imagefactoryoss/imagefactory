@@ -84,6 +84,9 @@ Branch: `feature/packer-builds`
   - empty/malformed execution metadata now defaults transition mode to `metadata_only`.
 - PR8 lifecycle transition-mode visibility follow-up completed:
   - VM catalog table lifecycle column now shows transition mode inline per artifact row.
+- PR8 lifecycle transition-mode filterability follow-up completed:
+  - VM catalog list API now supports `transition_mode` filtering.
+  - VM catalog UI now includes transition-mode filter dropdown for list narrowing.
 
 ## PR3 Backend Summary
 

@@ -860,6 +860,9 @@ Progress update (2026-03-27):
   - VM catalog payloads default `lifecycle_transition_mode` to `metadata_only` when execution metadata is empty or malformed.
 - VM catalog list UX now surfaces lifecycle transition mode inline:
   - lifecycle column in VM image table displays `lifecycle_transition_mode` per row for faster operator triage.
+- VM catalog filtering now includes transition mode:
+  - list endpoint accepts `transition_mode` filter with normalized mode matching.
+  - frontend filter bar includes transition mode selector for rapid metadata-only/provider-native segmentation.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

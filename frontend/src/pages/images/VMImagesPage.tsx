@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 
 const providerOptions = ['', 'aws', 'azure', 'gcp', 'vmware']
 const statusOptions = ['', 'success', 'running', 'pending', 'failed', 'cancelled']
+const transitionModeOptions = ['', 'metadata_only', 'provider_native', 'hybrid']
 const lifecycleReasonMaxLength = 500
 type LifecycleAction = 'promote' | 'deprecate' | 'delete'
 
@@ -22,6 +23,7 @@ const VMImagesPage: React.FC = () => {
   const [search, setSearch] = useState('')
   const [provider, setProvider] = useState('')
   const [status, setStatus] = useState('')
+  const [transitionMode, setTransitionMode] = useState('')
   const [totalCount, setTotalCount] = useState(0)
   const [selected, setSelected] = useState<VMImageCatalogItem | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -40,6 +42,7 @@ const VMImagesPage: React.FC = () => {
         offset: 0,
         provider: provider || undefined,
         status: status || undefined,
+        transition_mode: transitionMode || undefined,
         search: search || undefined,
       })
       setItems(response.data || [])
@@ -51,7 +54,7 @@ const VMImagesPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [provider, search, status])
+  }, [provider, search, status, transitionMode])
 
   useEffect(() => {
     load()
@@ -199,7 +202,7 @@ const VMImagesPage: React.FC = () => {
       </div>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <form className="grid gap-3 md:grid-cols-4" onSubmit={onSearchSubmit}>
+        <form className="grid gap-3 md:grid-cols-5" onSubmit={onSearchSubmit}>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -225,6 +228,17 @@ const VMImagesPage: React.FC = () => {
             {statusOptions.map((option) => (
               <option key={option || 'all'} value={option}>
                 {option ? option : 'All statuses'}
+              </option>
+            ))}
+          </select>
+          <select
+            value={transitionMode}
+            onChange={(event) => setTransitionMode(event.target.value)}
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-900/50"
+          >
+            {transitionModeOptions.map((option) => (
+              <option key={option || 'all'} value={option}>
+                {option ? option : 'All modes'}
               </option>
             ))}
           </select>
