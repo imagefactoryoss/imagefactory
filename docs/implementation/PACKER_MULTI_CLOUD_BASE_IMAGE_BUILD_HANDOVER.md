@@ -3,7 +3,7 @@
 Last updated: 2026-03-27  
 Branch: `feature/packer-builds`
 
-## Delivered Through PR7 (backend scheduler slice)
+## Delivered Through PR7 + scheduled notification hooks
 
 - PR1 completed:
   - Packer config contract hardening (`variables`, `build_vars`, `on_error`, `parallel`) across backend/frontend/runtime.
@@ -25,6 +25,10 @@ Branch: `feature/packer-builds`
   - dispatcher now processes due schedule triggers and queues scheduled-origin packer builds.
   - cron-based `next_trigger_at` calculation added for schedule create + post-fire advancement.
   - scheduled-origin metadata + default `forbid` concurrency behavior added.
+- PR7 follow-up notification hooks completed:
+  - schedule runner now publishes scheduled outcome statuses (`scheduled_queued`, `scheduled_failed`, `scheduled_noop`).
+  - build notification mapping includes trigger IDs `BN-011`, `BN-012`, `BN-013`.
+  - scheduled failure trigger defaults include email channel alongside in-app.
 
 ## PR3 Backend Summary
 
@@ -171,6 +175,10 @@ PR7 backend behavior:
   - `trigger.updated`
   - `trigger.schedule.paused`
   - `trigger.schedule.resumed`
+- scheduled trigger execution now emits outcome status updates for notification routing:
+  - `scheduled_queued`
+  - `scheduled_failed`
+  - `scheduled_noop`
 
 ## Validation Run Notes
 
@@ -179,11 +187,11 @@ Backend:
 - `go test ./internal/domain/build -count=1`
 - `go test ./internal/application/dispatcher -count=1`
 - `go test ./internal/adapters/secondary/postgres -run TriggerRepository -count=1`
+- `go test ./internal/application/buildnotifications -count=1`
 
 Frontend:
 - `npm run build`
 
-## Known Gap For Next PR (PR7 follow-up)
+## Known Gap For Next PR
 
-- notification hooks for scheduled fire outcomes (success/failure/no-op) tied to build notification defaults.
 - expand VM catalog semantics for lifecycle actions (promote/deprecate/delete) after schedule UX/API parity.

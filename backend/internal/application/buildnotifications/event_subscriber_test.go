@@ -296,6 +296,56 @@ func TestMapEventToTrigger_RetryStatusUpdate(t *testing.T) {
 	}
 }
 
+func TestMapEventToTrigger_ScheduledStatusUpdates(t *testing.T) {
+	cases := []struct {
+		status           string
+		trigger          buildnotification.TriggerID
+		notificationType string
+		title            string
+	}{
+		{
+			status:           "scheduled_queued",
+			trigger:          buildnotification.TriggerBuildScheduledQueued,
+			notificationType: "build_scheduled_queued",
+			title:            "Scheduled Build Queued",
+		},
+		{
+			status:           "scheduled_failed",
+			trigger:          buildnotification.TriggerBuildScheduledFailed,
+			notificationType: "build_scheduled_failed",
+			title:            "Scheduled Build Failed",
+		},
+		{
+			status:           "scheduled_noop",
+			trigger:          buildnotification.TriggerBuildScheduledNoOp,
+			notificationType: "build_scheduled_noop",
+			title:            "Scheduled Build Skipped",
+		},
+	}
+
+	for _, tc := range cases {
+		trigger, notificationType, title, ok := mapEventToTrigger(messaging.Event{
+			Type: messaging.EventTypeBuildExecutionStatusUpdate,
+			Payload: map[string]interface{}{
+				"build_id": "00000000-0000-0000-0000-000000000001",
+				"status":   tc.status,
+			},
+		})
+		if !ok {
+			t.Fatalf("expected status %s to map to a trigger", tc.status)
+		}
+		if trigger != tc.trigger {
+			t.Fatalf("status %s expected trigger %s, got %s", tc.status, tc.trigger, trigger)
+		}
+		if notificationType != tc.notificationType {
+			t.Fatalf("status %s expected notification type %s, got %s", tc.status, tc.notificationType, notificationType)
+		}
+		if title != tc.title {
+			t.Fatalf("status %s expected title %s, got %s", tc.status, tc.title, title)
+		}
+	}
+}
+
 func TestEventSubscriber_TriggerMatrix_CustomUsers_DeliversInAppAndEmail(t *testing.T) {
 	tenantID := uuid.New()
 	projectID := uuid.New()
@@ -324,10 +374,10 @@ func TestEventSubscriber_TriggerMatrix_CustomUsers_DeliversInAppAndEmail(t *test
 		&stubTriggerService{
 			prefs: []buildnotification.ProjectTriggerPreference{
 				{
-					TriggerID:           buildnotification.TriggerBuildFailed,
-					Enabled:             true,
-					Channels:            []buildnotification.Channel{buildnotification.ChannelInApp, buildnotification.ChannelEmail},
-					RecipientPolicy:     buildnotification.RecipientCustomUsers,
+					TriggerID:            buildnotification.TriggerBuildFailed,
+					Enabled:              true,
+					Channels:             []buildnotification.Channel{buildnotification.ChannelInApp, buildnotification.ChannelEmail},
+					RecipientPolicy:      buildnotification.RecipientCustomUsers,
 					CustomRecipientUsers: []uuid.UUID{customUserA, customUserB},
 				},
 			},
