@@ -65,13 +65,24 @@ func TestParsePackerMetadataFields(t *testing.T) {
 			"target_provider": "aws",
 			"target_profile_id": "11111111-1111-1111-1111-111111111111",
 			"lifecycle_state": "released",
+			"lifecycle_last_action_at": "2026-03-27T20:00:00Z",
+			"lifecycle_last_action_by": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+			"lifecycle_last_reason": "promoted by operator",
+			"lifecycle_history": [
+				{
+					"state": "released",
+					"reason": "promoted by operator",
+					"actor_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+					"at": "2026-03-27T20:00:00Z"
+				}
+			],
 			"provider_artifact_identifiers": {
 				"aws": ["ami-b", "ami-a"],
 				"gcp": ["projects/demo/global/images/example"]
 			}
 		}
 	}`)
-	provider, profileID, identifiers, lifecycleOverride := parsePackerMetadataFields(raw)
+	provider, profileID, identifiers, lifecycle := parsePackerMetadataFields(raw)
 	if provider != "aws" {
 		t.Fatalf("expected provider aws, got %q", provider)
 	}
@@ -81,8 +92,14 @@ func TestParsePackerMetadataFields(t *testing.T) {
 	if !reflect.DeepEqual(identifiers["aws"], []string{"ami-a", "ami-b"}) {
 		t.Fatalf("unexpected aws identifiers: %+v", identifiers["aws"])
 	}
-	if lifecycleOverride != "released" {
-		t.Fatalf("expected lifecycle override released, got %q", lifecycleOverride)
+	if lifecycle.State != "released" {
+		t.Fatalf("expected lifecycle override released, got %q", lifecycle.State)
+	}
+	if lifecycle.LastActionBy != "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" {
+		t.Fatalf("unexpected lifecycle actor: %q", lifecycle.LastActionBy)
+	}
+	if len(lifecycle.History) != 1 || lifecycle.History[0].State != "released" {
+		t.Fatalf("unexpected lifecycle history: %+v", lifecycle.History)
 	}
 }
 
@@ -111,7 +128,10 @@ func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 		t.Fatalf("updatePackerLifecycleMetadata returned error: %v", err)
 	}
 	_, _, _, lifecycle := parsePackerMetadataFields(out)
-	if lifecycle != "deprecated" {
-		t.Fatalf("expected lifecycle override deprecated, got %q", lifecycle)
+	if lifecycle.State != "deprecated" {
+		t.Fatalf("expected lifecycle override deprecated, got %q", lifecycle.State)
+	}
+	if len(lifecycle.History) != 1 || lifecycle.History[0].State != "deprecated" {
+		t.Fatalf("expected lifecycle history to include deprecated entry, got %+v", lifecycle.History)
 	}
 }

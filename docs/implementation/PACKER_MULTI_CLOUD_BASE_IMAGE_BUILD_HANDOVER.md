@@ -50,6 +50,11 @@ Branch: `feature/packer-builds`
   - actions use confirmation-dialog flow with success/error toast feedback.
   - lifecycle-aware action disabling prevents invalid UI transitions.
   - list and detail drawer are refreshed after action completion.
+- PR8 lifecycle policy + audit hardening completed:
+  - `deprecate` and `delete` require explicit reason payloads.
+  - `delete` transitions are accepted only from `deprecated` lifecycle state.
+  - metadata now persists bounded `lifecycle_history` entries (`state`, `reason`, `actor_id`, `at`).
+  - VM catalog responses include lifecycle last-action fields + lifecycle history for traceability.
 
 ## PR3 Backend Summary
 
@@ -216,4 +221,4 @@ Frontend:
 
 ## Known Gap For Next PR
 
-- enforce stricter policy/permission guardrails + audit trail depth for lifecycle delete semantics (currently metadata-state transition, not provider-side deletion).
+- implement provider-side lifecycle actions (actual provider deprecate/delete integrations) behind policy gates; current lifecycle transitions remain metadata-only state management.

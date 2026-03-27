@@ -16,6 +16,15 @@ export interface VMImageCatalogItem {
   provider_artifact_identifiers: Record<string, string[]>
   artifact_values: string[]
   lifecycle_state: string
+  lifecycle_last_action_at?: string
+  lifecycle_last_action_by?: string
+  lifecycle_last_reason?: string
+  lifecycle_history?: Array<{
+    state: string
+    reason?: string
+    actor_id?: string
+    at?: string
+  }>
 }
 
 export interface VMImageCatalogListResponse {

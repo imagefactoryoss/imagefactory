@@ -24,21 +24,32 @@ type VMImageHandler struct {
 }
 
 type vmImageCatalogItem struct {
-	ExecutionID                 uuid.UUID           `db:"execution_id" json:"execution_id"`
-	BuildID                     uuid.UUID           `db:"build_id" json:"build_id"`
-	ProjectID                   uuid.UUID           `db:"project_id" json:"project_id"`
-	ProjectName                 string              `db:"project_name" json:"project_name"`
-	BuildNumber                 int                 `db:"build_number" json:"build_number"`
-	BuildStatus                 string              `db:"build_status" json:"build_status"`
-	ExecutionStatus             string              `db:"execution_status" json:"execution_status"`
-	CreatedAt                   time.Time           `db:"created_at" json:"created_at"`
-	StartedAt                   *time.Time          `db:"started_at" json:"started_at,omitempty"`
-	CompletedAt                 *time.Time          `db:"completed_at" json:"completed_at,omitempty"`
-	TargetProvider              string              `db:"target_provider" json:"target_provider"`
-	TargetProfileID             string              `db:"target_profile_id" json:"target_profile_id"`
-	ProviderArtifactIdentifiers map[string][]string `json:"provider_artifact_identifiers"`
-	ArtifactValues              []string            `json:"artifact_values"`
-	LifecycleState              string              `json:"lifecycle_state"`
+	ExecutionID                 uuid.UUID            `db:"execution_id" json:"execution_id"`
+	BuildID                     uuid.UUID            `db:"build_id" json:"build_id"`
+	ProjectID                   uuid.UUID            `db:"project_id" json:"project_id"`
+	ProjectName                 string               `db:"project_name" json:"project_name"`
+	BuildNumber                 int                  `db:"build_number" json:"build_number"`
+	BuildStatus                 string               `db:"build_status" json:"build_status"`
+	ExecutionStatus             string               `db:"execution_status" json:"execution_status"`
+	CreatedAt                   time.Time            `db:"created_at" json:"created_at"`
+	StartedAt                   *time.Time           `db:"started_at" json:"started_at,omitempty"`
+	CompletedAt                 *time.Time           `db:"completed_at" json:"completed_at,omitempty"`
+	TargetProvider              string               `db:"target_provider" json:"target_provider"`
+	TargetProfileID             string               `db:"target_profile_id" json:"target_profile_id"`
+	ProviderArtifactIdentifiers map[string][]string  `json:"provider_artifact_identifiers"`
+	ArtifactValues              []string             `json:"artifact_values"`
+	LifecycleState              string               `json:"lifecycle_state"`
+	LifecycleLastActionAt       string               `json:"lifecycle_last_action_at,omitempty"`
+	LifecycleLastActionBy       string               `json:"lifecycle_last_action_by,omitempty"`
+	LifecycleLastReason         string               `json:"lifecycle_last_reason,omitempty"`
+	LifecycleHistory            []vmLifecycleHistory `json:"lifecycle_history,omitempty"`
+}
+
+type vmLifecycleHistory struct {
+	State   string `json:"state"`
+	Reason  string `json:"reason,omitempty"`
+	ActorID string `json:"actor_id,omitempty"`
+	At      string `json:"at,omitempty"`
 }
 
 type vmImageCatalogListResponse struct {
@@ -151,7 +162,7 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 
 	items := make([]vmImageCatalogItem, 0, len(rows))
 	for _, row := range rows {
-		targetProvider, targetProfileID, providerIdentifiers, lifecycleOverride := parsePackerMetadataFields(row.MetadataRaw)
+		targetProvider, targetProfileID, providerIdentifiers, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
 		artifactValues := extractArtifactValues(row.ArtifactsRaw)
 		items = append(items, vmImageCatalogItem{
 			ExecutionID:                 row.ExecutionID,
@@ -168,7 +179,11 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 			TargetProfileID:             targetProfileID,
 			ProviderArtifactIdentifiers: providerIdentifiers,
 			ArtifactValues:              artifactValues,
-			LifecycleState:              vmImageLifecycleState(row.ExecutionStatus, lifecycleOverride),
+			LifecycleState:              vmImageLifecycleState(row.ExecutionStatus, lifecycle.State),
+			LifecycleLastActionAt:       lifecycle.LastActionAt,
+			LifecycleLastActionBy:       lifecycle.LastActionBy,
+			LifecycleLastReason:         lifecycle.LastReason,
+			LifecycleHistory:            lifecycle.History,
 		})
 	}
 
@@ -225,7 +240,7 @@ func (h *VMImageHandler) GetTenantVMImage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	targetProvider, targetProfileID, providerIdentifiers, lifecycleOverride := parsePackerMetadataFields(row.MetadataRaw)
+	targetProvider, targetProfileID, providerIdentifiers, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
 	item := vmImageCatalogItem{
 		ExecutionID:                 row.ExecutionID,
 		BuildID:                     row.BuildID,
@@ -241,7 +256,11 @@ func (h *VMImageHandler) GetTenantVMImage(w http.ResponseWriter, r *http.Request
 		TargetProfileID:             targetProfileID,
 		ProviderArtifactIdentifiers: providerIdentifiers,
 		ArtifactValues:              extractArtifactValues(row.ArtifactsRaw),
-		LifecycleState:              vmImageLifecycleState(row.ExecutionStatus, lifecycleOverride),
+		LifecycleState:              vmImageLifecycleState(row.ExecutionStatus, lifecycle.State),
+		LifecycleLastActionAt:       lifecycle.LastActionAt,
+		LifecycleLastActionBy:       lifecycle.LastActionBy,
+		LifecycleLastReason:         lifecycle.LastReason,
+		LifecycleHistory:            lifecycle.History,
 	}
 
 	writeVMImageJSON(w, http.StatusOK, map[string]vmImageCatalogItem{"data": item})
@@ -300,23 +319,41 @@ func vmImageLifecycleState(executionStatus, lifecycleOverride string) string {
 	}
 }
 
-func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfileID string, providerIdentifiers map[string][]string, lifecycleOverride string) {
+type vmImageLifecycleMetadata struct {
+	State        string
+	LastActionAt string
+	LastActionBy string
+	LastReason   string
+	History      []vmLifecycleHistory
+}
+
+func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfileID string, providerIdentifiers map[string][]string, lifecycle vmImageLifecycleMetadata) {
 	type packerMetadata struct {
-		TargetProvider              string              `json:"target_provider"`
-		TargetProfileID             string              `json:"target_profile_id"`
-		ProviderArtifactIdentifiers map[string][]string `json:"provider_artifact_identifiers"`
-		LifecycleState              string              `json:"lifecycle_state"`
+		TargetProvider              string               `json:"target_provider"`
+		TargetProfileID             string               `json:"target_profile_id"`
+		ProviderArtifactIdentifiers map[string][]string  `json:"provider_artifact_identifiers"`
+		LifecycleState              string               `json:"lifecycle_state"`
+		LifecycleLastActionAt       string               `json:"lifecycle_last_action_at"`
+		LifecycleLastActionBy       string               `json:"lifecycle_last_action_by"`
+		LifecycleLastReason         string               `json:"lifecycle_last_reason"`
+		LifecycleHistory            []vmLifecycleHistory `json:"lifecycle_history"`
 	}
 	type executionMetadata struct {
 		Packer packerMetadata `json:"packer"`
 	}
 	var parsed executionMetadata
 	if len(raw) == 0 || json.Unmarshal(raw, &parsed) != nil {
-		return "", "", map[string][]string{}, ""
+		return "", "", map[string][]string{}, vmImageLifecycleMetadata{}
 	}
 	targetProvider = strings.TrimSpace(parsed.Packer.TargetProvider)
 	targetProfileID = strings.TrimSpace(parsed.Packer.TargetProfileID)
-	lifecycleOverride = strings.TrimSpace(parsed.Packer.LifecycleState)
+	lifecycle = vmImageLifecycleMetadata{
+		State:        strings.TrimSpace(parsed.Packer.LifecycleState),
+		LastActionAt: strings.TrimSpace(parsed.Packer.LifecycleLastActionAt),
+		LastActionBy: strings.TrimSpace(parsed.Packer.LifecycleLastActionBy),
+		LastReason:   strings.TrimSpace(parsed.Packer.LifecycleLastReason),
+		History:      sanitizeLifecycleHistory(parsed.Packer.LifecycleHistory),
+	}
 	out := make(map[string][]string, len(parsed.Packer.ProviderArtifactIdentifiers))
 	for provider, values := range parsed.Packer.ProviderArtifactIdentifiers {
 		normalized := make([]string, 0, len(values))
@@ -332,7 +369,7 @@ func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfi
 		sort.Strings(normalized)
 		out[strings.ToLower(strings.TrimSpace(provider))] = normalized
 	}
-	return targetProvider, targetProfileID, out, lifecycleOverride
+	return targetProvider, targetProfileID, out, lifecycle
 }
 
 func extractArtifactValues(raw json.RawMessage) []string {
@@ -410,8 +447,9 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		_ = json.NewDecoder(r.Body).Decode(&reqBody)
 	}
 	reason := strings.TrimSpace(reqBody.Reason)
-	if reason == "" && allowReason {
-		reason = fmt.Sprintf("lifecycle transitioned to %s", targetState)
+	if allowReason && reason == "" {
+		writeVMImageJSON(w, http.StatusBadRequest, map[string]string{"error": "reason is required for this lifecycle transition"})
+		return
 	}
 
 	row, err := h.getTenantVMImageRow(r, authCtx.TenantID, executionID)
@@ -426,8 +464,8 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		return
 	}
 
-	_, _, _, lifecycleOverride := parsePackerMetadataFields(row.MetadataRaw)
-	currentLifecycle := vmImageLifecycleState(row.ExecutionStatus, lifecycleOverride)
+	_, _, _, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
+	currentLifecycle := vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)
 	if strings.EqualFold(row.ExecutionStatus, "running") || strings.EqualFold(row.ExecutionStatus, "pending") {
 		writeVMImageJSON(w, http.StatusConflict, map[string]string{"error": "cannot transition lifecycle while build execution is active"})
 		return
@@ -438,6 +476,14 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 	}
 	if currentLifecycle == "deleted" && targetState != "deleted" {
 		writeVMImageJSON(w, http.StatusConflict, map[string]string{"error": "deleted vm image cannot be transitioned"})
+		return
+	}
+	if targetState == "deleted" && currentLifecycle != "deprecated" && currentLifecycle != "deleted" {
+		writeVMImageJSON(w, http.StatusConflict, map[string]string{"error": "vm image must be deprecated before delete transition"})
+		return
+	}
+	if currentLifecycle == targetState {
+		writeVMImageJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("vm image already in %s lifecycle state", targetState)})
 		return
 	}
 
@@ -472,7 +518,7 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		writeVMImageJSON(w, http.StatusInternalServerError, map[string]string{"error": "vm image lifecycle updated but failed to reload response"})
 		return
 	}
-	targetProvider, targetProfileID, providerIdentifiers, updatedLifecycleOverride := parsePackerMetadataFields(updatedRow.MetadataRaw)
+	targetProvider, targetProfileID, providerIdentifiers, updatedLifecycle := parsePackerMetadataFields(updatedRow.MetadataRaw)
 	item := vmImageCatalogItem{
 		ExecutionID:                 updatedRow.ExecutionID,
 		BuildID:                     updatedRow.BuildID,
@@ -488,7 +534,11 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		TargetProfileID:             targetProfileID,
 		ProviderArtifactIdentifiers: providerIdentifiers,
 		ArtifactValues:              extractArtifactValues(updatedRow.ArtifactsRaw),
-		LifecycleState:              vmImageLifecycleState(updatedRow.ExecutionStatus, updatedLifecycleOverride),
+		LifecycleState:              vmImageLifecycleState(updatedRow.ExecutionStatus, updatedLifecycle.State),
+		LifecycleLastActionAt:       updatedLifecycle.LastActionAt,
+		LifecycleLastActionBy:       updatedLifecycle.LastActionBy,
+		LifecycleLastReason:         updatedLifecycle.LastReason,
+		LifecycleHistory:            updatedLifecycle.History,
 	}
 	writeVMImageJSON(w, http.StatusOK, map[string]interface{}{
 		"data":    item,
@@ -561,6 +611,55 @@ func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason stri
 	if strings.TrimSpace(reason) != "" {
 		packer["lifecycle_last_reason"] = strings.TrimSpace(reason)
 	}
+	history := sanitizeLifecycleHistory(interfaceToLifecycleHistory(packer["lifecycle_history"]))
+	history = append(history, vmLifecycleHistory{
+		State:   strings.ToLower(strings.TrimSpace(targetState)),
+		Reason:  strings.TrimSpace(reason),
+		ActorID: userID.String(),
+		At:      at.UTC().Format(time.RFC3339),
+	})
+	if len(history) > 25 {
+		history = history[len(history)-25:]
+	}
+	packer["lifecycle_history"] = history
 	metadata["packer"] = packer
 	return json.Marshal(metadata)
+}
+
+func interfaceToLifecycleHistory(raw interface{}) []vmLifecycleHistory {
+	if raw == nil {
+		return nil
+	}
+	payload, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	var history []vmLifecycleHistory
+	if err := json.Unmarshal(payload, &history); err != nil {
+		return nil
+	}
+	return history
+}
+
+func sanitizeLifecycleHistory(history []vmLifecycleHistory) []vmLifecycleHistory {
+	if len(history) == 0 {
+		return nil
+	}
+	out := make([]vmLifecycleHistory, 0, len(history))
+	for _, entry := range history {
+		state := strings.ToLower(strings.TrimSpace(entry.State))
+		if state == "" {
+			continue
+		}
+		out = append(out, vmLifecycleHistory{
+			State:   state,
+			Reason:  strings.TrimSpace(entry.Reason),
+			ActorID: strings.TrimSpace(entry.ActorID),
+			At:      strings.TrimSpace(entry.At),
+		})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

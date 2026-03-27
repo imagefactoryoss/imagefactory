@@ -826,6 +826,10 @@ Progress update (2026-03-27):
   - `Promote`, `Deprecate`, `Delete` actions on each VM image row.
   - confirmation dialog + toast feedback + post-action list/detail refresh behavior.
   - lifecycle-aware button disabling to avoid invalid transitions from UI.
+- lifecycle policy hardening now enforces:
+  - explicit reason required for `deprecate` and `delete` transitions.
+  - `delete` is allowed only from `deprecated` lifecycle state.
+  - bounded lifecycle history persisted in execution metadata and surfaced in VM catalog details.
 
 ### 16.10 Cross-cutting quality gates for every PR
 
