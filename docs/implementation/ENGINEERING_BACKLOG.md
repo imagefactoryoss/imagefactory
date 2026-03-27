@@ -99,6 +99,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 lifecycle reason payload hardening completed on `feature/packer-builds`:
     - backend now enforces a 500-character maximum reason length for lifecycle transitions.
     - VM catalog reason modal now mirrors the 500-character limit with inline counter feedback.
+  - PR8 lifecycle transition-mode contract clarity completed on `feature/packer-builds`:
+    - VM catalog API now returns `lifecycle_transition_mode` for list/detail/action responses.
+    - current mode is explicit `metadata_only` to indicate provider-native deprecate/delete is not yet wired.
 
 ## Backlog Review Summary (2026-03-16)
 

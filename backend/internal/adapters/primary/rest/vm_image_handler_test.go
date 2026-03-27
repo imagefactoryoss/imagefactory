@@ -92,6 +92,7 @@ func TestParsePackerMetadataFields(t *testing.T) {
 			"lifecycle_last_action_at": "2026-03-27T20:00:00Z",
 			"lifecycle_last_action_by": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 			"lifecycle_last_reason": "promoted by operator",
+			"lifecycle_transition_mode": "metadata_only",
 			"lifecycle_history": [
 				{
 					"state": "released",
@@ -121,6 +122,9 @@ func TestParsePackerMetadataFields(t *testing.T) {
 	}
 	if lifecycle.LastActionBy != "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" {
 		t.Fatalf("unexpected lifecycle actor: %q", lifecycle.LastActionBy)
+	}
+	if lifecycle.TransitionMode != "metadata_only" {
+		t.Fatalf("unexpected lifecycle transition mode: %q", lifecycle.TransitionMode)
 	}
 	if len(lifecycle.History) != 1 || lifecycle.History[0].State != "released" {
 		t.Fatalf("unexpected lifecycle history: %+v", lifecycle.History)
@@ -158,6 +162,9 @@ func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 	if len(lifecycle.History) != 1 || lifecycle.History[0].State != "deprecated" {
 		t.Fatalf("expected lifecycle history to include deprecated entry, got %+v", lifecycle.History)
 	}
+	if lifecycle.TransitionMode != "metadata_only" {
+		t.Fatalf("expected lifecycle transition mode metadata_only, got %q", lifecycle.TransitionMode)
+	}
 }
 
 func TestValidateVMLifecycleReason(t *testing.T) {
@@ -194,4 +201,13 @@ func TestValidateVMLifecycleReason(t *testing.T) {
 			t.Fatalf("expected empty reason, got %q", reason)
 		}
 	})
+}
+
+func TestVMLifecycleTransitionMode_DefaultsToMetadataOnly(t *testing.T) {
+	if got := vmImageLifecycleTransitionMode(""); got != "metadata_only" {
+		t.Fatalf("expected default metadata_only mode, got %q", got)
+	}
+	if got := vmImageLifecycleTransitionMode("  provider_native  "); got != "provider_native" {
+		t.Fatalf("expected normalized provider_native mode, got %q", got)
+	}
 }

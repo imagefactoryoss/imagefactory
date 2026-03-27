@@ -64,6 +64,9 @@ Branch: `feature/packer-builds`
 - PR8 lifecycle reason payload hardening completed:
   - backend now enforces max lifecycle reason length at 500 characters.
   - VM catalog reason modal now applies the same 500-character limit with inline count feedback.
+- PR8 lifecycle transition-mode contract clarity completed:
+  - VM catalog responses now include `lifecycle_transition_mode`.
+  - lifecycle transitions currently report `metadata_only` to explicitly signal metadata-state transitions (provider-native lifecycle actions pending).
 
 ## PR3 Backend Summary
 

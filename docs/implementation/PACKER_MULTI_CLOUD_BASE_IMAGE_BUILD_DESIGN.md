@@ -841,6 +841,9 @@ Progress update (2026-03-27):
 - lifecycle reason payload hardening now enforces bounded reason size:
   - backend rejects lifecycle reason payloads longer than 500 characters.
   - frontend reason modal constrains input to 500 characters and shows inline character count.
+- lifecycle transition mode is now explicit in VM catalog responses:
+  - API exposes `lifecycle_transition_mode` for VM catalog list/detail/action responses.
+  - current implementation emits `metadata_only`, clarifying lifecycle transitions are metadata state management until provider-native actions are integrated.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

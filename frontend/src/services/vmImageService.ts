@@ -19,6 +19,7 @@ export interface VMImageCatalogItem {
   lifecycle_last_action_at?: string
   lifecycle_last_action_by?: string
   lifecycle_last_reason?: string
+  lifecycle_transition_mode: string
   lifecycle_history?: Array<{
     state: string
     reason?: string
