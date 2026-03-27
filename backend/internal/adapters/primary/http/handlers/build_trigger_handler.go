@@ -66,12 +66,14 @@ type CreateGitEventTriggerRequest struct {
 	GitBranchPattern string `json:"git_branch_pattern,omitempty"`
 }
 
-// UpdateProjectWebhookTriggerRequest represents partial update payload for project webhook triggers.
+// UpdateProjectWebhookTriggerRequest represents partial update payload for project triggers.
 type UpdateProjectWebhookTriggerRequest struct {
 	Name          *string  `json:"name,omitempty"`
 	Description   *string  `json:"description,omitempty"`
 	WebhookURL    *string  `json:"webhook_url,omitempty"`
 	WebhookSecret *string  `json:"webhook_secret,omitempty"`
+	CronExpr      *string  `json:"cron_expression,omitempty"`
+	Timezone      *string  `json:"timezone,omitempty"`
 	WebhookEvents []string `json:"webhook_events,omitempty"`
 	IsActive      *bool    `json:"is_active,omitempty"`
 }
@@ -432,7 +434,7 @@ func (h *BuildTriggerHandler) GetProjectTriggers(w http.ResponseWriter, r *http.
 	})
 }
 
-// UpdateProjectWebhookTrigger updates a project webhook trigger.
+// UpdateProjectWebhookTrigger updates a project webhook or schedule trigger.
 // PATCH /api/v1/projects/{projectID}/triggers/{triggerID}
 func (h *BuildTriggerHandler) UpdateProjectWebhookTrigger(w http.ResponseWriter, r *http.Request) {
 	projectIDStr := chi.URLParam(r, "projectID")
@@ -465,6 +467,8 @@ func (h *BuildTriggerHandler) UpdateProjectWebhookTrigger(w http.ResponseWriter,
 		req.Description,
 		req.WebhookURL,
 		req.WebhookSecret,
+		req.CronExpr,
+		req.Timezone,
 		req.WebhookEvents,
 		req.IsActive,
 	)

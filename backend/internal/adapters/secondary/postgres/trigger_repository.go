@@ -321,8 +321,13 @@ func (r *TriggerRepository) UpdateTrigger(ctx context.Context, trigger *build.Bu
 			webhook_url = $6,
 			webhook_secret = $7,
 			webhook_events = $8,
-			updated_at = $9
-		WHERE id = $10
+			cron_expression = $9,
+			timezone = $10,
+			git_provider = $11,
+			git_repository_url = $12,
+			git_branch_pattern = $13,
+			updated_at = $14
+		WHERE id = $15
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -334,6 +339,11 @@ func (r *TriggerRepository) UpdateTrigger(ctx context.Context, trigger *build.Bu
 		nullIfEmpty(trigger.WebhookURL),
 		nullIfEmpty(trigger.WebhookSecret),
 		pq.Array(trigger.WebhookEvents),
+		nullIfEmpty(trigger.CronExpr),
+		trigger.Timezone,
+		nullIfEmpty(string(trigger.GitProvider)),
+		nullIfEmpty(trigger.GitRepoURL),
+		nullIfEmpty(trigger.GitBranchPattern),
 		trigger.UpdatedAt,
 		trigger.ID,
 	)
