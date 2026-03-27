@@ -24,25 +24,32 @@ type VMImageHandler struct {
 }
 
 type vmImageCatalogItem struct {
-	ExecutionID                 uuid.UUID            `db:"execution_id" json:"execution_id"`
-	BuildID                     uuid.UUID            `db:"build_id" json:"build_id"`
-	ProjectID                   uuid.UUID            `db:"project_id" json:"project_id"`
-	ProjectName                 string               `db:"project_name" json:"project_name"`
-	BuildNumber                 int                  `db:"build_number" json:"build_number"`
-	BuildStatus                 string               `db:"build_status" json:"build_status"`
-	ExecutionStatus             string               `db:"execution_status" json:"execution_status"`
-	CreatedAt                   time.Time            `db:"created_at" json:"created_at"`
-	StartedAt                   *time.Time           `db:"started_at" json:"started_at,omitempty"`
-	CompletedAt                 *time.Time           `db:"completed_at" json:"completed_at,omitempty"`
-	TargetProvider              string               `db:"target_provider" json:"target_provider"`
-	TargetProfileID             string               `db:"target_profile_id" json:"target_profile_id"`
-	ProviderArtifactIdentifiers map[string][]string  `json:"provider_artifact_identifiers"`
-	ArtifactValues              []string             `json:"artifact_values"`
-	LifecycleState              string               `json:"lifecycle_state"`
-	LifecycleLastActionAt       string               `json:"lifecycle_last_action_at,omitempty"`
-	LifecycleLastActionBy       string               `json:"lifecycle_last_action_by,omitempty"`
-	LifecycleLastReason         string               `json:"lifecycle_last_reason,omitempty"`
-	LifecycleHistory            []vmLifecycleHistory `json:"lifecycle_history,omitempty"`
+	ExecutionID                 uuid.UUID                `db:"execution_id" json:"execution_id"`
+	BuildID                     uuid.UUID                `db:"build_id" json:"build_id"`
+	ProjectID                   uuid.UUID                `db:"project_id" json:"project_id"`
+	ProjectName                 string                   `db:"project_name" json:"project_name"`
+	BuildNumber                 int                      `db:"build_number" json:"build_number"`
+	BuildStatus                 string                   `db:"build_status" json:"build_status"`
+	ExecutionStatus             string                   `db:"execution_status" json:"execution_status"`
+	CreatedAt                   time.Time                `db:"created_at" json:"created_at"`
+	StartedAt                   *time.Time               `db:"started_at" json:"started_at,omitempty"`
+	CompletedAt                 *time.Time               `db:"completed_at" json:"completed_at,omitempty"`
+	TargetProvider              string                   `db:"target_provider" json:"target_provider"`
+	TargetProfileID             string                   `db:"target_profile_id" json:"target_profile_id"`
+	ProviderArtifactIdentifiers map[string][]string      `json:"provider_artifact_identifiers"`
+	ArtifactValues              []string                 `json:"artifact_values"`
+	LifecycleState              string                   `json:"lifecycle_state"`
+	LifecycleLastActionAt       string                   `json:"lifecycle_last_action_at,omitempty"`
+	LifecycleLastActionBy       string                   `json:"lifecycle_last_action_by,omitempty"`
+	LifecycleLastReason         string                   `json:"lifecycle_last_reason,omitempty"`
+	LifecycleHistory            []vmLifecycleHistory     `json:"lifecycle_history,omitempty"`
+	ActionPermissions           vmImageActionPermissions `json:"action_permissions"`
+}
+
+type vmImageActionPermissions struct {
+	CanPromote   bool `json:"can_promote"`
+	CanDeprecate bool `json:"can_deprecate"`
+	CanDelete    bool `json:"can_delete"`
 }
 
 type vmLifecycleHistory struct {
@@ -184,6 +191,7 @@ func (h *VMImageHandler) ListTenantVMImages(w http.ResponseWriter, r *http.Reque
 			LifecycleLastActionBy:       lifecycle.LastActionBy,
 			LifecycleLastReason:         lifecycle.LastReason,
 			LifecycleHistory:            lifecycle.History,
+			ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)),
 		})
 	}
 
@@ -261,6 +269,7 @@ func (h *VMImageHandler) GetTenantVMImage(w http.ResponseWriter, r *http.Request
 		LifecycleLastActionBy:       lifecycle.LastActionBy,
 		LifecycleLastReason:         lifecycle.LastReason,
 		LifecycleHistory:            lifecycle.History,
+		ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)),
 	}
 
 	writeVMImageJSON(w, http.StatusOK, map[string]vmImageCatalogItem{"data": item})
@@ -316,6 +325,23 @@ func vmImageLifecycleState(executionStatus, lifecycleOverride string) string {
 		return "failed"
 	default:
 		return "unknown"
+	}
+}
+
+func vmImageLifecycleActionPermissions(executionStatus, lifecycleState string) vmImageActionPermissions {
+	exec := strings.ToLower(strings.TrimSpace(executionStatus))
+	state := strings.ToLower(strings.TrimSpace(lifecycleState))
+	if exec == "running" || exec == "pending" {
+		return vmImageActionPermissions{}
+	}
+	switch state {
+	case "failed", "cancelled", "unknown", "deleted":
+		return vmImageActionPermissions{}
+	}
+	return vmImageActionPermissions{
+		CanPromote:   state == "available" || state == "deprecated",
+		CanDeprecate: state == "available" || state == "released",
+		CanDelete:    state == "deprecated",
 	}
 }
 
@@ -539,6 +565,7 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		LifecycleLastActionBy:       updatedLifecycle.LastActionBy,
 		LifecycleLastReason:         updatedLifecycle.LastReason,
 		LifecycleHistory:            updatedLifecycle.History,
+		ActionPermissions:           vmImageLifecycleActionPermissions(updatedRow.ExecutionStatus, vmImageLifecycleState(updatedRow.ExecutionStatus, updatedLifecycle.State)),
 	}
 	writeVMImageJSON(w, http.StatusOK, map[string]interface{}{
 		"data":    item,

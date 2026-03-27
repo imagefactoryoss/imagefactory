@@ -59,6 +59,29 @@ func TestVMImageLifecycleState_UsesOverride(t *testing.T) {
 	}
 }
 
+func TestVMImageLifecycleActionPermissions(t *testing.T) {
+	cases := []struct {
+		name            string
+		executionStatus string
+		lifecycle       string
+		wantPromote     bool
+		wantDeprecate   bool
+		wantDelete      bool
+	}{
+		{name: "available", executionStatus: "success", lifecycle: "available", wantPromote: true, wantDeprecate: true, wantDelete: false},
+		{name: "released", executionStatus: "success", lifecycle: "released", wantPromote: false, wantDeprecate: true, wantDelete: false},
+		{name: "deprecated", executionStatus: "success", lifecycle: "deprecated", wantPromote: true, wantDeprecate: false, wantDelete: true},
+		{name: "deleted", executionStatus: "success", lifecycle: "deleted", wantPromote: false, wantDeprecate: false, wantDelete: false},
+		{name: "running blocked", executionStatus: "running", lifecycle: "available", wantPromote: false, wantDeprecate: false, wantDelete: false},
+	}
+	for _, tc := range cases {
+		got := vmImageLifecycleActionPermissions(tc.executionStatus, tc.lifecycle)
+		if got.CanPromote != tc.wantPromote || got.CanDeprecate != tc.wantDeprecate || got.CanDelete != tc.wantDelete {
+			t.Fatalf("%s: unexpected permissions: %+v", tc.name, got)
+		}
+	}
+}
+
 func TestParsePackerMetadataFields(t *testing.T) {
 	raw := json.RawMessage(`{
 		"packer": {

@@ -25,6 +25,11 @@ export interface VMImageCatalogItem {
     actor_id?: string
     at?: string
   }>
+  action_permissions?: {
+    can_promote: boolean
+    can_deprecate: boolean
+    can_delete: boolean
+  }
 }
 
 export interface VMImageCatalogListResponse {

@@ -90,6 +90,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - `delete` transition now requires current lifecycle state `deprecated` (policy guardrail).
     - lifecycle metadata now records bounded `lifecycle_history` entries with actor/reason/timestamp.
     - VM catalog responses now expose lifecycle last-action fields and lifecycle history for operator traceability.
+  - PR8 lifecycle action contract normalization completed on `feature/packer-builds`:
+    - VM catalog API now returns server-calculated `action_permissions` (`can_promote`, `can_deprecate`, `can_delete`).
+    - frontend VM action controls now rely on backend policy flags instead of duplicated client-side transition logic.
 
 ## Backlog Review Summary (2026-03-16)
 

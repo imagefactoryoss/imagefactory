@@ -217,11 +217,10 @@ const VMImagesPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {items.map((item) => {
-                  const lifecycle = (item.lifecycle_state || '').toLowerCase()
                   const isActionBusy = actionExecutionID === item.execution_id
-                  const canPromote = lifecycle === 'available' || lifecycle === 'deprecated'
-                  const canDeprecate = lifecycle === 'available' || lifecycle === 'released'
-                  const canDelete = lifecycle !== 'deleted'
+                  const canPromote = Boolean(item.action_permissions?.can_promote)
+                  const canDeprecate = Boolean(item.action_permissions?.can_deprecate)
+                  const canDelete = Boolean(item.action_permissions?.can_delete)
                   return (
                   <tr key={item.execution_id} className="align-top">
                     <td className="px-3 py-3 text-xs text-slate-800 dark:text-slate-100">
