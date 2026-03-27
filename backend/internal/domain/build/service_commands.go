@@ -79,6 +79,12 @@ func (s *Service) StartBuild(ctx context.Context, buildID uuid.UUID) error {
 			return err
 		}
 	}
+	if err := s.validatePackerTargetProfileForBuildConfig(ctx, build); err != nil {
+		s.logger.Warn("Packer target profile preflight failed",
+			zap.Error(err),
+			zap.String("build_id", buildID.String()))
+		return err
+	}
 
 	if build.Status() == BuildStatusRunning {
 		s.logger.Info("Build already running; skipping start", zap.String("build_id", buildID.String()))
@@ -111,6 +117,9 @@ func (s *Service) DispatchBuild(ctx context.Context, build *Build) error {
 		return fmt.Errorf("build must be running to dispatch (status=%s)", build.Status())
 	}
 	if err := s.validateBuildCapabilities(ctx, build.TenantID(), build.Manifest()); err != nil {
+		return err
+	}
+	if err := s.validatePackerTargetProfileForBuildConfig(ctx, build); err != nil {
 		return err
 	}
 
@@ -202,6 +211,12 @@ func (s *Service) RetryBuild(ctx context.Context, buildID uuid.UUID) error {
 				zap.String("stage", "retry"))
 			return err
 		}
+	}
+	if err := s.validatePackerTargetProfileForBuildConfig(ctx, b); err != nil {
+		s.logger.Warn("Packer target profile preflight failed on retry",
+			zap.Error(err),
+			zap.String("build_id", buildID.String()))
+		return err
 	}
 
 	if err := b.RetryStart(); err != nil {

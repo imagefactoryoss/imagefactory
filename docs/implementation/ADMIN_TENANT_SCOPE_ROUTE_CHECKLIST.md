@@ -45,6 +45,12 @@
 | `GET /api/v1/admin/infrastructure/providers/{id}/permissions` | `InfrastructureProviderHandler.ListProviderPermissions` | `DONE` | Scoped provider-access guard enforces tenant/all-tenant contract. |
 | `POST /api/v1/admin/infrastructure/providers/{id}/permissions` | `InfrastructureProviderHandler.GrantProviderPermission` | `DONE` | Scoped provider-access guard + tenant override checks. |
 | `DELETE /api/v1/admin/infrastructure/providers/{id}/permissions` | `InfrastructureProviderHandler.RevokeProviderPermission` | `DONE` | Scoped provider-access guard + tenant override checks. |
+| `GET /api/v1/admin/packer-target-profiles` | `PackerTargetProfileHandler.ListProfiles` | `DONE` | Uses shared tenant scope resolver with explicit all-tenant support and optional provider filter. |
+| `POST /api/v1/admin/packer-target-profiles` | `PackerTargetProfileHandler.CreateProfile` | `DONE` | Creates tenant-scoped profile from auth scope; system admins can provide explicit `tenant_id` in request body. |
+| `GET /api/v1/admin/packer-target-profiles/{id}` | `PackerTargetProfileHandler.GetProfile` | `DONE` | Reads profile within resolved tenant scope. |
+| `PUT /api/v1/admin/packer-target-profiles/{id}` | `PackerTargetProfileHandler.UpdateProfile` | `DONE` | Updates profile within resolved tenant scope and resets validation state to `untested`. |
+| `DELETE /api/v1/admin/packer-target-profiles/{id}` | `PackerTargetProfileHandler.DeleteProfile` | `DONE` | Deletes profile within resolved tenant scope. |
+| `POST /api/v1/admin/packer-target-profiles/{id}/validate` | `PackerTargetProfileHandler.ValidateProfile` | `DONE` | Runs deterministic preflight validation and persists `valid|invalid` status, timestamp, and remediation hints. |
 | `POST /api/v1/admin/system/reboot` | `SystemConfigHandler.RebootServer` | `GLOBAL` | System runtime action. |
 | `POST /api/v1/system-configs` | `SystemConfigHandler.CreateConfig` | `DONE` | Tenant-scoped by default; explicit tenant override enforced via auth scope checks. |
 | `GET /api/v1/system-configs` | `SystemConfigHandler.ListConfigs` | `DONE` | Supports explicit all-tenant scope for system admins via resolver contract. |
@@ -54,6 +60,7 @@
 | `PUT /api/v1/admin/settings/tools` | `SystemConfigHandler.UpdateToolAvailability` | `DONE` | Tenant scope resolver + explicit all-tenants support. |
 | `GET /api/v1/admin/settings/tekton-task-images` | `SystemConfigHandler.GetTektonTaskImages` | `GLOBAL` | Global Tekton task image defaults; no tenant dimension today. |
 | `PUT /api/v1/admin/settings/tekton-task-images` | `SystemConfigHandler.UpdateTektonTaskImages` | `GLOBAL` | Global Tekton task image defaults; no tenant dimension today. |
+| `GET /api/v1/admin/settings/product-info-metadata` | `SystemConfigHandler.GetProductInfoMetadata` | `GLOBAL` | Global runtime metadata for Product Info page (for example `last_backlog_sync`). |
 | `GET /api/v1/admin/settings/build-capabilities` | `SystemConfigHandler.GetBuildCapabilities` | `DONE` | Tenant scope resolver + explicit all-tenants support for admin capability view. |
 | `PUT /api/v1/admin/settings/build-capabilities` | `SystemConfigHandler.UpdateBuildCapabilities` | `DONE` | Tenant scope resolver + explicit all-tenants support for capability updates. |
 | `GET /api/v1/admin/settings/operation-capabilities` | `SystemConfigHandler.GetOperationCapabilities` | `DONE` | Tenant scope resolver + explicit all-tenants support for operation capability view. |
@@ -74,8 +81,13 @@
 | `PUT /api/v1/admin/settings/robot-sre` | `SystemConfigHandler.UpdateRobotSREPolicy` | `GLOBAL` | SRE Smart Bot global policy update action. |
 | `GET /api/v1/admin/sre/demo/scenarios` | `SRESmartBotHandler.ListDemoScenarios` | `GLOBAL` | Demo catalog for synthetic incident generation in admin-only SRE workflows. |
 | `POST /api/v1/admin/sre/demo/incidents` | `SRESmartBotHandler.GenerateDemoIncident` | `GLOBAL` | Admin-only synthetic incident creation for demos and operator training. |
+| `GET /api/v1/admin/sre/remediation-packs` | `SRESmartBotHandler.ListRemediationPacks` | `GLOBAL` | Lists available guided remediation packs for the current runtime contract. |
 | `GET /api/v1/admin/sre/incidents` | `SRESmartBotHandler.ListIncidents` | `DONE` | Incident ledger list with tenant scoping by auth context unless all-tenants scope is explicitly requested. |
 | `GET /api/v1/admin/sre/incidents/{id}` | `SRESmartBotHandler.GetIncident` | `DONE` | Incident detail endpoint; record itself is read under `system:read` admin scope. |
+| `GET /api/v1/admin/sre/incidents/{id}/remediation-packs` | `SRESmartBotHandler.ListIncidentRemediationPacks` | `DONE` | Returns remediation packs that match the selected incident type for operator action planning. |
+| `GET /api/v1/admin/sre/incidents/{id}/remediation-packs/runs` | `SRESmartBotHandler.ListIncidentRemediationPackRuns` | `DONE` | Lists remediation pack dry-run and execute records for the selected incident. |
+| `POST /api/v1/admin/sre/incidents/{id}/remediation-packs/{packKey}/dry-run` | `SRESmartBotHandler.DryRunIncidentRemediationPack` | `DONE` | Runs deterministic remediation-pack precondition checks and persists dry-run output for the incident. |
+| `POST /api/v1/admin/sre/incidents/{id}/remediation-packs/{packKey}/execute` | `SRESmartBotHandler.ExecuteIncidentRemediationPack` | `DONE` | Records approval-gated remediation-pack execution attempts and persists execution outcome payloads. |
 | `GET /api/v1/admin/sre/detector-rule-suggestions` | `SRESmartBotHandler.ListDetectorRuleSuggestions` | `GLOBAL` | Global reviewer queue for pending detector rule suggestions. |
 | `POST /api/v1/admin/sre/incidents/{id}/detector-rule-suggestions` | `SRESmartBotHandler.ProposeDetectorRuleSuggestion` | `DONE` | Creates a detector rule suggestion from the selected incident context. |
 | `POST /api/v1/admin/sre/detector-rule-suggestions/{suggestionId}/accept` | `SRESmartBotHandler.AcceptDetectorRuleSuggestion` | `GLOBAL` | Admin-only approval path for promoting a suggested detector rule into policy. |

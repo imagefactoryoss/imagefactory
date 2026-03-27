@@ -706,6 +706,10 @@ export interface ReleaseGovernancePolicyConfig {
     window_minutes: number
 }
 
+export interface ProductInfoMetadataConfig {
+    last_backlog_sync?: string
+}
+
 export type SREIncidentSeverity = 'info' | 'warning' | 'critical'
 export type SREIncidentConfidence = 'low' | 'medium' | 'high'
 export type SREIncidentStatus = 'observed' | 'triaged' | 'contained' | 'recovering' | 'resolved' | 'suppressed' | 'escalated'
@@ -814,6 +818,56 @@ export interface SREIncidentWorkspaceResponse {
     executive_summary: string[]
     recommended_questions: string[]
     suggested_tooling: string[]
+    default_tool_bundle?: string[]
+    async_pressure_summary?: {
+        backlog?: {
+            incident_type: string
+            display_name: string
+            queue_kind: string
+            subsystem: string
+            count: number
+            threshold: number
+            threshold_delta: number
+            threshold_ratio_percent: number
+            trend: string
+            operator_status: string
+            latest_summary: string
+            latest_captured_at?: string
+            recent_observations?: Record<string, number>
+            correlation_hints?: Record<string, string>
+        }
+        messaging_transport?: {
+            status: string
+            reconnects: number
+            disconnects: number
+            reconnect_threshold: number
+            operator_status: string
+            latest_summary: string
+            latest_captured_at?: string
+        }
+        messaging_consumer?: {
+            incident_type: string
+            display_name: string
+            kind: string
+            stream: string
+            consumer: string
+            target_ref: string
+            count: number
+            threshold: number
+            threshold_delta: number
+            threshold_ratio_percent: number
+            pending_count: number
+            ack_pending_count: number
+            waiting_count: number
+            redelivered_count: number
+            trend: string
+            operator_status: string
+            latest_summary: string
+            latest_captured_at?: string
+            last_active?: string
+            correlation_hints?: Record<string, string>
+        }
+    }
     enabled_mcp_servers: SRESmartBotMCPServer[]
     agent_runtime: SRESmartBotAgentRuntimeConfig
 }
@@ -1013,6 +1067,49 @@ export interface SRESmartBotMutationResponse {
     incident?: SREIncident
     action?: SREActionAttempt
     approval?: SREApproval
+}
+
+export interface SRERemediationPack {
+    key: string
+    version: string
+    name: string
+    summary: string
+    risk_tier: string
+    action_class: string
+    requires_approval: boolean
+    incident_types: string[]
+}
+
+export interface SRERemediationPackListResponse {
+    packs: SRERemediationPack[]
+}
+
+export interface SRERemediationPackRun {
+    id: string
+    tenant_id?: string | null
+    incident_id: string
+    pack_key: string
+    pack_version: string
+    run_kind: string
+    status: string
+    requested_by?: string
+    request_id?: string
+    approval_id?: string | null
+    action_attempt_id?: string | null
+    summary?: string
+    result_payload?: Record<string, any> | null
+    started_at?: string | null
+    completed_at?: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface SRERemediationPackRunListResponse {
+    runs: SRERemediationPackRun[]
+}
+
+export interface SRERemediationPackRunResponse {
+    run: SRERemediationPackRun
 }
 
 export type SREDetectorRuleSuggestionStatus = 'pending' | 'accepted' | 'rejected'
@@ -1439,6 +1536,7 @@ export interface BuildConfig {
     environment?: Record<string, string>
     // Packer-specific fields
     packerTemplate?: string
+    packerTargetProfileId?: string
     buildVars?: Record<string, string>
     onError?: string
     parallel?: boolean
@@ -1964,7 +2062,7 @@ export interface CreateProjectSourceRequest {
     isActive?: boolean
 }
 
-export interface UpdateProjectSourceRequest extends CreateProjectSourceRequest {}
+export interface UpdateProjectSourceRequest extends CreateProjectSourceRequest { }
 
 export type ProjectStatus = 'active' | 'archived' | 'suspended'
 
@@ -2205,6 +2303,44 @@ export interface TestProviderConnectionResponse {
     success: boolean
     message: string
     details?: Record<string, any>
+}
+
+export type PackerTargetProvider = 'vmware' | 'aws' | 'azure' | 'gcp'
+export type PackerTargetValidationStatus = 'untested' | 'valid' | 'invalid'
+
+export interface PackerTargetProfile {
+    id: string
+    tenant_id: string
+    is_global: boolean
+    name: string
+    provider: PackerTargetProvider
+    description?: string
+    secret_ref: string
+    options: Record<string, any>
+    validation_status: PackerTargetValidationStatus
+    last_validated_at?: string
+    last_validation_message?: string
+    last_remediation_hints?: string[]
+    created_by: string
+    created_at: string
+    updated_at: string
+}
+
+export interface PackerTargetValidationCheck {
+    name: string
+    ok: boolean
+    message?: string
+    remediation_hint?: string
+}
+
+export interface PackerTargetValidationResult {
+    profile_id: string
+    provider: PackerTargetProvider
+    status: PackerTargetValidationStatus
+    checked_at: string
+    checks: PackerTargetValidationCheck[]
+    message: string
+    remediation_hints: string[]
 }
 
 export type TektonInstallMode = 'gitops' | 'image_factory_installer'
