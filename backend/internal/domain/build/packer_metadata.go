@@ -8,6 +8,9 @@ func packerMetadataFromBuildConfig(config *BuildConfig) map[string]interface{} {
 	}
 
 	metadata := map[string]interface{}{}
+	if profileID := strings.TrimSpace(config.PackerTargetProfileID); profileID != "" {
+		metadata["packer_target_profile_id"] = profileID
+	}
 	if len(config.Variables) > 0 {
 		metadata["variables"] = config.Variables
 	}

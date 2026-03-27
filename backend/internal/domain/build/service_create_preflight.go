@@ -61,5 +61,13 @@ func (s *Service) preflightCreateBuild(ctx context.Context, tenantID, projectID 
 		manifest.BuildConfig.RegistryAuthID = resolvedAuthID
 	}
 
+	if err := s.validatePackerTargetProfileForManifest(ctx, tenantID, *manifest); err != nil {
+		s.logger.Warn("Packer target profile validation failed",
+			zap.Error(err),
+			zap.String("tenant_id", tenantID.String()),
+			zap.String("project_id", projectID.String()))
+		return err
+	}
+
 	return nil
 }

@@ -148,12 +148,13 @@ func TestBuildConfigFromManifest_PackerPersistsExtendedMetadata(t *testing.T) {
 	manifest := BuildManifest{
 		Type: BuildTypePacker,
 		BuildConfig: &BuildConfig{
-			BuildType:      BuildTypePacker,
-			PackerTemplate: `{"builders":[{"type":"amazon-ebs"}]}`,
-			Variables:      map[string]interface{}{"region": "us-east-1"},
-			BuildVars:      map[string]string{"image_name": "base-ami"},
-			OnError:        "abort",
-			Parallel:       false,
+			BuildType:             BuildTypePacker,
+			PackerTemplate:        `{"builders":[{"type":"amazon-ebs"}]}`,
+			PackerTargetProfileID: uuid.New().String(),
+			Variables:             map[string]interface{}{"region": "us-east-1"},
+			BuildVars:             map[string]string{"image_name": "base-ami"},
+			OnError:               "abort",
+			Parallel:              false,
 		},
 	}
 
@@ -186,8 +187,9 @@ func TestBuildConfigDataFromManifest_PackerDefaultsOnError(t *testing.T) {
 	manifest := BuildManifest{
 		Type: BuildTypePacker,
 		BuildConfig: &BuildConfig{
-			BuildType:      BuildTypePacker,
-			PackerTemplate: `{"builders":[{"type":"amazon-ebs"}]}`,
+			BuildType:             BuildTypePacker,
+			PackerTemplate:        `{"builders":[{"type":"amazon-ebs"}]}`,
+			PackerTargetProfileID: uuid.New().String(),
 		},
 	}
 
