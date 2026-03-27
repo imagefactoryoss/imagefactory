@@ -82,6 +82,8 @@ Branch: `feature/packer-builds`
 - PR8 lifecycle transition-mode default contract hardening completed:
   - VM catalog response payloads now always emit `lifecycle_transition_mode`.
   - empty/malformed execution metadata now defaults transition mode to `metadata_only`.
+- PR8 lifecycle transition-mode visibility follow-up completed:
+  - VM catalog table lifecycle column now shows transition mode inline per artifact row.
 
 ## PR3 Backend Summary
 

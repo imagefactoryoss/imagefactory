@@ -858,6 +858,8 @@ Progress update (2026-03-27):
   - unknown/invalid mode values are normalized to `metadata_only` for stable API/UI semantics.
 - lifecycle transition mode now has a non-empty response contract:
   - VM catalog payloads default `lifecycle_transition_mode` to `metadata_only` when execution metadata is empty or malformed.
+- VM catalog list UX now surfaces lifecycle transition mode inline:
+  - lifecycle column in VM image table displays `lifecycle_transition_mode` per row for faster operator triage.
 
 ### 16.10 Cross-cutting quality gates for every PR
 
