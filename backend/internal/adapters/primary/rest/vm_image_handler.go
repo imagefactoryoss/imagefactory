@@ -8,11 +8,15 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	awscore "github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -27,11 +31,12 @@ type VMImageHandler struct {
 }
 
 type vmLifecycleTransitionRequest struct {
-	ExecutionID    uuid.UUID
-	TenantID       uuid.UUID
-	TargetProvider string
-	TargetState    string
-	Reason         string
+	ExecutionID                 uuid.UUID
+	TenantID                    uuid.UUID
+	TargetProvider              string
+	ProviderArtifactIdentifiers map[string][]string
+	TargetState                 string
+	Reason                      string
 }
 
 type vmLifecycleTransitionResult struct {
@@ -45,26 +50,127 @@ type vmLifecycleExecutor interface {
 type vmLifecycleExecutionMode string
 
 const (
-	vmLifecycleExecutionModeMetadataOnly        vmLifecycleExecutionMode = "metadata_only"
-	vmLifecycleExecutionModePreferProviderNative vmLifecycleExecutionMode = "prefer_provider_native"
+	vmLifecycleExecutionModeMetadataOnly          vmLifecycleExecutionMode = "metadata_only"
+	vmLifecycleExecutionModePreferProviderNative  vmLifecycleExecutionMode = "prefer_provider_native"
 	vmLifecycleExecutionModeRequireProviderNative vmLifecycleExecutionMode = "require_provider_native"
 )
 
 var errUnsupportedProviderLifecycleTransition = errors.New("provider lifecycle transition is not implemented")
+var errInvalidProviderLifecycleTransitionInput = errors.New("provider lifecycle transition is missing required metadata")
+
+var awsAMIIDPattern = regexp.MustCompile(`\bami-[0-9a-fA-F]{8,17}\b`)
+var awsImageARNPattern = regexp.MustCompile(`^arn:aws[a-zA-Z-]*:ec2:([a-z0-9-]+):[0-9]*:image/(ami-[0-9a-fA-F]{8,17})$`)
+
+type awsLifecycleImageReference struct {
+	Region  string
+	ImageID string
+}
+
+type vmAWSLifecycleClient interface {
+	DeregisterImage(ctx context.Context, params *ec2.DeregisterImageInput, optFns ...func(*ec2.Options)) (*ec2.DeregisterImageOutput, error)
+}
 
 type vmDispatchLifecycleExecutor struct {
-	mode vmLifecycleExecutionMode
+	mode             vmLifecycleExecutionMode
+	awsClientFactory func(ctx context.Context, region string) (vmAWSLifecycleClient, error)
 }
 
 func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error) {
 	provider := strings.ToLower(strings.TrimSpace(req.TargetProvider))
-	if e.mode == vmLifecycleExecutionModeRequireProviderNative {
-		if provider == "" {
-			provider = "unknown"
-		}
-		return vmLifecycleTransitionResult{}, fmt.Errorf("%w for provider %s", errUnsupportedProviderLifecycleTransition, provider)
+	if e.mode == vmLifecycleExecutionModeMetadataOnly {
+		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
 	}
-	return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
+
+	if provider != "aws" || req.TargetState != "deleted" {
+		if e.mode == vmLifecycleExecutionModeRequireProviderNative {
+			if provider == "" {
+				provider = "unknown"
+			}
+			return vmLifecycleTransitionResult{}, fmt.Errorf("%w for provider %s", errUnsupportedProviderLifecycleTransition, provider)
+		}
+		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
+	}
+
+	ref, err := selectAWSLifecycleImageReference(req.ProviderArtifactIdentifiers, strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AWS_REGION")))
+	if err != nil {
+		return vmLifecycleTransitionResult{}, err
+	}
+
+	clientFactory := e.awsClientFactory
+	if clientFactory == nil {
+		clientFactory = newVMAWSLifecycleClient
+	}
+	client, err := clientFactory(ctx, ref.Region)
+	if err != nil {
+		return vmLifecycleTransitionResult{}, err
+	}
+	if _, err := client.DeregisterImage(ctx, &ec2.DeregisterImageInput{ImageId: awscore.String(ref.ImageID)}); err != nil {
+		return vmLifecycleTransitionResult{}, err
+	}
+
+	return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+}
+
+func newVMAWSLifecycleClient(ctx context.Context, region string) (vmAWSLifecycleClient, error) {
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(strings.TrimSpace(region)))
+	if err != nil {
+		return nil, err
+	}
+	return ec2.NewFromConfig(cfg), nil
+}
+
+func selectAWSLifecycleImageReference(providerArtifactIdentifiers map[string][]string, defaultRegion string) (awsLifecycleImageReference, error) {
+	candidates := providerArtifactIdentifiers["aws"]
+	if len(candidates) == 0 {
+		return awsLifecycleImageReference{}, fmt.Errorf("%w: aws image identifier", errInvalidProviderLifecycleTransitionInput)
+	}
+
+	for _, candidate := range candidates {
+		if ref, ok := parseAWSLifecycleImageReference(candidate, defaultRegion); ok {
+			return ref, nil
+		}
+	}
+
+	return awsLifecycleImageReference{}, fmt.Errorf("%w: aws image identifier parse failed", errInvalidProviderLifecycleTransitionInput)
+}
+
+func parseAWSLifecycleImageReference(raw, defaultRegion string) (awsLifecycleImageReference, bool) {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return awsLifecycleImageReference{}, false
+	}
+
+	if matches := awsImageARNPattern.FindStringSubmatch(candidate); len(matches) == 3 {
+		return awsLifecycleImageReference{
+			Region:  strings.ToLower(strings.TrimSpace(matches[1])),
+			ImageID: strings.ToLower(strings.TrimSpace(matches[2])),
+		}, true
+	}
+
+	if strings.Contains(candidate, ":") {
+		parts := strings.SplitN(candidate, ":", 2)
+		region := strings.ToLower(strings.TrimSpace(parts[0]))
+		image := strings.TrimSpace(parts[1])
+		if region != "" && awsAMIIDPattern.MatchString(image) {
+			return awsLifecycleImageReference{
+				Region:  region,
+				ImageID: strings.ToLower(awsAMIIDPattern.FindString(image)),
+			}, true
+		}
+	}
+
+	if awsAMIIDPattern.MatchString(candidate) {
+		region := strings.ToLower(strings.TrimSpace(defaultRegion))
+		if region == "" {
+			return awsLifecycleImageReference{}, false
+		}
+		return awsLifecycleImageReference{
+			Region:  region,
+			ImageID: strings.ToLower(awsAMIIDPattern.FindString(candidate)),
+		}, true
+	}
+
+	return awsLifecycleImageReference{}, false
 }
 
 func resolveVMLifecycleExecutionMode(logger *zap.Logger) vmLifecycleExecutionMode {
@@ -133,9 +239,12 @@ type vmImageCatalogListResponse struct {
 func NewVMImageHandler(db *sqlx.DB, logger *zap.Logger) *VMImageHandler {
 	mode := resolveVMLifecycleExecutionMode(logger)
 	return &VMImageHandler{
-		db:                db,
-		logger:            logger,
-		lifecycleExecutor: vmDispatchLifecycleExecutor{mode: mode},
+		db:     db,
+		logger: logger,
+		lifecycleExecutor: vmDispatchLifecycleExecutor{
+			mode:             mode,
+			awsClientFactory: newVMAWSLifecycleClient,
+		},
 	}
 }
 
@@ -541,7 +650,7 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		return
 	}
 
-	targetProvider, _, _, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
+	targetProvider, _, providerIdentifiers, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
 	currentLifecycle := vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)
 	if strings.EqualFold(row.ExecutionStatus, "running") || strings.EqualFold(row.ExecutionStatus, "pending") {
 		writeVMImageJSON(w, http.StatusConflict, map[string]string{"error": "cannot transition lifecycle while build execution is active"})
@@ -570,15 +679,20 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 	transitionMode := "metadata_only"
 	if h.lifecycleExecutor != nil {
 		result, execErr := h.lifecycleExecutor.ExecuteTransition(r.Context(), vmLifecycleTransitionRequest{
-			ExecutionID:    executionID,
-			TenantID:       authCtx.TenantID,
-			TargetProvider: targetProvider,
-			TargetState:    targetState,
-			Reason:         reason,
+			ExecutionID:                 executionID,
+			TenantID:                    authCtx.TenantID,
+			TargetProvider:              targetProvider,
+			ProviderArtifactIdentifiers: providerIdentifiers,
+			TargetState:                 targetState,
+			Reason:                      reason,
 		})
 		if execErr != nil {
 			if errors.Is(execErr, errUnsupportedProviderLifecycleTransition) {
 				writeVMImageJSON(w, http.StatusNotImplemented, map[string]string{"error": execErr.Error()})
+				return
+			}
+			if errors.Is(execErr, errInvalidProviderLifecycleTransitionInput) {
+				writeVMImageJSON(w, http.StatusBadRequest, map[string]string{"error": execErr.Error()})
 				return
 			}
 			h.logger.Error("Failed provider lifecycle transition execution",

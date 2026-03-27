@@ -93,6 +93,9 @@ Branch: `feature/packer-builds`
 - PR8 provider-lifecycle execution-mode policy gate completed:
   - added `IF_VM_LIFECYCLE_EXECUTION_MODE` with `metadata_only` (default), `prefer_provider_native`, and `require_provider_native`.
   - `require_provider_native` now returns `501` for lifecycle actions until provider-native executors are shipped.
+- PR8 provider-native lifecycle initial execution completed:
+  - AWS `delete` lifecycle action now supports provider-native execution via EC2 `DeregisterImage` when execution mode allows.
+  - successful AWS native delete transitions now persist `provider_native`; invalid/missing AWS image metadata now returns `400`.
 
 ## PR3 Backend Summary
 

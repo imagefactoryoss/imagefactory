@@ -869,6 +869,9 @@ Progress update (2026-03-27):
 - lifecycle execution mode policy gate now exists for rollout safety:
   - `IF_VM_LIFECYCLE_EXECUTION_MODE` supports `metadata_only` (default), `prefer_provider_native`, and `require_provider_native`.
   - `require_provider_native` enforces fail-closed behavior (`501`) until provider-native transition executors are implemented.
+- provider-native lifecycle execution now has initial AWS implementation:
+  - AWS `delete` transitions invoke EC2 `DeregisterImage` when provider-native mode is enabled.
+  - successful native execution records `lifecycle_transition_mode=provider_native`; malformed AWS artifact metadata fails request validation.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

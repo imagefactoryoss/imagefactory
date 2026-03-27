@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -90,6 +91,78 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 			t.Fatalf("expected unsupported provider transition error, got %v", err)
 		}
 	})
+
+	t.Run("prefer_provider_native executes aws delete", func(t *testing.T) {
+		fake := &fakeVMAWSLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			awsClientFactory: func(ctx context.Context, region string) (vmAWSLifecycleClient, error) {
+				if region != "us-west-2" {
+					t.Fatalf("expected region us-west-2, got %q", region)
+				}
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "deleted",
+			ProviderArtifactIdentifiers: map[string][]string{
+				"aws": {"us-west-2:ami-0123456789abcdef0"},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastImageID != "ami-0123456789abcdef0" {
+			t.Fatalf("expected deregister image id ami-0123456789abcdef0, got %q", fake.lastImageID)
+		}
+	})
+}
+
+func TestParseAWSLifecycleImageReference(t *testing.T) {
+	t.Run("parses region prefixed identifier", func(t *testing.T) {
+		ref, ok := parseAWSLifecycleImageReference("us-east-1:ami-0123456789abcdef0", "")
+		if !ok {
+			t.Fatal("expected parse success")
+		}
+		if ref.Region != "us-east-1" || ref.ImageID != "ami-0123456789abcdef0" {
+			t.Fatalf("unexpected ref: %+v", ref)
+		}
+	})
+
+	t.Run("parses arn identifier", func(t *testing.T) {
+		ref, ok := parseAWSLifecycleImageReference("arn:aws:ec2:us-west-2:123456789012:image/ami-0a1b2c3d4e5f67890", "")
+		if !ok {
+			t.Fatal("expected parse success")
+		}
+		if ref.Region != "us-west-2" || ref.ImageID != "ami-0a1b2c3d4e5f67890" {
+			t.Fatalf("unexpected ref: %+v", ref)
+		}
+	})
+
+	t.Run("uses default region for bare ami", func(t *testing.T) {
+		ref, ok := parseAWSLifecycleImageReference("ami-0123456789abcdef0", "us-east-2")
+		if !ok {
+			t.Fatal("expected parse success")
+		}
+		if ref.Region != "us-east-2" || ref.ImageID != "ami-0123456789abcdef0" {
+			t.Fatalf("unexpected ref: %+v", ref)
+		}
+	})
+}
+
+type fakeVMAWSLifecycleClient struct {
+	lastImageID string
+}
+
+func (f *fakeVMAWSLifecycleClient) DeregisterImage(ctx context.Context, params *ec2.DeregisterImageInput, optFns ...func(*ec2.Options)) (*ec2.DeregisterImageOutput, error) {
+	if params != nil && params.ImageId != nil {
+		f.lastImageID = *params.ImageId
+	}
+	return &ec2.DeregisterImageOutput{}, nil
 }
 
 func TestVMImageLifecycleState(t *testing.T) {
