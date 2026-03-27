@@ -206,24 +206,6 @@ func (h *TenantHandler) respondError(w http.ResponseWriter, status int, message 
 // Can be used with external tenant selection or manual entry
 type CreateTenantRequest struct {
 	CompanyID        string `json:"company_id" validate:"omitempty,uuid"`
-	ExternalTenantID string `json:"external_tenant_id"` // UUID from external tenant service
-	TenantCode       string `json:"tenant_code" validate:"required,max=8"`
-	Name             string `json:"name" validate:"required"`
-	Slug             string `json:"slug" validate:"required"`
-	Description      string `json:"description,omitempty"`
-	AdminName        string `json:"admin_name" validate:"required"`        // Tenant administrator name
-	AdminEmail       string `json:"admin_email" validate:"required,email"` // Tenant administrator email
-	ContactEmail     string `json:"contact_email"`                         // From external tenant
-	Status           string `json:"status"`                                // From AppHQ (APPSTATUS)
-	Company          string `json:"company"`                               // From AppHQ (COMPANY)
-	APIRateLimit     int    `json:"api_rate_limit"`                        // Editable quota
-	StorageLimit     int    `json:"storage_limit"`                         // Editable quota in GB
-	MaxUsers         int    `json:"max_users"`                             // Editable quota
-}
-
-// CreateTenantResponse represents the response for tenant creation
-type CreateTenantRequest struct {
-	CompanyID        string `json:"company_id" validate:"omitempty,uuid"`
 	ExternalTenantID string `json:"external_tenant_id"`
 	TenantCode       string `json:"tenant_code" validate:"required,max=8"`
 	Name             string `json:"name" validate:"required"`
@@ -249,6 +231,23 @@ type CreateTenantRequest struct {
 	APIRateLimit     int    `json:"api_rate_limit"`
 	StorageLimit     int    `json:"storage_limit"`
 	MaxUsers         int    `json:"max_users"`
+}
+
+// CreateTenantResponse represents the response for tenant create/get operations.
+type CreateTenantResponse struct {
+	ID           string    `json:"id"`
+	NumericID    string    `json:"numeric_id"`
+	TenantCode   string    `json:"tenant_code"`
+	Name         string    `json:"name"`
+	Slug         string    `json:"slug"`
+	Description  string    `json:"description,omitempty"`
+	Status       string    `json:"status"`
+	ContactEmail string    `json:"contact_email,omitempty"`
+	Company      string    `json:"company,omitempty"`
+	CreatedAt    string    `json:"created_at"`
+	UpdatedAt    string    `json:"updated_at"`
+	Version      int       `json:"version"`
+	Quota        QuotaInfo `json:"quota"`
 }
 type externalTenantMetadata struct {
 	ContactEmail string
@@ -581,24 +580,20 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 	*/
 
 	var adminUserID uuid.UUID
-	var adminEmail string
-
-	// Set admin email for CC (always use the requested admin email)
-	adminEmail = req.AdminEmail
 
 	// Search LDAP for the tenant admin by email
-	if h.ldapService != nil && req.AdminEmail != "" {
-		h.logger.Info("Searching LDAP for tenant admin", zap.String("email", req.AdminEmail))
+	if h.ldapService != nil && adminEmail != "" {
+		h.logger.Info("Searching LDAP for tenant admin", zap.String("email", adminEmail))
 
-		ldapUsers, err := h.ldapService.SearchLDAPUsers(r.Context(), req.AdminEmail, 1)
+		ldapUsers, err := h.ldapService.SearchLDAPUsers(r.Context(), adminEmail, 1)
 		if err != nil {
 			h.logger.Warn("Failed to search LDAP for tenant admin",
-				zap.String("email", req.AdminEmail),
+				zap.String("email", adminEmail),
 				zap.Error(err))
 		} else if len(ldapUsers) > 0 {
 			ldapUser := ldapUsers[0]
 			h.logger.Info("Found LDAP user for tenant admin",
-				zap.String("email", req.AdminEmail),
+				zap.String("email", adminEmail),
 				zap.String("username", ldapUser.Username),
 				zap.String("displayName", ldapUser.DisplayName))
 
@@ -654,7 +649,7 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else {
-			h.logger.Warn("No LDAP user found for tenant admin email", zap.String("email", req.AdminEmail))
+			h.logger.Warn("No LDAP user found for tenant admin email", zap.String("email", adminEmail))
 		}
 	}
 
@@ -696,7 +691,7 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 				APIRateLimit: req.APIRateLimit,
 				StorageLimit: req.StorageLimit,
 				MaxUsers:     req.MaxUsers,
-				DashboardURL: "https://app.imagefactory.local/dashboard",
+				DashboardURL: "https://app.imgfactory.com/dashboard",
 			}
 
 			// Send email with CC to tenant admin (if different from contact)
