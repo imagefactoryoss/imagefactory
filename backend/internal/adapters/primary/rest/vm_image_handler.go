@@ -346,10 +346,15 @@ func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfi
 
 func vmImageLifecycleTransitionMode(raw string) string {
 	mode := strings.ToLower(strings.TrimSpace(raw))
-	if mode == "" {
+	switch mode {
+	case "", "metadata_only", "provider_native", "hybrid":
+		if mode == "" {
+			return "metadata_only"
+		}
+		return mode
+	default:
 		return "metadata_only"
 	}
-	return mode
 }
 
 func extractArtifactValues(raw json.RawMessage) []string {

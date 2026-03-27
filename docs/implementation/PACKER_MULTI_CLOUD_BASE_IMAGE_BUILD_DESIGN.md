@@ -853,6 +853,9 @@ Progress update (2026-03-27):
 - VM catalog lifecycle UX now surfaces backend lifecycle action messages:
   - action success toasts prefer API-provided `message` values.
   - idempotent transition outcomes are shown with backend-authored text for operator clarity.
+- lifecycle transition mode parsing now uses strict normalization:
+  - accepted modes are `metadata_only`, `provider_native`, and `hybrid`.
+  - unknown/invalid mode values are normalized to `metadata_only` for stable API/UI semantics.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

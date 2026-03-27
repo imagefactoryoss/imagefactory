@@ -217,6 +217,12 @@ func TestVMLifecycleTransitionMode_DefaultsToMetadataOnly(t *testing.T) {
 	if got := vmImageLifecycleTransitionMode("  provider_native  "); got != "provider_native" {
 		t.Fatalf("expected normalized provider_native mode, got %q", got)
 	}
+	if got := vmImageLifecycleTransitionMode("hybrid"); got != "hybrid" {
+		t.Fatalf("expected hybrid mode, got %q", got)
+	}
+	if got := vmImageLifecycleTransitionMode("unknown_mode"); got != "metadata_only" {
+		t.Fatalf("expected unknown mode to fallback to metadata_only, got %q", got)
+	}
 }
 
 func TestVMImageCatalogItemFromRow(t *testing.T) {
