@@ -876,6 +876,11 @@ Progress update (2026-03-27):
   - AWS native transition image lookup now falls back to execution artifact payload values when provider identifier metadata is missing.
   - artifact extraction now scans nested artifact payload shapes (object/array string leaves), improving native fallback identifier discovery for legacy/non-standard payload formats.
   - successful native execution records `lifecycle_transition_mode=provider_native`; malformed AWS artifact metadata fails request validation.
+- provider-native lifecycle execution now includes VMware implementation:
+  - VMware `delete` transitions execute provider-native vCenter object destroy for the resolved VM/template identifier.
+  - VMware `deprecate` / `released` transitions execute provider-native vCenter annotation updates to mark and clear deprecation state.
+  - VMware identifier resolution supports provider metadata plus execution artifact fallback (`vsphere://`, inventory-path, and VM managed object reference forms).
+  - vCenter connection is configured via `IF_VM_LIFECYCLE_VMWARE_VCENTER_URL`, `IF_VM_LIFECYCLE_VMWARE_USERNAME`, `IF_VM_LIFECYCLE_VMWARE_PASSWORD`, optional `IF_VM_LIFECYCLE_VMWARE_DATACENTER`, and `IF_VM_LIFECYCLE_VMWARE_INSECURE`.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

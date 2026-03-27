@@ -104,6 +104,15 @@ Branch: `feature/packer-builds`
   - AWS native lifecycle actions now use execution artifact values as fallback image lookup when provider identifiers are not present in execution metadata.
 - PR8 provider-native lifecycle artifact-shape compatibility expansion completed:
   - execution artifact parsing now supports nested payload shapes for identifier extraction fallback, improving native lifecycle compatibility with older/non-standard artifact payloads.
+- PR8 VMware provider-native lifecycle execution completed:
+  - VMware lifecycle actions now support provider-native execution for `released` / `deprecated` / `deleted` transitions via vCenter-backed executor path.
+  - VMware image/template identifiers are resolved from provider metadata and execution artifacts with strict validation (`400` on missing/invalid identifier input).
+  - vCenter executor configuration uses:
+    - `IF_VM_LIFECYCLE_VMWARE_VCENTER_URL`
+    - `IF_VM_LIFECYCLE_VMWARE_USERNAME`
+    - `IF_VM_LIFECYCLE_VMWARE_PASSWORD`
+    - optional `IF_VM_LIFECYCLE_VMWARE_DATACENTER`
+    - optional `IF_VM_LIFECYCLE_VMWARE_INSECURE`
 
 ## PR3 Backend Summary
 
