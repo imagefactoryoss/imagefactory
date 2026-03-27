@@ -10,7 +10,9 @@ Owners: Backend + Platform/Ops + Frontend
 - PR2 (Tekton parity for Packer execution): completed on `feature/packer-builds`.
 - PR3 (admin target profiles read/write/validate): completed on `feature/packer-builds`.
 - PR4 (tenant profile binding + preflight + execution metadata): completed on `feature/packer-builds`.
-- PR5+ remain pending.
+- PR5 (tenant profile selector UX): completed on `feature/packer-builds`.
+- PR6 (tenant VM image catalog read path): completed on `feature/packer-builds`.
+- PR7+ remain pending.
 
 ## 1) Objective
 
@@ -728,6 +730,19 @@ Primary changes:
 Acceptance criteria:
 - tenant can filter and inspect VM artifacts across supported providers.
 - details include provider-native artifact IDs, source build links, and lifecycle state.
+
+Progress update (2026-03-27):
+- backend tenant VM image catalog APIs added:
+  - `GET /api/v1/images/vm`
+  - `GET /api/v1/images/vm/{executionId}`
+- API exposes packer execution traceability and lifecycle context:
+  - build/execution/project IDs, build number/status, execution status/lifecycle state.
+  - `packer.target_provider`, `packer.target_profile_id`.
+  - `packer.provider_artifact_identifiers`.
+  - captured artifact values from execution payloads.
+- frontend tenant page added at `/images/vm`:
+  - filterable VM image catalog table (`provider`, `status`, `search`).
+  - details drawer with source build link + provider identifier sections.
 
 ### 16.8 PR7 - Scheduled triggers for Packer builds
 

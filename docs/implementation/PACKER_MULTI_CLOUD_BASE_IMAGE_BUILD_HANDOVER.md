@@ -3,7 +3,7 @@
 Last updated: 2026-03-27  
 Branch: `feature/packer-builds`
 
-## Delivered Through PR4
+## Delivered Through PR6
 
 - PR1 completed:
   - Packer config contract hardening (`variables`, `build_vars`, `on_error`, `parallel`) across backend/frontend/runtime.
@@ -16,6 +16,11 @@ Branch: `feature/packer-builds`
   - tenant Packer build config now requires `packer_target_profile_id`.
   - create/start/retry preflight enforces profile entitlement and `validation_status=valid`.
   - execution metadata persists selected profile/provider context and derived provider artifact identifiers.
+- PR5 completed:
+  - tenant Packer wizard now uses entitled target profile selector (no free-form UUID entry).
+- PR6 completed:
+  - tenant VM image catalog APIs and UI shipped (`/images/vm` list + details drawer).
+  - catalog exposes provider artifact identifiers, source traceability, and lifecycle state.
 
 ## PR3 Backend Summary
 
@@ -96,19 +101,52 @@ PR4 behavior:
 - build payload mapping includes `build_config.packer_target_profile_id`.
 - wizard Packer form exposes required target profile ID input.
 
+## PR6 Backend Summary
+
+Core backend modules touched:
+- `backend/internal/adapters/primary/rest/vm_image_handler.go`
+- `backend/internal/adapters/primary/rest/router_route_registration.go`
+- `backend/internal/adapters/primary/rest/router.go`
+- `backend/internal/adapters/primary/rest/vm_image_handler_test.go`
+
+PR6 API contract:
+- `GET /api/v1/images/vm`
+- `GET /api/v1/images/vm/{executionId}`
+
+PR6 behavior:
+- tenant reads packer execution-derived VM artifacts from `build_executions` + `builds` + `projects` + `build_configs`.
+- supports filters: `provider`, `status`, `search`, plus pagination (`limit`, `offset`).
+- response includes:
+  - source traceability (`project_id`, `build_id`, `execution_id`, build number).
+  - lifecycle fields (`build_status`, `execution_status`, derived `lifecycle_state`).
+  - packer metadata (`target_provider`, `target_profile_id`, `provider_artifact_identifiers`).
+  - execution artifact values for operator inspection.
+
+## PR6 Frontend Summary
+
+Files touched:
+- `frontend/src/services/vmImageService.ts`
+- `frontend/src/pages/images/VMImagesPage.tsx`
+- `frontend/src/App.tsx`
+- `frontend/src/components/layout/Layout.tsx`
+
+PR6 behavior:
+- new tenant route: `/images/vm`.
+- filterable VM image catalog table.
+- detail drawer showing provider artifact identifiers, source build link, and lifecycle state.
+- dark-mode-ready styling for all new controls/tables/drawer sections.
+
 ## Validation Run Notes
 
 Backend:
-- `go test ./internal/domain/build -count=1`
-- `go test ./internal/adapters/secondary/postgres -count=1`
 - `go test ./internal/adapters/primary/rest -count=1`
-- `go test ./tests/integration -count=1`
+- `go test ./internal/domain/build -count=1`
 
 Frontend:
 - `npm run build`
 
-## Known Gap For Next PR (PR5)
+## Known Gap For Next PR (PR7)
 
-- replace free-text profile UUID input in tenant wizard with selectable entitled profile list.
-- extend profile-aware validation to any future explicit packer-config update endpoints.
-- tighten provider-specific artifact extraction heuristics with structured parser coverage for all supported providers.
+- scheduled triggers for packer builds (schedule config + scheduler dispatch metadata).
+- expand VM catalog semantics for lifecycle actions (promote/deprecate/delete) after schedule support lands.
+- continue hardening provider-specific artifact extraction heuristics for edge-case parser coverage.

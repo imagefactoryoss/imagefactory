@@ -1,5 +1,5 @@
-import { useRefresh } from '@/context/RefreshContext'
 import { useConfirmDialog } from '@/context/ConfirmDialogContext'
+import { useRefresh } from '@/context/RefreshContext'
 import { api } from '@/services/api'
 import { authService } from '@/services/authService'
 import { profileService } from '@/services/profileService'
@@ -21,6 +21,7 @@ interface LayoutProps {
 }
 
 const NAV_OPEN_SECTION_KEY = 'if_layout_open_nav_section'
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'dev'
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { user, logout, avatar, groups, canAccessAdmin, isSystemAdmin } = useAuthStore()
@@ -107,6 +108,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             title: 'Image Catalog',
             items: [
                 { name: 'Images', href: '/images', icon: '🖼️', description: 'Manage images', show: permissions.canViewImages },
+                { name: 'VM Images', href: '/images/vm', icon: '💿', description: 'Provider VM artifact catalog', show: permissions.canViewImages },
             ]
         },
         {
@@ -147,6 +149,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {
             title: 'Help',
             items: [
+                { name: 'Product Info', href: '/help/product-info', icon: '📦', description: `Capabilities and release info (v${APP_VERSION})`, show: true },
                 { name: 'Capability Access', href: '/help/capabilities', icon: '🧭', description: 'What this tenant is entitled to use', show: true },
             ]
         },
@@ -318,6 +321,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         >
                             <span className="text-2xl">🏭</span>
                             <span className="hidden sm:block">Image Factory</span>
+                        </Link>
+                        <Link
+                            to="/help/product-info"
+                            className="hidden sm:inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-sky-400 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:text-sky-300"
+                            title="Open product information"
+                        >
+                            v{APP_VERSION}
                         </Link>
                     </div>
                     <div className="flex items-center gap-4">
