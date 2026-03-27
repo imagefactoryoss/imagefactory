@@ -68,6 +68,7 @@ type awsLifecycleImageReference struct {
 
 type vmAWSLifecycleClient interface {
 	DeregisterImage(ctx context.Context, params *ec2.DeregisterImageInput, optFns ...func(*ec2.Options)) (*ec2.DeregisterImageOutput, error)
+	EnableImageDeprecation(ctx context.Context, params *ec2.EnableImageDeprecationInput, optFns ...func(*ec2.Options)) (*ec2.EnableImageDeprecationOutput, error)
 }
 
 type vmDispatchLifecycleExecutor struct {
@@ -81,7 +82,7 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
 	}
 
-	if provider != "aws" || req.TargetState != "deleted" {
+	if provider != "aws" || (req.TargetState != "deleted" && req.TargetState != "deprecated") {
 		if e.mode == vmLifecycleExecutionModeRequireProviderNative {
 			if provider == "" {
 				provider = "unknown"
@@ -104,8 +105,20 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 	if err != nil {
 		return vmLifecycleTransitionResult{}, err
 	}
-	if _, err := client.DeregisterImage(ctx, &ec2.DeregisterImageInput{ImageId: awscore.String(ref.ImageID)}); err != nil {
-		return vmLifecycleTransitionResult{}, err
+	if req.TargetState == "deleted" {
+		if _, err := client.DeregisterImage(ctx, &ec2.DeregisterImageInput{ImageId: awscore.String(ref.ImageID)}); err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+	}
+
+	if req.TargetState == "deprecated" {
+		deprecateAt := resolveVMAWSDeprecationTimestamp()
+		if _, err := client.EnableImageDeprecation(ctx, &ec2.EnableImageDeprecationInput{
+			ImageId:     awscore.String(ref.ImageID),
+			DeprecateAt: awscore.Time(deprecateAt),
+		}); err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
 	}
 
 	return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
@@ -171,6 +184,16 @@ func parseAWSLifecycleImageReference(raw, defaultRegion string) (awsLifecycleIma
 	}
 
 	return awsLifecycleImageReference{}, false
+}
+
+func resolveVMAWSDeprecationTimestamp() time.Time {
+	hours := 24
+	if raw := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AWS_DEPRECATION_HOURS")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= 24*365 {
+			hours = parsed
+		}
+	}
+	return time.Now().UTC().Add(time.Duration(hours) * time.Hour)
 }
 
 func resolveVMLifecycleExecutionMode(logger *zap.Logger) vmLifecycleExecutionMode {

@@ -871,6 +871,7 @@ Progress update (2026-03-27):
   - `require_provider_native` enforces fail-closed behavior (`501`) until provider-native transition executors are implemented.
 - provider-native lifecycle execution now has initial AWS implementation:
   - AWS `delete` transitions invoke EC2 `DeregisterImage` when provider-native mode is enabled.
+  - AWS `deprecate` transitions invoke EC2 `EnableImageDeprecation` with configurable deprecation window.
   - successful native execution records `lifecycle_transition_mode=provider_native`; malformed AWS artifact metadata fails request validation.
 
 ### 16.10 Cross-cutting quality gates for every PR
