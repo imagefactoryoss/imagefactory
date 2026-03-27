@@ -266,3 +266,15 @@ func TestVMImageCatalogItemFromRow(t *testing.T) {
 		t.Fatalf("unexpected provider artifact identifiers: %+v", item.ProviderArtifactIdentifiers)
 	}
 }
+
+func TestParsePackerMetadataFields_DefaultLifecycleModeOnEmptyOrInvalid(t *testing.T) {
+	_, _, _, lifecycle := parsePackerMetadataFields(nil)
+	if lifecycle.TransitionMode != "metadata_only" {
+		t.Fatalf("expected default metadata_only on empty metadata, got %q", lifecycle.TransitionMode)
+	}
+
+	_, _, _, lifecycle = parsePackerMetadataFields(json.RawMessage(`{"packer":`))
+	if lifecycle.TransitionMode != "metadata_only" {
+		t.Fatalf("expected default metadata_only on invalid metadata, got %q", lifecycle.TransitionMode)
+	}
+}
