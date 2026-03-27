@@ -67,6 +67,9 @@ Branch: `feature/packer-builds`
 - PR8 lifecycle transition-mode contract clarity completed:
   - VM catalog responses now include `lifecycle_transition_mode`.
   - lifecycle transitions currently report `metadata_only` to explicitly signal metadata-state transitions (provider-native lifecycle actions pending).
+- PR8 lifecycle audit mode-depth completed:
+  - lifecycle history metadata now includes per-transition `transition_mode`.
+  - VM catalog lifecycle history UI now renders each transition's mode for clearer audit context.
 
 ## PR3 Backend Summary
 

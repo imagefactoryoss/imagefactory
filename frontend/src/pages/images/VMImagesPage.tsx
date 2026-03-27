@@ -409,6 +409,7 @@ const VMImagesPage: React.FC = () => {
                   {selected.lifecycle_history.map((entry, index) => (
                     <li key={`${entry.state}-${entry.at || index}`} className="rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                       <div className="font-semibold">{entry.state}</div>
+                      {entry.transition_mode ? <div>mode: {entry.transition_mode}</div> : null}
                       {entry.at ? <div>{new Date(entry.at).toLocaleString()}</div> : null}
                       {entry.reason ? <div>{entry.reason}</div> : null}
                       {entry.actor_id ? <div className="break-all">actor: {entry.actor_id}</div> : null}

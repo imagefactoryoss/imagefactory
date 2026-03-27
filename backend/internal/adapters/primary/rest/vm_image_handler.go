@@ -54,10 +54,11 @@ type vmImageActionPermissions struct {
 }
 
 type vmLifecycleHistory struct {
-	State   string `json:"state"`
-	Reason  string `json:"reason,omitempty"`
-	ActorID string `json:"actor_id,omitempty"`
-	At      string `json:"at,omitempty"`
+	State          string `json:"state"`
+	Reason         string `json:"reason,omitempty"`
+	ActorID        string `json:"actor_id,omitempty"`
+	At             string `json:"at,omitempty"`
+	TransitionMode string `json:"transition_mode,omitempty"`
 }
 
 type vmImageCatalogListResponse struct {
@@ -669,10 +670,11 @@ func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason stri
 	}
 	history := sanitizeLifecycleHistory(interfaceToLifecycleHistory(packer["lifecycle_history"]))
 	history = append(history, vmLifecycleHistory{
-		State:   strings.ToLower(strings.TrimSpace(targetState)),
-		Reason:  strings.TrimSpace(reason),
-		ActorID: userID.String(),
-		At:      at.UTC().Format(time.RFC3339),
+		State:          strings.ToLower(strings.TrimSpace(targetState)),
+		Reason:         strings.TrimSpace(reason),
+		ActorID:        userID.String(),
+		At:             at.UTC().Format(time.RFC3339),
+		TransitionMode: "metadata_only",
 	})
 	if len(history) > 25 {
 		history = history[len(history)-25:]
@@ -708,10 +710,11 @@ func sanitizeLifecycleHistory(history []vmLifecycleHistory) []vmLifecycleHistory
 			continue
 		}
 		out = append(out, vmLifecycleHistory{
-			State:   state,
-			Reason:  strings.TrimSpace(entry.Reason),
-			ActorID: strings.TrimSpace(entry.ActorID),
-			At:      strings.TrimSpace(entry.At),
+			State:          state,
+			Reason:         strings.TrimSpace(entry.Reason),
+			ActorID:        strings.TrimSpace(entry.ActorID),
+			At:             strings.TrimSpace(entry.At),
+			TransitionMode: vmImageLifecycleTransitionMode(entry.TransitionMode),
 		})
 	}
 	if len(out) == 0 {

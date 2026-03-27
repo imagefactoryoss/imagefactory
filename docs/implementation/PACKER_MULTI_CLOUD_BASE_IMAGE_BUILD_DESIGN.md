@@ -844,6 +844,9 @@ Progress update (2026-03-27):
 - lifecycle transition mode is now explicit in VM catalog responses:
   - API exposes `lifecycle_transition_mode` for VM catalog list/detail/action responses.
   - current implementation emits `metadata_only`, clarifying lifecycle transitions are metadata state management until provider-native actions are integrated.
+- lifecycle history audit depth now includes transition mode:
+  - lifecycle history entries include `transition_mode` for each transition event.
+  - VM catalog lifecycle history view surfaces each entry's transition mode for operator traceability.
 
 ### 16.10 Cross-cutting quality gates for every PR
 
