@@ -521,6 +521,19 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
                     <PackerConfigForm
                         onChange={handlePackerConfig}
                         isLoading={false}
+                        initialConfig={{
+                            id: 'wizard',
+                            build_id: '',
+                            method: 'packer',
+                            config: {
+                                template: wizardState.buildConfig?.packerTemplate || '',
+                                packer_target_profile_id: wizardState.buildConfig?.packerTargetProfileId,
+                                variables: wizardState.buildConfig?.variables,
+                                build_vars: wizardState.buildConfig?.buildVars,
+                                on_error: wizardState.buildConfig?.onError,
+                                parallel: wizardState.buildConfig?.parallel,
+                            },
+                        }}
                     />
                 )
             case 'buildx':
