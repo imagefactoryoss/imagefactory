@@ -177,6 +177,21 @@ func TestUser_ChangePassword(t *testing.T) {
 	assert.True(t, user.PasswordChangedAt().After(initialChangedAt))
 }
 
+func TestUser_ClearPasswordHash(t *testing.T) {
+	user, err := NewUser("test@example.com", "John", "Doe", "password123")
+	require.NoError(t, err)
+
+	initialVersion := user.Version()
+	assert.NotEmpty(t, user.PasswordHash())
+
+	user.ClearPasswordHash()
+
+	assert.Empty(t, user.PasswordHash())
+	assert.Equal(t, initialVersion+1, user.Version())
+	assert.False(t, user.MustChangePassword())
+	assert.False(t, user.VerifyPassword("password123"))
+}
+
 func TestUser_RecordLogin(t *testing.T) {
 	user, err := NewUser("test@example.com", "John", "Doe", "password123")
 	require.NoError(t, err)

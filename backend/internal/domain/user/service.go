@@ -979,6 +979,10 @@ func (s *Service) AcceptInvitation(ctx context.Context, token, firstName, lastNa
 		// Set auth method based on user type
 		if isLDAP {
 			user.SetAuthMethod(AuthMethodLDAP)
+			user.ClearPasswordHash()
+			if err := s.repository.Update(ctx, user); err != nil {
+				return nil, err
+			}
 		} else {
 			user.SetAuthMethod(AuthMethodCredentials)
 		}
