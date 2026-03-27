@@ -93,6 +93,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 lifecycle action contract normalization completed on `feature/packer-builds`:
     - VM catalog API now returns server-calculated `action_permissions` (`can_promote`, `can_deprecate`, `can_delete`).
     - frontend VM action controls now rely on backend policy flags instead of duplicated client-side transition logic.
+  - PR8 frontend lifecycle reason-entry UX completed on `feature/packer-builds`:
+    - VM catalog now requires operator-entered reason text for `deprecate` and `delete` actions before confirmation.
+    - frontend now forwards typed reason payloads directly to lifecycle APIs instead of generated default reason strings.
 
 ## Backlog Review Summary (2026-03-16)
 

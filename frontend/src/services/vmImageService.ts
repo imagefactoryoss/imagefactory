@@ -74,7 +74,7 @@ export const vmImageService = {
 
   async deprecate(
     executionId: string,
-    reason?: string,
+    reason: string,
   ): Promise<VMImageLifecycleActionResponse> {
     const response = await api.post(`/images/vm/${executionId}/deprecate`, {
       reason,
@@ -84,7 +84,7 @@ export const vmImageService = {
 
   async remove(
     executionId: string,
-    reason?: string,
+    reason: string,
   ): Promise<VMImageLifecycleActionResponse> {
     const response = await api.delete(`/images/vm/${executionId}`, {
       data: {
