@@ -98,7 +98,8 @@ func TestParsePackerMetadataFields(t *testing.T) {
 					"state": "released",
 					"reason": "promoted by operator",
 					"actor_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-					"at": "2026-03-27T20:00:00Z"
+					"at": "2026-03-27T20:00:00Z",
+					"transition_mode": "metadata_only"
 				}
 			],
 			"provider_artifact_identifiers": {
@@ -128,6 +129,9 @@ func TestParsePackerMetadataFields(t *testing.T) {
 	}
 	if len(lifecycle.History) != 1 || lifecycle.History[0].State != "released" {
 		t.Fatalf("unexpected lifecycle history: %+v", lifecycle.History)
+	}
+	if lifecycle.History[0].TransitionMode != "metadata_only" {
+		t.Fatalf("unexpected lifecycle history transition mode: %q", lifecycle.History[0].TransitionMode)
 	}
 }
 
@@ -164,6 +168,9 @@ func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 	}
 	if lifecycle.TransitionMode != "metadata_only" {
 		t.Fatalf("expected lifecycle transition mode metadata_only, got %q", lifecycle.TransitionMode)
+	}
+	if lifecycle.History[0].TransitionMode != "metadata_only" {
+		t.Fatalf("expected lifecycle history mode metadata_only, got %q", lifecycle.History[0].TransitionMode)
 	}
 }
 

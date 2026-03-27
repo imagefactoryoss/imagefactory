@@ -25,6 +25,7 @@ export interface VMImageCatalogItem {
     reason?: string
     actor_id?: string
     at?: string
+    transition_mode?: string
   }>
   action_permissions?: {
     can_promote: boolean
