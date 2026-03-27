@@ -38,6 +38,9 @@ type CreatePackerConfigRequest struct {
 	BuildID   string                 `json:"build_id"`
 	Template  string                 `json:"template"`
 	Variables map[string]interface{} `json:"variables,omitempty"`
+	BuildVars map[string]string      `json:"build_vars,omitempty"`
+	OnError   string                 `json:"on_error,omitempty"`
+	Parallel  bool                   `json:"parallel,omitempty"`
 }
 
 type CreateBuildxConfigRequest struct {
@@ -137,6 +140,15 @@ func (h *ConfigHandler) CreatePackerConfig(w http.ResponseWriter, r *http.Reques
 	if len(req.Variables) > 0 {
 		config.Metadata["variables"] = req.Variables
 	}
+	if len(req.BuildVars) > 0 {
+		config.Metadata["build_vars"] = req.BuildVars
+	}
+	if req.OnError != "" {
+		config.Metadata["on_error"] = req.OnError
+	} else {
+		config.Metadata["on_error"] = "cleanup"
+	}
+	config.Metadata["parallel"] = req.Parallel
 
 	if err := h.repo.SaveBuildConfig(r.Context(), config); err != nil {
 		h.respondError(w, http.StatusInternalServerError, "failed to create packer config", err)
@@ -598,6 +610,19 @@ func (h *ConfigHandler) buildConfigToResponse(config *build.BuildConfigData) Con
 		configMap["template"] = config.PackerTemplate
 		if vars, ok := config.Metadata["variables"]; ok {
 			configMap["variables"] = vars
+		}
+		if buildVars, ok := config.Metadata["build_vars"]; ok {
+			configMap["build_vars"] = buildVars
+		}
+		onError := "cleanup"
+		if value, ok := config.Metadata["on_error"].(string); ok && value != "" {
+			onError = value
+		}
+		configMap["on_error"] = onError
+		if parallel, ok := config.Metadata["parallel"].(bool); ok {
+			configMap["parallel"] = parallel
+		} else {
+			configMap["parallel"] = false
 		}
 	case "buildx":
 		configMap["dockerfile"] = config.Dockerfile

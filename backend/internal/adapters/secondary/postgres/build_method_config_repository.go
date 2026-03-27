@@ -147,6 +147,15 @@ func (r *BuildMethodConfigRepository) configRowToMethodConfig(row *buildConfigRo
 				_ = cfg.SetVariable(key, val)
 			}
 		}
+		for key, val := range getMetadataStringMap(metadata, "build_vars") {
+			_ = cfg.SetBuildVar(key, val)
+		}
+		if onError := getMetadataString(metadata, "on_error", "onError"); onError != "" {
+			if err := cfg.SetOnError(onError); err != nil {
+				return nil, fmt.Errorf("invalid packer on_error value: %w", err)
+			}
+		}
+		cfg.SetParallel(getMetadataBool(metadata, "parallel"))
 		return cfg, nil
 
 	case build.BuildMethodBuildx, build.BuildMethodDocker, build.BuildMethod("container"):
@@ -305,4 +314,31 @@ func getMetadataMap(metadata map[string]interface{}, key string) map[string]inte
 		return nil
 	}
 	return val
+}
+
+func getMetadataStringMap(metadata map[string]interface{}, key string) map[string]string {
+	if metadata == nil {
+		return nil
+	}
+	raw, ok := metadata[key]
+	if !ok || raw == nil {
+		return nil
+	}
+	out := map[string]string{}
+	switch typed := raw.(type) {
+	case map[string]string:
+		for k, v := range typed {
+			out[k] = v
+		}
+	case map[string]interface{}:
+		for k, v := range typed {
+			if s, ok := v.(string); ok {
+				out[k] = s
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

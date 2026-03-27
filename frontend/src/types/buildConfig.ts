@@ -115,6 +115,9 @@ export interface CreatePackerConfigRequest {
     build_id: string;
     template: string;
     variables?: Record<string, unknown>;
+    build_vars?: Record<string, string>;
+    on_error?: string;
+    parallel?: boolean;
 }
 
 export interface CreateBuildxConfigRequest {

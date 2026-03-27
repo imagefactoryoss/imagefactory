@@ -126,11 +126,7 @@ func buildConfigFromManifest(buildID uuid.UUID, manifest BuildManifest) *BuildCo
 
 	case BuildTypePacker:
 		config.PackerTemplate = manifest.BuildConfig.PackerTemplate
-		if len(manifest.BuildConfig.Variables) > 0 {
-			config.Metadata = map[string]interface{}{
-				"variables": manifest.BuildConfig.Variables,
-			}
-		}
+		config.Metadata = packerMetadataFromBuildConfig(manifest.BuildConfig)
 	case BuildTypeNix:
 		config.Metadata = map[string]interface{}{
 			"nix_expression": manifest.BuildConfig.NixExpression,

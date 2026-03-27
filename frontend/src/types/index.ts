@@ -1439,6 +1439,9 @@ export interface BuildConfig {
     environment?: Record<string, string>
     // Packer-specific fields
     packerTemplate?: string
+    buildVars?: Record<string, string>
+    onError?: string
+    parallel?: boolean
     // Buildpack-specific fields
     paketoConfig?: PaketoConfig
     // Nix-specific fields
