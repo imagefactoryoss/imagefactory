@@ -25,6 +25,10 @@ type BuildDispatchService interface {
 	DispatchBuild(ctx context.Context, build *build.Build) error
 }
 
+type ScheduledTriggerProcessor interface {
+	ProcessScheduledTriggers(ctx context.Context, limit int) (int, error)
+}
+
 // QueuedBuildDispatcher polls queued builds and dispatches them for execution.
 type QueuedBuildDispatcher struct {
 	repo                build.Repository
@@ -98,6 +102,14 @@ func (d *QueuedBuildDispatcher) RunOnce(ctx context.Context) (int, error) {
 }
 
 func (d *QueuedBuildDispatcher) dispatchBatch(ctx context.Context) (int, error) {
+	if processor, ok := d.service.(ScheduledTriggerProcessor); ok {
+		if scheduledCount, err := processor.ProcessScheduledTriggers(ctx, d.config.MaxDispatchPerTick); err != nil {
+			d.logger.Warn("Failed to process scheduled build triggers", zap.Error(err))
+		} else if scheduledCount > 0 {
+			d.logger.Info("Processed scheduled build triggers", zap.Int("queued_builds", scheduledCount))
+		}
+	}
+
 	dispatched := 0
 	for dispatched < d.config.MaxDispatchPerTick {
 		claimMeasure := metrics.NewMeasurement(&d.metrics.claimLatency)

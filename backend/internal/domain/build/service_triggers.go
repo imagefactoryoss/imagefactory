@@ -116,6 +116,14 @@ func (s *Service) CreateScheduledTrigger(
 		s.logger.Error("Failed to create scheduled trigger", zap.Error(err), zap.String("build_id", buildID.String()))
 		return nil, err
 	}
+	if next, nextErr := nextTriggerTimeFromCron(cronExpr, timezone, time.Now().UTC()); nextErr != nil {
+		s.logger.Warn("Failed to compute next trigger timestamp; schedule will be immediately eligible",
+			zap.String("build_id", buildID.String()),
+			zap.String("cron_expr", cronExpr),
+			zap.Error(nextErr))
+	} else {
+		trigger.NextTrigger = next
+	}
 
 	// Save to repository
 	if err := s.triggerRepository.SaveTrigger(ctx, trigger); err != nil {

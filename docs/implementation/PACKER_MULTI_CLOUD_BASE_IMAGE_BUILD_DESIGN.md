@@ -12,7 +12,8 @@ Owners: Backend + Platform/Ops + Frontend
 - PR4 (tenant profile binding + preflight + execution metadata): completed on `feature/packer-builds`.
 - PR5 (tenant profile selector UX): completed on `feature/packer-builds`.
 - PR6 (tenant VM image catalog read path): completed on `feature/packer-builds`.
-- PR7+ remain pending.
+- PR7 backend scheduler slice (scheduled trigger execution + metadata): completed on `feature/packer-builds`.
+- PR7 UX/management follow-up + PR8 remain pending.
 
 ## 1) Objective
 
@@ -759,6 +760,18 @@ Acceptance criteria:
 - schedule create/update/pause/resume works with audit trail.
 - scheduled runs honor concurrency policy (`forbid` default).
 - trigger metadata clearly identifies scheduled origin.
+
+Progress update (2026-03-27):
+- dispatcher now processes due active `schedule` triggers before queue dispatch.
+- schedule triggers now compute and persist `next_trigger_at` from cron expression on create and after each fire.
+- scheduled trigger firing currently scoped to `BuildTypePacker` (PR7 scope alignment).
+- scheduled-origin metadata is now stamped into queued build manifests:
+  - `trigger_type=schedule`
+  - `trigger_mode=scheduled`
+  - `schedule_trigger_id`
+  - `schedule_fire_timestamp`
+  - `schedule_concurrency_policy=forbid`
+- default `forbid` policy is enforced by skipping schedule fire when another queued/running packer build exists in the project.
 
 ### 16.9 PR8 - Lifecycle actions (promote/deprecate/delete) and policy guardrails
 

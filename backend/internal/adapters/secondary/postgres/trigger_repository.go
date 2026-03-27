@@ -281,15 +281,19 @@ func (r *TriggerRepository) GetActiveScheduledTriggers(ctx context.Context, tena
 			   git_provider, git_repository_url, git_branch_pattern,
 			   is_active, created_at, updated_at
 		FROM build_triggers
-		WHERE tenant_id = $1 
-		  AND trigger_type = 'schedule'
+		WHERE trigger_type = 'schedule'
 		  AND is_active = true
 		  AND (next_trigger_at IS NULL OR next_trigger_at <= NOW())
-		ORDER BY next_trigger_at ASC
 	`
+	args := []interface{}{}
+	if tenantID != uuid.Nil {
+		query += " AND tenant_id = $1"
+		args = append(args, tenantID)
+	}
+	query += " ORDER BY next_trigger_at ASC"
 
 	var dbTriggers []dbBuildTrigger
-	err := r.db.SelectContext(ctx, &dbTriggers, query, tenantID)
+	err := r.db.SelectContext(ctx, &dbTriggers, query, args...)
 	if err != nil {
 		r.logger.Error("Failed to get active scheduled triggers", zap.Error(err), zap.String("tenant_id", tenantID.String()))
 		return nil, fmt.Errorf("failed to get scheduled triggers: %w", err)
