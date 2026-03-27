@@ -53,9 +53,14 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - enforced fail-fast preflight for create/start/retry when target profile is not tenant-entitled or not `valid`.
     - persisted Packer execution metadata with selected target profile/provider context and derived provider artifact identifiers.
     - added/updated backend and integration tests for the PR4 scope.
-  - Remaining PR5 follow-up:
-    - replace free-form UUID input in tenant build wizard with entitled target-profile selector UX.
-    - harden artifact identifier derivation with more provider-specific structured extraction paths.
+  - PR5 tenant profile selector UX completed on `feature/packer-builds`:
+    - replaced free-form UUID entry with entitled target-profile selector in tenant wizard.
+  - PR6 tenant VM image catalog read path completed on `feature/packer-builds`:
+    - added tenant VM image catalog APIs (`/api/v1/images/vm` + `/api/v1/images/vm/{executionId}`) with provider/status/search filters.
+    - added tenant VM image catalog UI route (`/images/vm`) with details drawer and source build traceability.
+  - Next PR7 follow-up:
+    - implement scheduled triggers for packer builds with concurrency policy and trigger metadata.
+    - keep hardening provider-specific artifact extraction coverage for edge-case output formats.
 
 ## Backlog Review Summary (2026-03-16)
 

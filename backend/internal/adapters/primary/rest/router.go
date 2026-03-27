@@ -429,6 +429,7 @@ func SetupRoutes(
 	notificationCenterHandler := NewNotificationCenterHandler(sqlxDB, logger, wsHub)
 	buildNotificationReplayHandler := NewBuildNotificationReplayHandler(sqlxDB, logger)
 	tenantDashboardHandler := NewTenantDashboardHandler(sqlxDB, logger)
+	vmImageHandler := NewVMImageHandler(sqlxDB, logger)
 	authHandler := NewAuthHandler(userService, ldapService, rbacService, auditService, bootstrapService, logger)
 	userHandler := NewUserHandler(userService, rbacService, auditService, cfg, logger)
 	// Set notification service on user handler for member addition/removal notifications
@@ -622,6 +623,7 @@ func SetupRoutes(
 		projectNotificationTriggerHandler,
 		notificationCenterHandler,
 		tenantDashboardHandler,
+		vmImageHandler,
 		buildNotificationReplayHandler,
 		infrastructureHandler,
 		infrastructureProviderHandler,

@@ -37,6 +37,7 @@ func registerCoreAPIRoutes(
 	projectNotificationTriggerHandler *ProjectNotificationTriggerHandler,
 	notificationCenterHandler *NotificationCenterHandler,
 	tenantDashboardHandler *TenantDashboardHandler,
+	vmImageHandler *VMImageHandler,
 	buildNotificationReplayHandler *BuildNotificationReplayHandler,
 	infrastructureHandler *handlers.InfrastructureHandler,
 	infrastructureProviderHandler *InfrastructureProviderHandler,
@@ -147,6 +148,8 @@ func registerCoreAPIRoutes(
 	router.Delete("/api/v1/notifications/read", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "projects", "read")(http.HandlerFunc(notificationCenterHandler.DeleteRead))).ServeHTTP)
 	router.Get("/api/v1/dashboard/tenant/summary", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "projects", "read")(http.HandlerFunc(tenantDashboardHandler.GetTenantSummary))).ServeHTTP)
 	router.Get("/api/v1/dashboard/tenant/activity", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "projects", "read")(http.HandlerFunc(tenantDashboardHandler.GetTenantActivity))).ServeHTTP)
+	router.Get("/api/v1/images/vm", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "image", "read")(http.HandlerFunc(vmImageHandler.ListTenantVMImages))).ServeHTTP)
+	router.Get("/api/v1/images/vm/{executionId}", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "image", "read")(http.HandlerFunc(vmImageHandler.GetTenantVMImage))).ServeHTTP)
 	router.Get("/api/v1/admin/tenants/{tenant_id}/notification-triggers", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "tenant", "read")(http.HandlerFunc(projectNotificationTriggerHandler.GetTenantNotificationTriggers))).ServeHTTP)
 	router.Put("/api/v1/admin/tenants/{tenant_id}/notification-triggers", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "tenant", "update")(http.HandlerFunc(projectNotificationTriggerHandler.UpdateTenantNotificationTriggers))).ServeHTTP)
 	router.Get("/api/v1/admin/tenants/{tenant_id}/notification-replay/status", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "tenant", "read")(http.HandlerFunc(buildNotificationReplayHandler.GetTenantBuildNotificationReplayStatus))).ServeHTTP)
