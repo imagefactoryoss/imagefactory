@@ -133,6 +133,9 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		if fake.lastDeprecateImageID != "" {
 			t.Fatalf("expected no deprecate call for delete flow, got %q", fake.lastDeprecateImageID)
 		}
+		if fake.lastDisableDeprecateImageID != "" {
+			t.Fatalf("expected no disable-deprecate call for delete flow, got %q", fake.lastDisableDeprecateImageID)
+		}
 	})
 
 	t.Run("prefer_provider_native executes aws deprecate", func(t *testing.T) {
@@ -167,6 +170,44 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		}
 		if fake.lastDeprecateAt.IsZero() {
 			t.Fatal("expected deprecate timestamp to be set")
+		}
+		if fake.lastDisableDeprecateImageID != "" {
+			t.Fatalf("expected no disable-deprecate call for deprecate flow, got %q", fake.lastDisableDeprecateImageID)
+		}
+	})
+
+	t.Run("prefer_provider_native executes aws release", func(t *testing.T) {
+		fake := &fakeVMAWSLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			awsClientFactory: func(ctx context.Context, region string) (vmAWSLifecycleClient, error) {
+				if region != "us-east-1" {
+					t.Fatalf("expected region us-east-1, got %q", region)
+				}
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "released",
+			ProviderArtifactIdentifiers: map[string][]string{
+				"aws": {"us-east-1:ami-0a1b2c3d4e5f67890"},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastDisableDeprecateImageID != "ami-0a1b2c3d4e5f67890" {
+			t.Fatalf("expected disable-deprecate image id ami-0a1b2c3d4e5f67890, got %q", fake.lastDisableDeprecateImageID)
+		}
+		if fake.lastImageID != "" {
+			t.Fatalf("expected no deregister call for release flow, got %q", fake.lastImageID)
+		}
+		if fake.lastDeprecateImageID != "" {
+			t.Fatalf("expected no deprecate call for release flow, got %q", fake.lastDeprecateImageID)
 		}
 	})
 }
@@ -204,9 +245,10 @@ func TestParseAWSLifecycleImageReference(t *testing.T) {
 }
 
 type fakeVMAWSLifecycleClient struct {
-	lastImageID          string
-	lastDeprecateImageID string
-	lastDeprecateAt      time.Time
+	lastImageID                 string
+	lastDeprecateImageID        string
+	lastDisableDeprecateImageID string
+	lastDeprecateAt             time.Time
 }
 
 func (f *fakeVMAWSLifecycleClient) DeregisterImage(ctx context.Context, params *ec2.DeregisterImageInput, optFns ...func(*ec2.Options)) (*ec2.DeregisterImageOutput, error) {
@@ -224,6 +266,13 @@ func (f *fakeVMAWSLifecycleClient) EnableImageDeprecation(ctx context.Context, p
 		f.lastDeprecateAt = *params.DeprecateAt
 	}
 	return &ec2.EnableImageDeprecationOutput{}, nil
+}
+
+func (f *fakeVMAWSLifecycleClient) DisableImageDeprecation(ctx context.Context, params *ec2.DisableImageDeprecationInput, optFns ...func(*ec2.Options)) (*ec2.DisableImageDeprecationOutput, error) {
+	if params != nil && params.ImageId != nil {
+		f.lastDisableDeprecateImageID = *params.ImageId
+	}
+	return &ec2.DisableImageDeprecationOutput{}, nil
 }
 
 func TestVMImageLifecycleState(t *testing.T) {

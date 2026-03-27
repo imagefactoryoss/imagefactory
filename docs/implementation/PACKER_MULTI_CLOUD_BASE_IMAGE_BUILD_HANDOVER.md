@@ -98,6 +98,8 @@ Branch: `feature/packer-builds`
   - successful AWS native delete transitions now persist `provider_native`; invalid/missing AWS image metadata now returns `400`.
 - PR8 provider-native lifecycle expansion completed:
   - AWS `deprecate` lifecycle action now supports provider-native EC2 image deprecation when execution mode allows.
+- PR8 provider-native lifecycle release expansion completed:
+  - AWS `released` lifecycle action now supports provider-native EC2 image undeprecation when execution mode allows.
 
 ## PR3 Backend Summary
 

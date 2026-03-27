@@ -69,6 +69,7 @@ type awsLifecycleImageReference struct {
 type vmAWSLifecycleClient interface {
 	DeregisterImage(ctx context.Context, params *ec2.DeregisterImageInput, optFns ...func(*ec2.Options)) (*ec2.DeregisterImageOutput, error)
 	EnableImageDeprecation(ctx context.Context, params *ec2.EnableImageDeprecationInput, optFns ...func(*ec2.Options)) (*ec2.EnableImageDeprecationOutput, error)
+	DisableImageDeprecation(ctx context.Context, params *ec2.DisableImageDeprecationInput, optFns ...func(*ec2.Options)) (*ec2.DisableImageDeprecationOutput, error)
 }
 
 type vmDispatchLifecycleExecutor struct {
@@ -82,7 +83,7 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
 	}
 
-	if provider != "aws" || (req.TargetState != "deleted" && req.TargetState != "deprecated") {
+	if provider != "aws" || (req.TargetState != "deleted" && req.TargetState != "deprecated" && req.TargetState != "released") {
 		if e.mode == vmLifecycleExecutionModeRequireProviderNative {
 			if provider == "" {
 				provider = "unknown"
@@ -116,6 +117,13 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		if _, err := client.EnableImageDeprecation(ctx, &ec2.EnableImageDeprecationInput{
 			ImageId:     awscore.String(ref.ImageID),
 			DeprecateAt: awscore.Time(deprecateAt),
+		}); err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+	}
+	if req.TargetState == "released" {
+		if _, err := client.DisableImageDeprecation(ctx, &ec2.DisableImageDeprecationInput{
+			ImageId: awscore.String(ref.ImageID),
 		}); err != nil {
 			return vmLifecycleTransitionResult{}, err
 		}

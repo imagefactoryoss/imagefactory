@@ -131,6 +131,8 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - transition mode persists as `provider_native` on successful AWS native delete path; missing/invalid AWS image metadata now returns `400`.
   - PR8 provider-native lifecycle action expansion completed on `feature/packer-builds`:
     - AWS `deprecate` lifecycle transitions now execute provider-native `EnableImageDeprecation` via EC2 when provider-native execution mode is enabled.
+  - PR8 provider-native lifecycle release expansion completed on `feature/packer-builds`:
+    - AWS `released` lifecycle transitions now execute provider-native `DisableImageDeprecation` via EC2 when provider-native execution mode is enabled.
 
 ## Backlog Review Summary (2026-03-16)
 
