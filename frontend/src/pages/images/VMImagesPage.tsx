@@ -1,6 +1,8 @@
+import { useConfirmDialog } from '@/context/ConfirmDialogContext'
 import Drawer from '@/components/ui/Drawer'
 import { type VMImageCatalogItem, vmImageService } from '@/services/vmImageService'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 
 const providerOptions = ['', 'aws', 'azure', 'gcp', 'vmware']
@@ -16,6 +18,8 @@ const VMImagesPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [selected, setSelected] = useState<VMImageCatalogItem | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [actionExecutionID, setActionExecutionID] = useState<string | null>(null)
+  const confirmDialog = useConfirmDialog()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -58,6 +62,75 @@ const VMImagesPage: React.FC = () => {
       setSelected(item)
     } finally {
       setDetailLoading(false)
+    }
+  }
+
+  const refreshSelected = async (executionID: string) => {
+    if (!selected || selected.execution_id !== executionID) return
+    try {
+      const detail = await vmImageService.get(executionID)
+      setSelected(detail.data)
+    } catch {
+      // no-op; list refresh will still update the table state
+    }
+  }
+
+  const handleLifecycleAction = async (
+    item: VMImageCatalogItem,
+    action: 'promote' | 'deprecate' | 'delete',
+  ) => {
+    const title =
+      action === 'promote'
+        ? 'Promote VM Image'
+        : action === 'deprecate'
+          ? 'Deprecate VM Image'
+          : 'Delete VM Image'
+    const confirmLabel =
+      action === 'promote'
+        ? 'Promote'
+        : action === 'deprecate'
+          ? 'Deprecate'
+          : 'Delete'
+    const message =
+      action === 'promote'
+        ? `Promote VM image execution ${item.execution_id} to released state?`
+        : action === 'deprecate'
+          ? `Deprecate VM image execution ${item.execution_id}?`
+          : `Delete VM image execution ${item.execution_id} from active lifecycle view?`
+    const confirmed = await confirmDialog({
+      title,
+      message,
+      confirmLabel,
+      destructive: action !== 'promote',
+    })
+    if (!confirmed) return
+
+    setActionExecutionID(item.execution_id)
+    try {
+      const reason =
+        action === 'promote'
+          ? undefined
+          : `action initiated from vm catalog ui (${action})`
+      if (action === 'promote') {
+        await vmImageService.promote(item.execution_id)
+      } else if (action === 'deprecate') {
+        await vmImageService.deprecate(item.execution_id, reason)
+      } else {
+        await vmImageService.remove(item.execution_id, reason)
+      }
+      toast.success(
+        `VM image ${action === 'delete' ? 'deleted' : `${action}d`} successfully`,
+      )
+      await load()
+      await refreshSelected(item.execution_id)
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.error ||
+        err?.message ||
+        `Failed to ${action} VM image`
+      toast.error(message)
+    } finally {
+      setActionExecutionID(null)
     }
   }
 
@@ -143,7 +216,13 @@ const VMImagesPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {items.map((item) => (
+                {items.map((item) => {
+                  const lifecycle = (item.lifecycle_state || '').toLowerCase()
+                  const isActionBusy = actionExecutionID === item.execution_id
+                  const canPromote = lifecycle === 'available' || lifecycle === 'deprecated'
+                  const canDeprecate = lifecycle === 'available' || lifecycle === 'released'
+                  const canDelete = lifecycle !== 'deleted'
+                  return (
                   <tr key={item.execution_id} className="align-top">
                     <td className="px-3 py-3 text-xs text-slate-800 dark:text-slate-100">
                       <p className="font-medium">{item.project_name}</p>
@@ -164,16 +243,42 @@ const VMImagesPage: React.FC = () => {
                       {item.completed_at ? new Date(item.completed_at).toLocaleString() : '-'}
                     </td>
                     <td className="px-3 py-3 text-right text-xs">
-                      <button
-                        type="button"
-                        onClick={() => void openDetail(item)}
-                        className="rounded-md border border-sky-300 bg-sky-50 px-2.5 py-1 font-medium text-sky-800 hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-900/30 dark:text-sky-200 dark:hover:bg-sky-900/50"
-                      >
-                        View
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void openDetail(item)}
+                          className="rounded-md border border-sky-300 bg-sky-50 px-2.5 py-1 font-medium text-sky-800 hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-900/30 dark:text-sky-200 dark:hover:bg-sky-900/50"
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canPromote || isActionBusy}
+                          onClick={() => void handleLifecycleAction(item, 'promote')}
+                          className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900/50"
+                        >
+                          Promote
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canDeprecate || isActionBusy}
+                          onClick={() => void handleLifecycleAction(item, 'deprecate')}
+                          className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                        >
+                          Deprecate
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canDelete || isActionBusy}
+                          onClick={() => void handleLifecycleAction(item, 'delete')}
+                          className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 font-medium text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-200 dark:hover:bg-rose-900/50"
+                        >
+                          {isActionBusy ? 'Applying...' : 'Delete'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                  )})}
               </tbody>
             </table>
           </div>
@@ -250,4 +355,3 @@ const VMImagesPage: React.FC = () => {
 }
 
 export default VMImagesPage
-

@@ -29,6 +29,11 @@ export interface VMImageCatalogDetailResponse {
   data: VMImageCatalogItem
 }
 
+export interface VMImageLifecycleActionResponse {
+  data: VMImageCatalogItem
+  message?: string
+}
+
 export const vmImageService = {
   async list(params?: {
     limit?: number
@@ -45,5 +50,33 @@ export const vmImageService = {
     const response = await api.get(`/images/vm/${executionId}`)
     return response.data
   },
-}
 
+  async promote(
+    executionId: string,
+  ): Promise<VMImageLifecycleActionResponse> {
+    const response = await api.post(`/images/vm/${executionId}/promote`)
+    return response.data
+  },
+
+  async deprecate(
+    executionId: string,
+    reason?: string,
+  ): Promise<VMImageLifecycleActionResponse> {
+    const response = await api.post(`/images/vm/${executionId}/deprecate`, {
+      reason,
+    })
+    return response.data
+  },
+
+  async remove(
+    executionId: string,
+    reason?: string,
+  ): Promise<VMImageLifecycleActionResponse> {
+    const response = await api.delete(`/images/vm/${executionId}`, {
+      data: {
+        reason,
+      },
+    })
+    return response.data
+  },
+}
