@@ -79,6 +79,9 @@ Branch: `feature/packer-builds`
 - PR8 lifecycle transition-mode normalization hardening completed:
   - backend now enforces allowlisted transition modes (`metadata_only`, `provider_native`, `hybrid`) when parsing metadata.
   - unknown transition-mode values now safely normalize to `metadata_only`.
+- PR8 lifecycle transition-mode default contract hardening completed:
+  - VM catalog response payloads now always emit `lifecycle_transition_mode`.
+  - empty/malformed execution metadata now defaults transition mode to `metadata_only`.
 
 ## PR3 Backend Summary
 

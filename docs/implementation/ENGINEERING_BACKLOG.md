@@ -113,6 +113,8 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - idempotent transition messaging is now surfaced directly in UI (for example, already-in-state responses).
   - PR8 lifecycle transition-mode normalization hardening completed on `feature/packer-builds`:
     - backend now normalizes transition mode to an allowlist (`metadata_only`, `provider_native`, `hybrid`) with unknown values falling back to `metadata_only`.
+  - PR8 lifecycle transition-mode default contract hardening completed on `feature/packer-builds`:
+    - VM catalog responses now guarantee non-empty `lifecycle_transition_mode`, defaulting to `metadata_only` for empty/invalid metadata payloads.
 
 ## Backlog Review Summary (2026-03-16)
 

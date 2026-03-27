@@ -856,6 +856,8 @@ Progress update (2026-03-27):
 - lifecycle transition mode parsing now uses strict normalization:
   - accepted modes are `metadata_only`, `provider_native`, and `hybrid`.
   - unknown/invalid mode values are normalized to `metadata_only` for stable API/UI semantics.
+- lifecycle transition mode now has a non-empty response contract:
+  - VM catalog payloads default `lifecycle_transition_mode` to `metadata_only` when execution metadata is empty or malformed.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

@@ -297,6 +297,12 @@ type vmImageLifecycleMetadata struct {
 	History        []vmLifecycleHistory
 }
 
+func defaultVMLifecycleMetadata() vmImageLifecycleMetadata {
+	return vmImageLifecycleMetadata{
+		TransitionMode: "metadata_only",
+	}
+}
+
 func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfileID string, providerIdentifiers map[string][]string, lifecycle vmImageLifecycleMetadata) {
 	type packerMetadata struct {
 		TargetProvider              string               `json:"target_provider"`
@@ -314,7 +320,7 @@ func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfi
 	}
 	var parsed executionMetadata
 	if len(raw) == 0 || json.Unmarshal(raw, &parsed) != nil {
-		return "", "", map[string][]string{}, vmImageLifecycleMetadata{}
+		return "", "", map[string][]string{}, defaultVMLifecycleMetadata()
 	}
 	targetProvider = strings.TrimSpace(parsed.Packer.TargetProvider)
 	targetProfileID = strings.TrimSpace(parsed.Packer.TargetProfileID)
@@ -544,6 +550,7 @@ type vmImageRow struct {
 func vmImageCatalogItemFromRow(row vmImageRow) vmImageCatalogItem {
 	targetProvider, targetProfileID, providerIdentifiers, lifecycle := parsePackerMetadataFields(row.MetadataRaw)
 	lifecycleState := vmImageLifecycleState(row.ExecutionStatus, lifecycle.State)
+	lifecycleTransitionMode := vmImageLifecycleTransitionMode(lifecycle.TransitionMode)
 	return vmImageCatalogItem{
 		ExecutionID:                 row.ExecutionID,
 		BuildID:                     row.BuildID,
@@ -563,7 +570,7 @@ func vmImageCatalogItemFromRow(row vmImageRow) vmImageCatalogItem {
 		LifecycleLastActionAt:       lifecycle.LastActionAt,
 		LifecycleLastActionBy:       lifecycle.LastActionBy,
 		LifecycleLastReason:         lifecycle.LastReason,
-		LifecycleTransitionMode:     lifecycle.TransitionMode,
+		LifecycleTransitionMode:     lifecycleTransitionMode,
 		LifecycleHistory:            lifecycle.History,
 		ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, lifecycleState),
 	}
