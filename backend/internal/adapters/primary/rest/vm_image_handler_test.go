@@ -218,3 +218,45 @@ func TestVMLifecycleTransitionMode_DefaultsToMetadataOnly(t *testing.T) {
 		t.Fatalf("expected normalized provider_native mode, got %q", got)
 	}
 }
+
+func TestVMImageCatalogItemFromRow(t *testing.T) {
+	row := vmImageRow{
+		ExecutionID:     uuid.MustParse("11111111-1111-4111-8111-111111111111"),
+		BuildID:         uuid.MustParse("22222222-2222-4222-8222-222222222222"),
+		ProjectID:       uuid.MustParse("33333333-3333-4333-8333-333333333333"),
+		ProjectName:     "demo-project",
+		BuildNumber:     42,
+		BuildStatus:     "success",
+		ExecutionStatus: "success",
+		CreatedAt:       time.Date(2026, 3, 27, 20, 0, 0, 0, time.UTC),
+		MetadataRaw: json.RawMessage(`{
+			"packer": {
+				"target_provider": "aws",
+				"target_profile_id": "profile-1",
+				"lifecycle_state": "released",
+				"lifecycle_transition_mode": "metadata_only",
+				"provider_artifact_identifiers": {
+					"aws": ["ami-2", "ami-1"]
+				}
+			}
+		}`),
+		ArtifactsRaw: json.RawMessage(`[{"name":"a","value":"ami-1","path":"p"}]`),
+	}
+
+	item := vmImageCatalogItemFromRow(row)
+	if item.ExecutionID != row.ExecutionID {
+		t.Fatalf("unexpected execution id: %s", item.ExecutionID)
+	}
+	if item.LifecycleState != "released" {
+		t.Fatalf("expected released lifecycle state, got %q", item.LifecycleState)
+	}
+	if item.LifecycleTransitionMode != "metadata_only" {
+		t.Fatalf("expected metadata_only transition mode, got %q", item.LifecycleTransitionMode)
+	}
+	if !item.ActionPermissions.CanDeprecate || item.ActionPermissions.CanDelete {
+		t.Fatalf("unexpected action permissions for released state: %+v", item.ActionPermissions)
+	}
+	if !reflect.DeepEqual(item.ProviderArtifactIdentifiers["aws"], []string{"ami-1", "ami-2"}) {
+		t.Fatalf("unexpected provider artifact identifiers: %+v", item.ProviderArtifactIdentifiers)
+	}
+}

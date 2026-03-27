@@ -105,6 +105,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 lifecycle audit mode-depth completed on `feature/packer-builds`:
     - lifecycle history entries now persist `transition_mode` for each recorded transition.
     - VM catalog lifecycle history UI now renders per-entry transition mode for audit clarity.
+  - PR8 lifecycle action response contract hardening completed on `feature/packer-builds`:
+    - idempotent lifecycle transitions (already in target state) now return `data` + `message`, matching successful transition response shape.
+    - VM catalog item mapping now uses a shared backend builder to keep list/detail/action payload fields consistent.
 
 ## Backlog Review Summary (2026-03-16)
 
