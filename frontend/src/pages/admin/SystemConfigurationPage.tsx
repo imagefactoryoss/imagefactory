@@ -165,6 +165,15 @@ interface RuntimeServicesConfigFormData {
   image_import_notification_receipt_retention_days: number;
   image_import_notification_receipt_cleanup_interval_hours: number;
   storage_profiles: RuntimeAssetStorageProfilesFormData;
+  apphq_enabled: boolean;
+  apphq_oauth_token_url: string;
+  apphq_client_id: string;
+  apphq_client_secret: string;
+  apphq_api_url: string;
+  apphq_system: string;
+  apphq_system_name: string;
+  apphq_run: string;
+  apphq_obj_cd: string;
 }
 
 type RuntimeServicesSubTab =
