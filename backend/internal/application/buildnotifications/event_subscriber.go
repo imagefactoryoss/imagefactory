@@ -282,6 +282,12 @@ func templateTypeForTrigger(triggerID buildnotification.TriggerID) string {
 		return "build_completed"
 	case buildnotification.TriggerPreflightBlocked:
 		return "build_failed"
+	case buildnotification.TriggerBuildScheduledQueued:
+		return "build_started"
+	case buildnotification.TriggerBuildScheduledFailed:
+		return "build_failed"
+	case buildnotification.TriggerBuildScheduledNoOp:
+		return "build_completed"
 	default:
 		return "build_failed"
 	}
@@ -388,6 +394,12 @@ func mapEventToTrigger(event messaging.Event) (buildnotification.TriggerID, stri
 			return buildnotification.TriggerBuildRecovered, "build_recovered", "Build Recovered", true
 		case "preflight_blocked":
 			return buildnotification.TriggerPreflightBlocked, "preflight_blocked", "Build Preflight Blocked", true
+		case "scheduled_queued":
+			return buildnotification.TriggerBuildScheduledQueued, "build_scheduled_queued", "Scheduled Build Queued", true
+		case "scheduled_failed":
+			return buildnotification.TriggerBuildScheduledFailed, "build_scheduled_failed", "Scheduled Build Failed", true
+		case "scheduled_noop":
+			return buildnotification.TriggerBuildScheduledNoOp, "build_scheduled_noop", "Scheduled Build Skipped", true
 		}
 		if status == "cancelled" || status == "canceled" {
 			return buildnotification.TriggerBuildCancelled, "build_cancelled", "Build Cancelled", true
@@ -488,6 +500,12 @@ func defaultMessageForTrigger(triggerID buildnotification.TriggerID, buildID uui
 		return fmt.Sprintf("Build %s recovered and resumed.", buildID.String())
 	case buildnotification.TriggerPreflightBlocked:
 		return fmt.Sprintf("Build %s was blocked by preflight checks.", buildID.String())
+	case buildnotification.TriggerBuildScheduledQueued:
+		return fmt.Sprintf("Scheduled run queued for build %s.", buildID.String())
+	case buildnotification.TriggerBuildScheduledFailed:
+		return fmt.Sprintf("Scheduled run failed for build %s.", buildID.String())
+	case buildnotification.TriggerBuildScheduledNoOp:
+		return fmt.Sprintf("Scheduled run skipped for build %s.", buildID.String())
 	default:
 		return fmt.Sprintf("Build %s status changed.", buildID.String())
 	}
