@@ -451,6 +451,19 @@ type vmImageLifecycleActionRequest struct {
 	Reason string `json:"reason"`
 }
 
+const vmImageLifecycleReasonMaxLength = 500
+
+func validateVMLifecycleReason(raw string, required bool) (string, error) {
+	reason := strings.TrimSpace(raw)
+	if required && reason == "" {
+		return "", errors.New("reason is required for this lifecycle transition")
+	}
+	if len(reason) > vmImageLifecycleReasonMaxLength {
+		return "", fmt.Errorf("reason must be %d characters or fewer", vmImageLifecycleReasonMaxLength)
+	}
+	return reason, nil
+}
+
 func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter, r *http.Request, targetState string, allowReason bool) {
 	authCtx, ok := middleware.GetAuthContext(r)
 	if !ok || authCtx == nil || authCtx.TenantID == uuid.Nil {
@@ -472,9 +485,9 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 	if r.Body != nil {
 		_ = json.NewDecoder(r.Body).Decode(&reqBody)
 	}
-	reason := strings.TrimSpace(reqBody.Reason)
-	if allowReason && reason == "" {
-		writeVMImageJSON(w, http.StatusBadRequest, map[string]string{"error": "reason is required for this lifecycle transition"})
+	reason, err := validateVMLifecycleReason(reqBody.Reason, allowReason)
+	if err != nil {
+		writeVMImageJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 

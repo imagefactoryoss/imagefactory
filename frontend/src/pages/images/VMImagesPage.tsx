@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 
 const providerOptions = ['', 'aws', 'azure', 'gcp', 'vmware']
 const statusOptions = ['', 'success', 'running', 'pending', 'failed', 'cancelled']
+const lifecycleReasonMaxLength = 500
 type LifecycleAction = 'promote' | 'deprecate' | 'delete'
 
 type PendingReasonAction = {
@@ -159,6 +160,10 @@ const VMImagesPage: React.FC = () => {
     const reason = reasonInput.trim()
     if (!reason) {
       setReasonError('Reason is required.')
+      return
+    }
+    if (reason.length > lifecycleReasonMaxLength) {
+      setReasonError(`Reason must be ${lifecycleReasonMaxLength} characters or fewer.`)
       return
     }
 
@@ -433,6 +438,7 @@ const VMImagesPage: React.FC = () => {
                 if (reasonError) setReasonError(null)
               }}
               rows={4}
+              maxLength={lifecycleReasonMaxLength}
               placeholder={
                 pendingReasonAction.action === 'deprecate'
                   ? 'Why is this VM image being deprecated?'
@@ -440,6 +446,9 @@ const VMImagesPage: React.FC = () => {
               }
               className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-400 dark:focus:ring-sky-900/50"
             />
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {reasonInput.trim().length}/{lifecycleReasonMaxLength}
+            </p>
             {reasonError ? (
               <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{reasonError}</p>
             ) : null}

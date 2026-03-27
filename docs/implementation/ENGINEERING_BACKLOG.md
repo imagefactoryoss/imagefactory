@@ -96,6 +96,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 frontend lifecycle reason-entry UX completed on `feature/packer-builds`:
     - VM catalog now requires operator-entered reason text in an in-app modal for `deprecate` and `delete` actions before confirmation.
     - frontend now forwards typed reason payloads directly to lifecycle APIs instead of generated default reason strings.
+  - PR8 lifecycle reason payload hardening completed on `feature/packer-builds`:
+    - backend now enforces a 500-character maximum reason length for lifecycle transitions.
+    - VM catalog reason modal now mirrors the 500-character limit with inline counter feedback.
 
 ## Backlog Review Summary (2026-03-16)
 
