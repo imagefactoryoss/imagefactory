@@ -13,6 +13,7 @@ Owners: Backend + Platform/Ops + Frontend
 - PR5 (tenant profile selector UX): completed on `feature/packer-builds`.
 - PR6 (tenant VM image catalog read path): completed on `feature/packer-builds`.
 - PR7 backend scheduler slice (scheduled trigger execution + metadata): completed on `feature/packer-builds`.
+- PR7 follow-up (scheduled outcome notification hooks): completed on `feature/packer-builds`.
 - PR7 UX/management follow-up + PR8 remain pending.
 
 ## 1) Objective
@@ -772,6 +773,19 @@ Progress update (2026-03-27):
   - `schedule_fire_timestamp`
   - `schedule_concurrency_policy=forbid`
 - default `forbid` policy is enforced by skipping schedule fire when another queued/running packer build exists in the project.
+- schedule management parity now supports update/pause/resume via existing project trigger update endpoint:
+  - `PATCH /api/v1/projects/{projectID}/triggers/{triggerID}`
+  - schedule fields supported: `name`, `description`, `cron_expression`, `timezone`, `is_active`.
+  - `is_active=false` pauses and `is_active=true` resumes schedule triggers.
+- trigger update actions now publish build status audit events:
+  - `trigger.schedule.paused`
+  - `trigger.schedule.resumed`
+  - `trigger.updated`
+- scheduled fire outcomes now emit build status updates for notification routing:
+  - `scheduled_queued` -> `BN-011` (`build_scheduled_queued`)
+  - `scheduled_failed` -> `BN-012` (`build_scheduled_failed`)
+  - `scheduled_noop` -> `BN-013` (`build_scheduled_noop`)
+- notification defaults now include scheduled failure email delivery by default.
 
 ### 16.9 PR8 - Lifecycle actions (promote/deprecate/delete) and policy guardrails
 

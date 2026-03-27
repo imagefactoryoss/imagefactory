@@ -62,9 +62,11 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - dispatcher now processes due active schedule triggers and queues packer builds from schedule templates.
     - schedule `next_trigger_at` is now computed from cron expression on create and after each fire.
     - scheduled-origin metadata and default `forbid` concurrency policy are applied to scheduled build queuing.
-  - Remaining PR7 follow-up:
-    - add schedule update/pause/resume management parity and explicit audit coverage.
-    - wire notification hooks for scheduled success/failure/no-op outcomes.
+  - PR7 follow-up (scheduled outcome notification hooks) completed on `feature/packer-builds`:
+    - added scheduled trigger outcome IDs (`BN-011`/`BN-012`/`BN-013`) and defaults (`scheduled_failed` includes email).
+    - mapped scheduled status updates (`scheduled_queued`, `scheduled_failed`, `scheduled_noop`) into notification routing.
+    - schedule runner now emits build status events for queue/fail/no-op outcomes to drive trigger-based delivery.
+  - Remaining follow-up:
     - keep hardening provider-specific artifact extraction coverage for edge-case output formats.
 
 ## Backlog Review Summary (2026-03-16)

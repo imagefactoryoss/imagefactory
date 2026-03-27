@@ -44,6 +44,10 @@ func (s *Service) ProcessScheduledTriggers(ctx context.Context, limit int) (int,
 				zap.String("trigger_id", trigger.ID.String()),
 				zap.String("cron_expr", trigger.CronExpr),
 				zap.Error(nextErr))
+			s.publishScheduledTriggerStatus(ctx, trigger, "scheduled_failed", "Scheduled trigger failed due to invalid cron expression", map[string]interface{}{
+				"reason":    "invalid_cron_expression",
+				"cron_expr": trigger.CronExpr,
+			})
 			continue
 		}
 
@@ -55,6 +59,10 @@ func (s *Service) ProcessScheduledTriggers(ctx context.Context, limit int) (int,
 				zap.Error(findErr))
 			trigger.RecordTrigger(nextTrigger)
 			_ = s.triggerRepository.UpdateTrigger(ctx, trigger)
+			s.publishScheduledTriggerStatus(ctx, trigger, "scheduled_failed", "Scheduled trigger failed because source build was not found", map[string]interface{}{
+				"reason":   "source_build_missing",
+				"build_id": trigger.BuildID.String(),
+			})
 			continue
 		}
 
@@ -72,6 +80,12 @@ func (s *Service) ProcessScheduledTriggers(ctx context.Context, limit int) (int,
 				zap.String("concurrency_policy", "forbid"))
 			trigger.RecordTrigger(nextTrigger)
 			_ = s.triggerRepository.UpdateTrigger(ctx, trigger)
+			s.publishScheduledTriggerStatus(ctx, trigger, "scheduled_noop", "Scheduled trigger skipped due to forbid concurrency policy", map[string]interface{}{
+				"reason":             "forbid_concurrency_policy",
+				"source_project_id":  sourceBuild.ProjectID().String(),
+				"source_build_id":    sourceBuild.ID().String(),
+				"concurrency_policy": "forbid",
+			})
 			processed++
 			continue
 		}
@@ -92,6 +106,11 @@ func (s *Service) ProcessScheduledTriggers(ctx context.Context, limit int) (int,
 				zap.String("trigger_id", trigger.ID.String()),
 				zap.String("build_id", trigger.BuildID.String()),
 				zap.Error(createErr))
+			s.publishScheduledTriggerStatus(ctx, trigger, "scheduled_failed", "Scheduled trigger failed to queue a build", map[string]interface{}{
+				"reason":          "create_build_failed",
+				"source_build_id": trigger.BuildID.String(),
+				"error":           createErr.Error(),
+			})
 			continue
 		}
 
@@ -100,6 +119,10 @@ func (s *Service) ProcessScheduledTriggers(ctx context.Context, limit int) (int,
 			zap.String("source_build_id", trigger.BuildID.String()),
 			zap.String("queued_build_id", newBuild.ID().String()),
 			zap.String("concurrency_policy", "forbid"))
+		s.publishScheduledTriggerStatus(ctx, trigger, "scheduled_queued", "Scheduled trigger queued a build", map[string]interface{}{
+			"source_build_id": trigger.BuildID.String(),
+			"queued_build_id": newBuild.ID().String(),
+		})
 
 		trigger.RecordTrigger(nextTrigger)
 		if updateErr := s.triggerRepository.UpdateTrigger(ctx, trigger); updateErr != nil {
@@ -110,6 +133,27 @@ func (s *Service) ProcessScheduledTriggers(ctx context.Context, limit int) (int,
 		processed++
 	}
 	return processed, nil
+}
+
+func (s *Service) publishScheduledTriggerStatus(ctx context.Context, trigger *BuildTrigger, status, message string, metadata map[string]interface{}) {
+	if s == nil || s.eventPublisher == nil || trigger == nil {
+		return
+	}
+	if metadata == nil {
+		metadata = map[string]interface{}{}
+	}
+	metadata["trigger_id"] = trigger.ID.String()
+	metadata["trigger_type"] = string(trigger.Type)
+	if _, exists := metadata["build_id"]; !exists {
+		metadata["build_id"] = trigger.BuildID.String()
+	}
+	event := NewBuildStatusUpdated(trigger.BuildID, trigger.TenantID, status, message, metadata)
+	if err := s.eventPublisher.PublishBuildStatusUpdated(ctx, event); err != nil {
+		s.logger.Warn("Failed to publish scheduled trigger status event",
+			zap.String("trigger_id", trigger.ID.String()),
+			zap.String("status", status),
+			zap.Error(err))
+	}
 }
 
 func (s *Service) shouldSkipForScheduledForbidPolicy(ctx context.Context, sourceBuild *Build) bool {
