@@ -40,6 +40,7 @@ func registerCoreAPIRoutes(
 	buildNotificationReplayHandler *BuildNotificationReplayHandler,
 	infrastructureHandler *handlers.InfrastructureHandler,
 	infrastructureProviderHandler *InfrastructureProviderHandler,
+	packerTargetProfileHandler *PackerTargetProfileHandler,
 	authHandler *AuthHandler,
 	passwordResetHandler *PasswordResetHandler,
 	bootstrapHandler *BootstrapHandler,
@@ -210,6 +211,12 @@ func registerCoreAPIRoutes(
 	router.Get("/api/v1/admin/infrastructure/providers/{id}/permissions", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "read")(http.HandlerFunc(infrastructureProviderHandler.ListProviderPermissions))).ServeHTTP)
 	router.Post("/api/v1/admin/infrastructure/providers/{id}/permissions", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "update")(http.HandlerFunc(infrastructureProviderHandler.GrantProviderPermission))).ServeHTTP)
 	router.Delete("/api/v1/admin/infrastructure/providers/{id}/permissions", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "update")(http.HandlerFunc(infrastructureProviderHandler.RevokeProviderPermission))).ServeHTTP)
+	router.Get("/api/v1/admin/packer-target-profiles", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "read")(http.HandlerFunc(packerTargetProfileHandler.ListProfiles))).ServeHTTP)
+	router.Post("/api/v1/admin/packer-target-profiles", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "create")(http.HandlerFunc(packerTargetProfileHandler.CreateProfile))).ServeHTTP)
+	router.Get("/api/v1/admin/packer-target-profiles/{id}", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "read")(http.HandlerFunc(packerTargetProfileHandler.GetProfile))).ServeHTTP)
+	router.Put("/api/v1/admin/packer-target-profiles/{id}", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "update")(http.HandlerFunc(packerTargetProfileHandler.UpdateProfile))).ServeHTTP)
+	router.Delete("/api/v1/admin/packer-target-profiles/{id}", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "delete")(http.HandlerFunc(packerTargetProfileHandler.DeleteProfile))).ServeHTTP)
+	router.Post("/api/v1/admin/packer-target-profiles/{id}/validate", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "update")(http.HandlerFunc(packerTargetProfileHandler.ValidateProfile))).ServeHTTP)
 
 	// User-facing infrastructure provider routes
 	router.Get("/api/v1/infrastructure/providers/available", tenantStatusMiddleware.EnforceTenantStatus(authMiddleware.RequirePermission(permissionService, "infrastructure", "select")(http.HandlerFunc(infrastructureProviderHandler.GetAvailableProviders))).ServeHTTP)

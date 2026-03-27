@@ -1,5 +1,5 @@
-import { useRefresh } from '@/context/RefreshContext'
 import { useConfirmDialog } from '@/context/ConfirmDialogContext'
+import { useRefresh } from '@/context/RefreshContext'
 import { useDashboardPath } from '@/hooks/useAccess'
 import { adminService } from '@/services/adminService'
 import { authService } from '@/services/authService'
@@ -9,14 +9,16 @@ import { useTenantStore } from '@/store/tenant'
 import { useThemeStore } from '@/store/theme'
 import React, { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import PostLoginContextSelector from '../auth/PostLoginContextSelector'
 import CurrentTenantDisplay from '../CurrentTenantDisplay'
 import UserNotificationCenter from '../notifications/UserNotificationCenter'
 import { TokenExpirationWarning } from '../TokenExpirationWarning'
-import PostLoginContextSelector from '../auth/PostLoginContextSelector'
 
 interface AdminLayoutProps {
     children: React.ReactNode
 }
+
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'dev'
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     const { user, logout, avatar, canAccessAdmin, setupRequired } = useAuthStore()
@@ -71,11 +73,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className="flex items-center gap-2 font-medium text-sm">
             <span>{name}</span>
             {href === '/admin/operations/sre-smart-bot/detector-rules' && pendingDetectorRuleSuggestions > 0 ? (
-                <span className={`inline-flex min-w-[1.5rem] items-center justify-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
-                    active
+                <span className={`inline-flex min-w-[1.5rem] items-center justify-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${active
                         ? 'border-blue-200/70 bg-blue-500/30 text-white'
                         : 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200'
-                }`}>
+                    }`}>
                     {pendingDetectorRuleSuggestions}
                 </span>
             ) : null}
@@ -206,6 +207,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     description: 'Configure K8s clusters and build nodes',
                 },
                 {
+                    name: 'Packer Target Profiles',
+                    href: '/admin/infrastructure/packer-target-profiles',
+                    icon: '📦',
+                    description: 'Configure VMware/AWS/Azure/GCP destination profiles',
+                },
+                {
                     name: 'Build Nodes',
                     href: '/admin/builds/nodes',
                     icon: '🖥️',
@@ -323,6 +330,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     description: 'View system audit logs',
                 }
             ]
+        },
+        {
+            title: 'Help',
+            items: [
+                {
+                    name: 'Product Info',
+                    href: '/admin/help/product-info',
+                    icon: '📦',
+                    description: `Capabilities and release info (v${APP_VERSION})`,
+                },
+            ],
         }
     ]
 
@@ -418,6 +436,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             <span className="text-2xl">🏭</span>
                             <span className="hidden sm:block">Image Factory Admin</span>
                             <span className="sm:hidden">Admin</span>
+                        </Link>
+                        <Link
+                            to="/admin/help/product-info"
+                            className="hidden sm:inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-sky-400 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:text-sky-300"
+                            title="Open product information"
+                        >
+                            v{APP_VERSION}
                         </Link>
                     </div>
                     <div className="flex items-center gap-4">

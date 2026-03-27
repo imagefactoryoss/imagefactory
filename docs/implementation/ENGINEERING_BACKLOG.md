@@ -39,6 +39,15 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - normalized Tekton Packer command assembly to emit repeated `-var` flags.
     - aligned Tekton render context with merged `variables + build_vars` handling and deterministic ordering.
     - added render-context tests for merged vars and `on_error` default/override behavior.
+  - PR3 admin target profile backend foundation completed on `feature/packer-builds`:
+    - added `packer_target_profiles` schema migration with persisted validation fields (`validation_status`, `last_validated_at`, `last_validation_message`, `last_remediation_hints`).
+    - introduced backend domain + postgres repository for profile CRUD and validation-state persistence.
+    - added admin APIs for create/edit/list/detail/delete/validate under `/api/v1/admin/packer-target-profiles`.
+    - added deterministic config validation contract with remediation hints (non-connectivity validation for this slice).
+  - PR3 frontend admin target profile UX completed on `feature/packer-builds`:
+    - added admin page `/admin/infrastructure/packer-target-profiles` for list/create/edit/delete/validate.
+    - wired `AdminLayout` navigation under `Build Management`.
+    - added frontend service/types for `packer-target-profiles` API contract.
 
 ## Backlog Review Summary (2026-03-16)
 
