@@ -73,6 +73,7 @@ var awsAMIIDPattern = regexp.MustCompile(`\bami-[0-9a-fA-F]{8,17}\b`)
 var awsImageARNPattern = regexp.MustCompile(`^arn:aws[a-zA-Z-]*:ec2:([a-z0-9-]+):[0-9]*:image/(ami-[0-9a-fA-F]{8,17})$`)
 var vmwareManagedObjectPattern = regexp.MustCompile(`^vm-\d+$`)
 var azureResourceIDPattern = regexp.MustCompile(`(?i)^/subscriptions/[^/]+/resourcegroups/[^/]+/providers/[^/]+/.+`)
+var gcpImagePathPattern = regexp.MustCompile(`(?i)^/?projects/[^/]+/global/images/[^/]+$`)
 
 type awsLifecycleImageReference struct {
 	Region  string
@@ -90,6 +91,7 @@ type vmDispatchLifecycleExecutor struct {
 	awsClientFactory    func(ctx context.Context, region string) (vmAWSLifecycleClient, error)
 	vmwareClientFactory func(ctx context.Context) (vmVMwareLifecycleClient, error)
 	azureClientFactory  func(ctx context.Context) (vmAzureLifecycleClient, error)
+	gcpClientFactory    func(ctx context.Context) (vmGCPLifecycleClient, error)
 }
 
 type vmVMwareLifecycleClient interface {
@@ -99,6 +101,12 @@ type vmVMwareLifecycleClient interface {
 }
 
 type vmAzureLifecycleClient interface {
+	DeleteImage(ctx context.Context, identifier string) error
+	DeprecateImage(ctx context.Context, identifier, reason string) error
+	ReleaseImage(ctx context.Context, identifier string) error
+}
+
+type vmGCPLifecycleClient interface {
 	DeleteImage(ctx context.Context, identifier string) error
 	DeprecateImage(ctx context.Context, identifier, reason string) error
 	ReleaseImage(ctx context.Context, identifier string) error
@@ -210,7 +218,37 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
 	}
 
-	if provider != "aws" && provider != "vmware" && provider != "azure" {
+	if provider == "gcp" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
+		identifier, err := selectGCPLifecycleIdentifier(req.ProviderArtifactIdentifiers, req.ArtifactValues)
+		if err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+		clientFactory := e.gcpClientFactory
+		if clientFactory == nil {
+			clientFactory = newVMGCPLifecycleClient
+		}
+		client, err := clientFactory(ctx)
+		if err != nil {
+			return vmLifecycleTransitionResult{}, err
+		}
+		switch req.TargetState {
+		case "deleted":
+			if err := client.DeleteImage(ctx, identifier); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		case "deprecated":
+			if err := client.DeprecateImage(ctx, identifier, req.Reason); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		case "released":
+			if err := client.ReleaseImage(ctx, identifier); err != nil {
+				return vmLifecycleTransitionResult{}, err
+			}
+		}
+		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+	}
+
+	if provider != "aws" && provider != "vmware" && provider != "azure" && provider != "gcp" {
 		if e.mode == vmLifecycleExecutionModeRequireProviderNative {
 			if provider == "" {
 				provider = "unknown"
@@ -239,6 +277,12 @@ type vmAzureLifecycleRESTClient struct {
 	bearerToken string
 }
 
+type vmGCPLifecycleRESTClient struct {
+	httpClient  *http.Client
+	baseURL     string
+	bearerToken string
+}
+
 func newVMAzureLifecycleClient(ctx context.Context) (vmAzureLifecycleClient, error) {
 	_ = ctx
 	token := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AZURE_BEARER_TOKEN"))
@@ -252,6 +296,23 @@ func newVMAzureLifecycleClient(ctx context.Context) (vmAzureLifecycleClient, err
 	return vmAzureLifecycleRESTClient{
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
 		apiVersion:  apiVersion,
+		bearerToken: token,
+	}, nil
+}
+
+func newVMGCPLifecycleClient(ctx context.Context) (vmGCPLifecycleClient, error) {
+	_ = ctx
+	token := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_GCP_BEARER_TOKEN"))
+	if token == "" {
+		return nil, fmt.Errorf("%w: gcp bearer token", errInvalidProviderLifecycleTransitionInput)
+	}
+	baseURL := strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_GCP_BASE_URL"))
+	if baseURL == "" {
+		baseURL = "https://compute.googleapis.com/compute/v1"
+	}
+	return vmGCPLifecycleRESTClient{
+		httpClient:  &http.Client{Timeout: 30 * time.Second},
+		baseURL:     strings.TrimRight(baseURL, "/"),
 		bearerToken: token,
 	}, nil
 }
@@ -315,6 +376,68 @@ func (c vmAzureLifecycleRESTClient) doAzureRequest(ctx context.Context, method, 
 		return resp, nil
 	}
 	return resp, fmt.Errorf("azure lifecycle request failed status=%d", resp.StatusCode)
+}
+
+func (c vmGCPLifecycleRESTClient) DeleteImage(ctx context.Context, identifier string) error {
+	normalized, ok := parseGCPLifecycleImageReference(identifier)
+	if !ok {
+		return fmt.Errorf("%w: gcp image identifier parse failed", errInvalidProviderLifecycleTransitionInput)
+	}
+	endpoint := c.baseURL + normalized
+	_, err := c.doGCPRequest(ctx, http.MethodDelete, endpoint, nil)
+	return err
+}
+
+func (c vmGCPLifecycleRESTClient) DeprecateImage(ctx context.Context, identifier, reason string) error {
+	normalized, ok := parseGCPLifecycleImageReference(identifier)
+	if !ok {
+		return fmt.Errorf("%w: gcp image identifier parse failed", errInvalidProviderLifecycleTransitionInput)
+	}
+	endpoint := c.baseURL + normalized + "/deprecate"
+	body := map[string]interface{}{
+		"state": "DEPRECATED",
+	}
+	_ = strings.TrimSpace(reason)
+	_, err := c.doGCPRequest(ctx, http.MethodPost, endpoint, body)
+	return err
+}
+
+func (c vmGCPLifecycleRESTClient) ReleaseImage(ctx context.Context, identifier string) error {
+	normalized, ok := parseGCPLifecycleImageReference(identifier)
+	if !ok {
+		return fmt.Errorf("%w: gcp image identifier parse failed", errInvalidProviderLifecycleTransitionInput)
+	}
+	endpoint := c.baseURL + normalized + "/deprecate"
+	body := map[string]interface{}{
+		"state": "ACTIVE",
+	}
+	_, err := c.doGCPRequest(ctx, http.MethodPost, endpoint, body)
+	return err
+}
+
+func (c vmGCPLifecycleRESTClient) doGCPRequest(ctx context.Context, method, endpoint string, body interface{}) (*http.Response, error) {
+	var payload []byte
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		payload = encoded
+	}
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return resp, nil
+	}
+	return resp, fmt.Errorf("gcp lifecycle request failed status=%d", resp.StatusCode)
 }
 
 type vmVMwareLifecycleSOAPClient struct {
@@ -548,6 +671,38 @@ func parseAzureLifecycleImageReference(raw string) (string, bool) {
 	return "", false
 }
 
+func selectGCPLifecycleIdentifier(providerArtifactIdentifiers map[string][]string, artifactValues []string) (string, error) {
+	candidates := make([]string, 0, len(providerArtifactIdentifiers["gcp"])+len(artifactValues))
+	candidates = append(candidates, providerArtifactIdentifiers["gcp"]...)
+	candidates = append(candidates, artifactValues...)
+	for _, candidate := range candidates {
+		if normalized, ok := parseGCPLifecycleImageReference(candidate); ok {
+			return normalized, nil
+		}
+	}
+	return "", fmt.Errorf("%w: gcp image identifier", errInvalidProviderLifecycleTransitionInput)
+}
+
+func parseGCPLifecycleImageReference(raw string) (string, bool) {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return "", false
+	}
+	lower := strings.ToLower(candidate)
+	if strings.HasPrefix(lower, "https://compute.googleapis.com/compute/v1/") {
+		candidate = "/" + strings.TrimPrefix(candidate, "https://compute.googleapis.com/compute/v1/")
+	} else if strings.HasPrefix(lower, "https://www.googleapis.com/compute/v1/") {
+		candidate = "/" + strings.TrimPrefix(candidate, "https://www.googleapis.com/compute/v1/")
+	}
+	if !strings.HasPrefix(candidate, "/") {
+		candidate = "/" + candidate
+	}
+	if gcpImagePathPattern.MatchString(candidate) {
+		return candidate, true
+	}
+	return "", false
+}
+
 func updateVMwareLifecycleAnnotation(current, reason string, at time.Time, deprecated bool) string {
 	lines := strings.Split(strings.TrimSpace(current), "\n")
 	cleaned := make([]string, 0, len(lines)+1)
@@ -665,6 +820,7 @@ func NewVMImageHandler(db *sqlx.DB, logger *zap.Logger) *VMImageHandler {
 			awsClientFactory:    newVMAWSLifecycleClient,
 			vmwareClientFactory: newVMVMwareLifecycleClient,
 			azureClientFactory:  newVMAzureLifecycleClient,
+			gcpClientFactory:    newVMGCPLifecycleClient,
 		},
 	}
 }

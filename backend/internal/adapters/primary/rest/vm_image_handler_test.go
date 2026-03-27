@@ -81,10 +81,10 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		}
 	})
 
-	t.Run("require_provider_native fails closed", func(t *testing.T) {
+	t.Run("require_provider_native fails closed for unsupported provider", func(t *testing.T) {
 		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
 		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
-			TargetProvider: "gcp",
+			TargetProvider: "oracle",
 			TargetState:    "deprecated",
 		})
 		if !errors.Is(err, errUnsupportedProviderLifecycleTransition) {
@@ -118,6 +118,17 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
 		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
 			TargetProvider: "azure",
+			TargetState:    "deleted",
+		})
+		if !errors.Is(err, errInvalidProviderLifecycleTransitionInput) {
+			t.Fatalf("expected invalid provider lifecycle input error, got %v", err)
+		}
+	})
+
+	t.Run("require_provider_native gcp requires identifiers", func(t *testing.T) {
+		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
+		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "gcp",
 			TargetState:    "deleted",
 		})
 		if !errors.Is(err, errInvalidProviderLifecycleTransitionInput) {
@@ -372,6 +383,60 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 			t.Fatalf("unexpected azure reason %q", fake.lastReason)
 		}
 	})
+
+	t.Run("prefer_provider_native executes gcp delete", func(t *testing.T) {
+		fake := &fakeGCPLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			gcpClientFactory: func(ctx context.Context) (vmGCPLifecycleClient, error) {
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "gcp",
+			TargetState:    "deleted",
+			ProviderArtifactIdentifiers: map[string][]string{
+				"gcp": {"projects/demo/global/images/base-image"},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastAction != "delete" {
+			t.Fatalf("expected gcp delete action, got %q", fake.lastAction)
+		}
+	})
+
+	t.Run("prefer_provider_native executes gcp deprecate with url identifier", func(t *testing.T) {
+		fake := &fakeGCPLifecycleClient{}
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			gcpClientFactory: func(ctx context.Context) (vmGCPLifecycleClient, error) {
+				return fake, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "gcp",
+			TargetState:    "deprecated",
+			Reason:         "superseded gcp image",
+			ArtifactValues: []string{"https://compute.googleapis.com/compute/v1/projects/demo/global/images/base-image"},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "provider_native" {
+			t.Fatalf("expected provider_native mode, got %q", result.TransitionMode)
+		}
+		if fake.lastAction != "deprecate" {
+			t.Fatalf("expected gcp deprecate action, got %q", fake.lastAction)
+		}
+		if fake.lastReason != "superseded gcp image" {
+			t.Fatalf("unexpected gcp reason %q", fake.lastReason)
+		}
+	})
 }
 
 func TestParseAWSLifecycleImageReference(t *testing.T) {
@@ -443,6 +508,28 @@ func TestParseAzureLifecycleImageReference(t *testing.T) {
 	})
 }
 
+func TestParseGCPLifecycleImageReference(t *testing.T) {
+	t.Run("accepts projects path", func(t *testing.T) {
+		ref, ok := parseGCPLifecycleImageReference("projects/demo/global/images/base-image")
+		if !ok || ref != "/projects/demo/global/images/base-image" {
+			t.Fatalf("unexpected parse result ok=%v ref=%q", ok, ref)
+		}
+	})
+
+	t.Run("accepts full compute url", func(t *testing.T) {
+		ref, ok := parseGCPLifecycleImageReference("https://compute.googleapis.com/compute/v1/projects/demo/global/images/base-image")
+		if !ok || ref != "/projects/demo/global/images/base-image" {
+			t.Fatalf("unexpected parse result ok=%v ref=%q", ok, ref)
+		}
+	})
+
+	t.Run("rejects unrelated string", func(t *testing.T) {
+		if _, ok := parseGCPLifecycleImageReference("ami-123"); ok {
+			t.Fatal("expected parse failure for unrelated string")
+		}
+	})
+}
+
 func TestUpdateVMwareLifecycleAnnotation(t *testing.T) {
 	at := time.Date(2026, 3, 27, 21, 0, 0, 0, time.UTC)
 	withDeprecation := updateVMwareLifecycleAnnotation("baseline\n", "stale template", at, true)
@@ -475,6 +562,31 @@ type fakeAzureLifecycleClient struct {
 	lastAction     string
 	lastIdentifier string
 	lastReason     string
+}
+
+type fakeGCPLifecycleClient struct {
+	lastAction     string
+	lastIdentifier string
+	lastReason     string
+}
+
+func (f *fakeGCPLifecycleClient) DeleteImage(ctx context.Context, identifier string) error {
+	f.lastAction = "delete"
+	f.lastIdentifier = identifier
+	return nil
+}
+
+func (f *fakeGCPLifecycleClient) DeprecateImage(ctx context.Context, identifier, reason string) error {
+	f.lastAction = "deprecate"
+	f.lastIdentifier = identifier
+	f.lastReason = reason
+	return nil
+}
+
+func (f *fakeGCPLifecycleClient) ReleaseImage(ctx context.Context, identifier string) error {
+	f.lastAction = "release"
+	f.lastIdentifier = identifier
+	return nil
 }
 
 func (f *fakeAzureLifecycleClient) DeleteImage(ctx context.Context, identifier string) error {
