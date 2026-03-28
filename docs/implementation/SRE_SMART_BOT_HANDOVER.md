@@ -1,7 +1,7 @@
 # SRE Smart Bot Handover
 
 Last updated: `2026-03-28`
-Branch: `feature/sre-smartbot-phase1-loki`
+Branch: `feature/sre-smartbot-test-harness`
 
 ## Current Status
 
@@ -126,11 +126,13 @@ cd /Users/srikarm/projects/image-factory/backend && go test ./internal/applicati
 cd /Users/srikarm/projects/image-factory/backend && go test ./internal/adapters/primary/rest -run SRESmartBot -count=1
 cd /Users/srikarm/projects/image-factory/backend && go test ./internal/application/sresmartbot -run 'Test(BuildDraft|DemoService|ObserveAsyncBacklogSignals_|ObserveNATSConsumerLagSignals_|BuildIncidentWorkspace_IncludesMessagingConsumerSummaryAndBundle)' -count=1
 cd /Users/srikarm/projects/image-factory/frontend && npm test -- --run src/pages/admin/__tests__/SRESmartBotIncidentsPage.test.tsx src/pages/admin/__tests__/sreSmartBotAsyncSummary.test.ts
+cd /Users/srikarm/projects/image-factory && make qa-sre-smartbot-regression
 ```
 
 Known test-harness noise:
 
 - frontend SRE incident tests pass but currently emit repeated React `act(...)` warnings from async state updates in test flows.
+- this is now tracked as a focused test-harness hardening follow-up; the new regression runner keeps failures visible while that warning cleanup is addressed.
 
 ## Notes For Next Contributor
 
