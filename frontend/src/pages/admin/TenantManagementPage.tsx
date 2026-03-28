@@ -35,7 +35,7 @@ interface ExternalTenant {
 interface TenantSelectionModalProps {
     isOpen: boolean
     onClose: () => void
-    onSelect: (tenant: ExternalTenant, formData: any) => Promise<void>
+    onSelect: (tenant: ExternalTenant | null, formData: any) => Promise<void>
     isLoading?: boolean
 }
 
@@ -63,12 +63,22 @@ const getCapabilityValue = (current: OperationCapabilitiesConfig, key: string): 
 
 // External Tenant Selection Modal
 const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onClose, onSelect, isLoading }) => {
+    const [onboardingMode, setOnboardingMode] = useState<'import' | 'manual'>('import')
+    const [apphqUnavailable, setApphqUnavailable] = useState(false)
+    const [apphqError, setApphqError] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
     const [externalTenants, setExternalTenants] = useState<ExternalTenant[]>([])
     const [filteredTenants, setFilteredTenants] = useState<ExternalTenant[]>([])
     const [selectedTenant, setSelectedTenant] = useState<ExternalTenant | null>(null)
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState({
+        tenantCode: '',
+        tenantName: '',
+        tenantSlug: '',
+        tenantDescription: '',
+        contactEmail: '',
+        tenantStatus: 'active',
+        tenantCompany: '',
         adminName: '',
         adminEmail: '',
         apiRateLimit: 1000,
@@ -100,6 +110,13 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
                     return
                 }
                 setFormData({
+                    tenantCode: '',
+                    tenantName: '',
+                    tenantSlug: '',
+                    tenantDescription: '',
+                    contactEmail: '',
+                    tenantStatus: 'active',
+                    tenantCompany: '',
                     adminName: '',
                     adminEmail: '',
                     apiRateLimit: 1000,
@@ -112,6 +129,9 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
             void resetForm()
             setSelectedTenant(null)
             setShowForm(false)
+            setOnboardingMode('import')
+            setApphqUnavailable(false)
+            setApphqError('')
             setLdapUsers([])
             setShowUserDropdown(false)
         }
@@ -122,14 +142,14 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
 
     // Load external tenants when modal opens or search query changes (debounced)
     useEffect(() => {
-        if (!isOpen) return
+        if (!isOpen || onboardingMode !== 'import') return
 
         const timeout = setTimeout(() => {
             loadExternalTenants()
         }, searchQuery ? 400 : 0)
 
         return () => clearTimeout(timeout)
-    }, [isOpen, searchQuery])
+    }, [isOpen, searchQuery, onboardingMode])
 
     // Keep filtered list in sync with fetched results
     useEffect(() => {
@@ -143,8 +163,15 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
             const response = await api.get(`/external-tenants${params}`)
             const data = response.data
             setExternalTenants(data.tenants || [])
+            setApphqUnavailable(false)
+            setApphqError('')
         } catch (error) {
-            toast.error('Failed to load available tenants')
+            setExternalTenants([])
+            setFilteredTenants([])
+            setApphqUnavailable(true)
+            setOnboardingMode('manual')
+            setApphqError('AppHQ lookup is unavailable. Continue with manual tenant onboarding.')
+            toast.error('AppHQ lookup unavailable. Switched to manual onboarding.')
         } finally {
             setLoading(false)
         }
@@ -152,6 +179,16 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
 
     const handleSelectTenant = (tenant: ExternalTenant) => {
         setSelectedTenant(tenant)
+        setFormData((prev) => ({
+            ...prev,
+            tenantCode: tenant.tenant_id || '',
+            tenantName: tenant.name || '',
+            tenantSlug: (tenant.slug || '').toLowerCase(),
+            tenantDescription: tenant.description || '',
+            contactEmail: tenant.contact_email || '',
+            tenantStatus: tenant.status || 'active',
+            tenantCompany: tenant.company || '',
+        }))
         setShowForm(true)
     }
 
@@ -203,12 +240,33 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
     }
 
     const handleSubmit = async () => {
-        if (!selectedTenant) return
+        const tenantForSubmit = onboardingMode === 'manual' ? null : selectedTenant
+        if (onboardingMode === 'import' && !tenantForSubmit) return
+
+        if (!formData.tenantCode.trim()) {
+            toast.error('Tenant code is required')
+            return
+        }
+        if (!formData.tenantName.trim()) {
+            toast.error('Tenant name is required')
+            return
+        }
+        if (!formData.tenantSlug.trim()) {
+            toast.error('Tenant slug is required')
+            return
+        }
 
         try {
-            await onSelect(selectedTenant, formData)
+            await onSelect(tenantForSubmit, formData)
             // Reset form state after successful submission
             setFormData({
+                tenantCode: '',
+                tenantName: '',
+                tenantSlug: '',
+                tenantDescription: '',
+                contactEmail: '',
+                tenantStatus: 'active',
+                tenantCompany: '',
                 adminName: '',
                 adminEmail: '',
                 apiRateLimit: 1000,
@@ -235,13 +293,20 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
                 {/* Header */}
                 <div className="sticky top-0 bg-white dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                        {showForm ? 'Configure Tenant Quotas' : 'Select Tenant to Onboard'}
+                        {showForm ? 'Configure Tenant Onboarding' : 'Onboard Tenant'}
                     </h2>
                     <button
                         onClick={() => {
                             setShowForm(false)
                             setSelectedTenant(null)
                             setFormData({
+                                tenantCode: '',
+                                tenantName: '',
+                                tenantSlug: '',
+                                tenantDescription: '',
+                                contactEmail: '',
+                                tenantStatus: 'active',
+                                tenantCompany: '',
                                 adminName: '',
                                 adminEmail: '',
                                 apiRateLimit: 1000,
@@ -262,7 +327,40 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
 
                 {/* Content */}
                 <div className="p-6 space-y-4">
-                    {!showForm ? (
+                    <div className="inline-flex rounded-md border border-slate-300 bg-slate-100 p-1 dark:border-slate-600 dark:bg-slate-900">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOnboardingMode('import')
+                                setShowForm(false)
+                                setSelectedTenant(null)
+                            }}
+                            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${onboardingMode === 'import'
+                                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
+                        >
+                            Import from AppHQ
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOnboardingMode('manual')
+                                setShowForm(true)
+                                setSelectedTenant(null)
+                            }}
+                            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${onboardingMode === 'manual'
+                                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
+                        >
+                            Manual onboarding
+                        </button>
+                    </div>
+                    {apphqError ? (
+                        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+                            {apphqError}
+                        </div>
+                    ) : null}
+                    {!showForm && onboardingMode === 'import' ? (
                         <>
                             {/* Search Input */}
                             <div>
@@ -287,7 +385,7 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
                                     </div>
                                 ) : filteredTenants.length === 0 ? (
                                     <div className="px-4 py-8 text-center text-slate-600 dark:text-slate-400">
-                                        {searchQuery ? 'No tenants match your search' : 'No tenants available'}
+                                        {searchQuery ? 'No tenants match your search' : apphqUnavailable ? 'AppHQ lookup unavailable. Switch to manual onboarding.' : 'No tenants available'}
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -320,7 +418,7 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
                     ) : (
                         <>
                             {/* Selected Tenant Summary */}
-                            {selectedTenant && (
+                            {selectedTenant && onboardingMode === 'import' && (
                                 <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-md p-4 mb-4">
                                     <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
                                         {selectedTenant.name}
@@ -335,6 +433,102 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
 
                             {/* Quota Configuration */}
                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                        Tenant Code
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.tenantCode}
+                                        onChange={(e) => setFormData({ ...formData, tenantCode: e.target.value.toUpperCase().slice(0, 8) })}
+                                        placeholder="e.g., APP123"
+                                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                        Tenant Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.tenantName}
+                                        onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
+                                        placeholder="e.g., Payments Platform"
+                                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                        Tenant Slug
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.tenantSlug}
+                                        onChange={(e) => setFormData({ ...formData, tenantSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                                        placeholder="e.g., payments-platform"
+                                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        value={formData.tenantDescription}
+                                        onChange={(e) => setFormData({ ...formData, tenantDescription: e.target.value })}
+                                        placeholder="Tenant description"
+                                        rows={2}
+                                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                        Contact Email
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={formData.contactEmail}
+                                        onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                                        placeholder="contact@example.com"
+                                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                            Tenant Status
+                                        </label>
+                                        <select
+                                            value={formData.tenantStatus}
+                                            onChange={(e) => setFormData({ ...formData, tenantStatus: e.target.value })}
+                                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        >
+                                            <option value="active">active</option>
+                                            <option value="pending">pending</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                            Company
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.tenantCompany}
+                                            onChange={(e) => setFormData({ ...formData, tenantCompany: e.target.value })}
+                                            placeholder="e.g., ACME Corp"
+                                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                         Tenant Administrator Name
@@ -478,8 +672,19 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
                     <button
                         onClick={() => {
                             if (showForm) {
-                                setShowForm(false)
+                                if (onboardingMode === 'import') {
+                                    setShowForm(false)
+                                } else {
+                                    onClose()
+                                }
                                 setFormData({
+                                    tenantCode: '',
+                                    tenantName: '',
+                                    tenantSlug: '',
+                                    tenantDescription: '',
+                                    contactEmail: '',
+                                    tenantStatus: 'active',
+                                    tenantCompany: '',
                                     adminName: '',
                                     adminEmail: '',
                                     apiRateLimit: 1000,
@@ -496,12 +701,12 @@ const TenantSelectionModal: React.FC<TenantSelectionModalProps> = ({ isOpen, onC
                         }}
                         className="flex-1 px-4 py-2 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
-                        {showForm ? 'Back' : 'Cancel'}
+                        {showForm && onboardingMode === 'import' ? 'Back' : 'Cancel'}
                     </button>
                     {showForm && (
                         <button
                             onClick={handleSubmit}
-                            disabled={isLoading || !selectedTenant}
+                            disabled={Boolean(isLoading)}
                             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                         >
                             {isLoading ? 'Creating...' : 'Create Tenant'}
@@ -949,7 +1154,7 @@ const TenantManagementPage: React.FC = () => {
         )
     }
 
-    const handleOnboardNewTenant = async (externalTenant: ExternalTenant, formData: any) => {
+    const handleOnboardNewTenant = async (externalTenant: ExternalTenant | null, formData: any) => {
         // Validate admin info
         if (!formData.adminName || !formData.adminName.trim()) {
             toast.error('Tenant administrator name is required')
@@ -967,34 +1172,42 @@ const TenantManagementPage: React.FC = () => {
         try {
             setSubmitting(true)
             const companyId = (window as any).__companyId || null
-            // Auto-populate owner fields from ExternalTenant (APP_MGR fields)
-            const adminName = externalTenant.app_mgr_first_name && externalTenant.app_mgr_last_name
+            // Auto-populate owner fields from ExternalTenant (APP_MGR fields) when available
+            const adminName = externalTenant?.app_mgr_first_name && externalTenant?.app_mgr_last_name
                 ? `${externalTenant.app_mgr_first_name} ${externalTenant.app_mgr_last_name}`.trim()
-                : formData.adminName;
-            const adminEmail = externalTenant.app_mgr_email || formData.adminEmail;
+                : formData.adminName
+            const adminEmail = externalTenant?.app_mgr_email || formData.adminEmail
+            const tenantCode = (externalTenant?.tenant_id || formData.tenantCode || '').trim()
+            const tenantName = (externalTenant?.name || formData.tenantName || '').trim()
+            const tenantSlug = (externalTenant?.slug || formData.tenantSlug || '').trim().toLowerCase()
+            if (!tenantCode || !tenantName || !tenantSlug) {
+                toast.error('Tenant code, name, and slug are required')
+                return
+            }
             const createResponse = await api.post('/tenants', {
                 ...(companyId ? { company_id: companyId } : {}),
-                external_tenant_id: externalTenant.id,
-                tenant_code: externalTenant.tenant_id,
-                name: externalTenant.name,
-                slug: externalTenant.slug,
+                external_tenant_id: externalTenant?.id || '',
+                tenant_code: tenantCode,
+                name: tenantName,
+                slug: tenantSlug,
+                description: formData.tenantDescription || externalTenant?.description || '',
                 admin_name: adminName,
                 admin_email: adminEmail,
-                contact_email: externalTenant.contact_email,
-                status: externalTenant.status,
-                company: externalTenant.company,
-                critical_app: externalTenant.critical_app,
-                org: externalTenant.org,
-                app_strategy: externalTenant.app_strategy,
-                record_type: externalTenant.record_type,
-                internal_flag: externalTenant.internal_flag,
-                prod_date: externalTenant.prod_date,
-                tech_exec_email: externalTenant.tech_exec_email,
-                lob_primary_email: externalTenant.lob_primary_email,
-                app_mgr_netid: externalTenant.app_mgr_netid,
-                app_mgr_first_name: externalTenant.app_mgr_first_name,
-                app_mgr_last_name: externalTenant.app_mgr_last_name,
-                app_mgr_email: externalTenant.app_mgr_email,
+                contact_email: formData.contactEmail || externalTenant?.contact_email || '',
+                status: formData.tenantStatus || externalTenant?.status || 'active',
+                company: formData.tenantCompany || externalTenant?.company || '',
+                critical_app: externalTenant?.critical_app || '',
+                org: externalTenant?.org || '',
+                app_strategy: externalTenant?.app_strategy || '',
+                record_type: externalTenant?.record_type || '',
+                internal_flag: externalTenant?.internal_flag || '',
+                prod_date: externalTenant?.prod_date || '',
+                tech_exec_email: externalTenant?.tech_exec_email || '',
+                lob_primary_email: externalTenant?.lob_primary_email || '',
+                app_mgr_netid: externalTenant?.app_mgr_netid || '',
+                app_mgr_first_name: externalTenant?.app_mgr_first_name || '',
+                app_mgr_last_name: externalTenant?.app_mgr_last_name || '',
+                app_mgr_email: externalTenant?.app_mgr_email || '',
                 api_rate_limit: formData.apiRateLimit,
                 storage_limit: formData.storageLimit,
                 max_users: formData.maxUsers,
