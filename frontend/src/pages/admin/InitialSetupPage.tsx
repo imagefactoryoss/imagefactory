@@ -19,8 +19,8 @@ const InitialSetupPage: React.FC = () => {
     const [general, setGeneral] = useState({
         system_name: 'Image Factory',
         system_description: 'Container image factory platform',
-        admin_email: 'admin@imagefactory.local',
-        support_email: 'support@example.com',
+        admin_email: 'admin@imgfactory.com',
+        support_email: 'support@imgfactory.com',
         time_zone: 'UTC',
         date_format: 'YYYY-MM-DD',
         default_language: 'en',
@@ -32,7 +32,7 @@ const InitialSetupPage: React.FC = () => {
         port: 587,
         username: '',
         password: '',
-        from: 'noreply@example.com',
+        from: 'noreply@imgfactory.com',
         start_tls: true,
         ssl: false,
         enabled: true,
@@ -52,7 +52,7 @@ const InitialSetupPage: React.FC = () => {
         group_filter: '(member=%s)',
         start_tls: false,
         ssl: false,
-        allowed_domains: ['imagefactory.local'],
+        allowed_domains: ['imgfactory.com'],
         enabled: true,
     })
     const [ldapDomainDraft, setLdapDomainDraft] = useState('')
@@ -412,7 +412,7 @@ const InitialSetupPage: React.FC = () => {
                         <div className="flex flex-wrap gap-2">
                             <input
                                 className={`${inputClass} flex-1 min-w-[220px]`}
-                                placeholder="e.g. imagefactory.local"
+                                placeholder="e.g. imgfactory.com"
                                 value={ldapDomainDraft}
                                 onChange={(e) => setLdapDomainDraft(e.target.value)}
                                 onKeyDown={(e) => {

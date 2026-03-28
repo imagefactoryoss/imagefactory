@@ -271,7 +271,7 @@ Image Factory - Secure Container Platform for Modern Development`,
         </div>
         <div class="footer">
             <p>Image Factory - Secure Container Platform for Modern Development</p>
-            <p><a href="mailto:support@imagefactory.local">support@imagefactory.local</a></p>
+            <p><a href="mailto:support@imgfactory.com">support@imgfactory.com</a></p>
         </div>
     </div>
 </body>
@@ -376,7 +376,7 @@ Image Factory - Secure Container Platform for Modern Development`,
         </div>
         <div class="footer">
             <p>Image Factory - Secure Container Platform for Modern Development</p>
-            <p><a href="mailto:support@imagefactory.local">support@imagefactory.local</a></p>
+            <p><a href="mailto:support@imgfactory.com">support@imgfactory.com</a></p>
         </div>
     </div>
 </body>
@@ -421,7 +421,7 @@ NEXT STEPS
 Dashboard: {{.DashboardURL}}
 Build Logs: {{.BuildLogsURL}}
 
-Need help? Contact our support team at support@imagefactory.local
+Need help? Contact our support team at support@imgfactory.com
 
 Best regards,
 The Image Factory Team
@@ -484,7 +484,7 @@ Image Factory - Secure Container Platform for Modern Development`,
         </div>
         <div class="footer">
             <p>Image Factory - Secure Container Platform for Modern Development</p>
-            <p><a href="mailto:support@imagefactory.local">support@imagefactory.local</a></p>
+            <p><a href="mailto:support@imgfactory.com">support@imgfactory.com</a></p>
         </div>
     </div>
 </body>
@@ -719,7 +719,7 @@ NEXT STEPS
 Deployment Logs: {{.DeploymentLogsURL}}
 Dashboard: {{.DashboardURL}}
 
-Need help? Contact our support team at support@imagefactory.local
+Need help? Contact our support team at support@imgfactory.com
 
 Best regards,
 The Image Factory Team
@@ -772,7 +772,7 @@ Image Factory - Secure Container Platform for Modern Development`,
         </div>
         <div class="footer">
             <p>Image Factory - Secure Container Platform for Modern Development</p>
-            <p><a href="mailto:support@imagefactory.local">support@imagefactory.local</a></p>
+            <p><a href="mailto:support@imgfactory.com">support@imgfactory.com</a></p>
         </div>
     </div>
 </body>
@@ -913,7 +913,7 @@ VIEW ALTERNATIVES
 Dashboard: {{.DashboardURL}}
 Image Details: {{.ImageDetailsURL}}
 
-For questions, contact support at support@imagefactory.local
+For questions, contact support at support@imgfactory.com
 
 Best regards,
 The Image Factory Team`,
@@ -961,7 +961,7 @@ The Image Factory Team`,
             </p>
             
             <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
-                For questions, contact support at <a href="mailto:support@imagefactory.local">support@imagefactory.local</a>
+                For questions, contact support at <a href="mailto:support@imgfactory.com">support@imgfactory.com</a>
             </p>
         </div>
         <div class="footer">
@@ -1005,7 +1005,7 @@ Image Details: {{.ImageDetailsURL}}
 
 This vulnerability has been flagged as critical. Please prioritize this update.
 
-For questions, contact security@imagefactory.local
+For questions, contact security@imgfactory.com
 
 Best regards,
 The Image Factory Team`,
@@ -1060,7 +1060,7 @@ The Image Factory Team`,
             </p>
             
             <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
-                For questions, contact <a href="mailto:security@imagefactory.local">security@imagefactory.local</a>
+                For questions, contact <a href="mailto:security@imgfactory.com">security@imgfactory.com</a>
             </p>
         </div>
         <div class="footer">

@@ -46,7 +46,7 @@ test.describe('Quarantine Happy Path (J-01)', () => {
     const projectSlug = `j01-project-${runKey}`.toLowerCase()
 
     // 1) Tenant prepares EPR + quarantine import request via authenticated API
-    await loginAsUser(page, 'alice.johnson@imagefactory.local', 'password', true)
+    await loginAsUser(page, 'alice.johnson@imgfactory.com', 'password', true)
     const tenantAuth = await readAuthContext(page)
     expect(tenantAuth.token.length).toBeGreaterThan(10)
     expect(tenantAuth.tenantId.length).toBeGreaterThan(10)
@@ -76,7 +76,7 @@ test.describe('Quarantine Happy Path (J-01)', () => {
     await resetSession(page)
 
     // 2) Security reviewer approves EPR
-    await loginAsUser(page, 'bob.smith@imagefactory.local', 'password', true)
+    await loginAsUser(page, 'bob.smith@imgfactory.com', 'password', true)
     const reviewerAuth = await readAuthContext(page)
     expect(reviewerAuth.token.length).toBeGreaterThan(10)
 
@@ -88,7 +88,7 @@ test.describe('Quarantine Happy Path (J-01)', () => {
     await resetSession(page)
 
     // 3) Tenant submits quarantine request
-    await loginAsUser(page, 'alice.johnson@imagefactory.local', 'password', true)
+    await loginAsUser(page, 'alice.johnson@imgfactory.com', 'password', true)
     const tenantAuthAfterApproval = await readAuthContext(page)
     const importResp = await apiPost(page, tenantAuthAfterApproval, '/images/import-requests', {
       epr_record_id: eprRecordId,
@@ -103,7 +103,7 @@ test.describe('Quarantine Happy Path (J-01)', () => {
     await resetSession(page)
 
     // 4) Security reviewer approves + releases quarantine request
-    await loginAsUser(page, 'bob.smith@imagefactory.local', 'password', true)
+    await loginAsUser(page, 'bob.smith@imgfactory.com', 'password', true)
     const reviewerAuthAfterImport = await readAuthContext(page)
     const approveImportResp = await apiPost(page, reviewerAuthAfterImport, `/images/import-requests/${importRequestId}/approve`)
     expect(approveImportResp.ok()).toBeTruthy()
@@ -114,7 +114,7 @@ test.describe('Quarantine Happy Path (J-01)', () => {
     await resetSession(page)
 
     // 5) Tenant consumes released artifact through UI drawer and lands in build wizard with prefill
-    await loginAsUser(page, 'alice.johnson@imagefactory.local', 'password', true)
+    await loginAsUser(page, 'alice.johnson@imgfactory.com', 'password', true)
     await page.goto('/quarantine/releases')
     await page.waitForLoadState('networkidle')
 
@@ -139,7 +139,7 @@ test.describe('Quarantine Happy Path (J-01)', () => {
     const sourceImageRef = `library/alpine:j02-${runKey}`
     const sourceRegistry = 'registry-1.docker.io'
 
-    await loginAsUser(page, 'alice.johnson@imagefactory.local', 'password', true)
+    await loginAsUser(page, 'alice.johnson@imgfactory.com', 'password', true)
     const tenantAuth = await readAuthContext(page)
 
     const eprResp = await apiPost(page, tenantAuth, '/epr/registration-requests', {
@@ -154,7 +154,7 @@ test.describe('Quarantine Happy Path (J-01)', () => {
     expect(eprRequestId).toBeTruthy()
 
     await resetSession(page)
-    await loginAsUser(page, 'bob.smith@imagefactory.local', 'password', true)
+    await loginAsUser(page, 'bob.smith@imgfactory.com', 'password', true)
     const reviewerAuth = await readAuthContext(page)
     const approveEprResp = await apiPost(page, reviewerAuth, `/admin/epr/registration-requests/${eprRequestId}/approve`, {
       reason: 'Approved by J-02 automation',
@@ -162,7 +162,7 @@ test.describe('Quarantine Happy Path (J-01)', () => {
     expect(approveEprResp.ok()).toBeTruthy()
 
     await resetSession(page)
-    await loginAsUser(page, 'alice.johnson@imagefactory.local', 'password', true)
+    await loginAsUser(page, 'alice.johnson@imgfactory.com', 'password', true)
     const tenantAuthAfterApproval = await readAuthContext(page)
 
     const importResp = await apiPost(page, tenantAuthAfterApproval, '/images/import-requests', {

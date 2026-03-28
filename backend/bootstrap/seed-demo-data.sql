@@ -33,26 +33,26 @@ ON CONFLICT (company_id, name) DO NOTHING;
 -- SEED EXTERNAL TENANTS (demo data)
 -- ============================================================================
 INSERT INTO external_tenants (tenant_id, name, slug, description, contact_email, industry, country) VALUES
-('10001', 'Engineering Team', 'engineering-team', 'Core engineering and development team', 'eng@imagefactory.local', 'Technology', 'US'),
-('10002', 'DevOps Team', 'devops-team', 'Infrastructure and deployment operations', 'devops@imagefactory.local', 'Technology', 'US'),
-('10003', 'Product Team', 'product-team', 'Product management and strategy', 'product@imagefactory.local', 'Technology', 'US'),
-('10004', 'QA & Testing Team', 'qa-testing-team', 'Quality assurance and testing', 'qa@imagefactory.local', 'Technology', 'US'),
-('10005', 'Frontend Team', 'frontend-team', 'User interface and frontend development', 'frontend@imagefactory.local', 'Technology', 'US'),
-('10006', 'Backend Team', 'backend-team', 'Backend services and APIs', 'backend@imagefactory.local', 'Technology', 'US'),
-('10007', 'Data Science Team', 'data-science-team', 'Analytics and machine learning', 'datasci@imagefactory.local', 'Technology', 'US'),
-('10008', 'Security Team', 'security-team', 'Information security and compliance', 'security@imagefactory.local', 'Technology', 'US'),
-('10009', 'Platform Team', 'platform-team', 'Internal platform and tools', 'platform@imagefactory.local', 'Technology', 'US'),
-('10010', 'Finance Team', 'finance-team', 'Financial planning and operations', 'finance@imagefactory.local', 'Finance', 'US'),
-('10011', 'Human Resources', 'human-resources', 'HR and talent management', 'hr@imagefactory.local', 'Administration', 'US'),
-('10012', 'Sales Team', 'sales-team', 'Enterprise sales and business development', 'sales@imagefactory.local', 'Sales', 'US'),
-('10013', 'Marketing Team', 'marketing-team', 'Marketing and communications', 'marketing@imagefactory.local', 'Marketing', 'US'),
-('10014', 'Customer Success', 'customer-success', 'Customer support and success', 'support@imagefactory.local', 'Support', 'US'),
-('10015', 'Legal Team', 'legal-team', 'Legal and compliance', 'legal@imagefactory.local', 'Legal', 'US'),
-('10016', 'Infrastructure Team', 'infrastructure-team', 'Cloud and infrastructure management', 'infra@imagefactory.local', 'Technology', 'US'),
-('10017', 'Mobile Team', 'mobile-team', 'Mobile app development', 'mobile@imagefactory.local', 'Technology', 'US'),
-('10018', 'API Team', 'api-team', 'API design and integration', 'api@imagefactory.local', 'Technology', 'US'),
-('10019', 'Database Team', 'database-team', 'Database administration and optimization', 'database@imagefactory.local', 'Technology', 'US'),
-('10020', 'Research Team', 'research-team', 'Research and innovation', 'research@imagefactory.local', 'Technology', 'US')
+('10001', 'Engineering Team', 'engineering-team', 'Core engineering and development team', 'eng@imgfactory.com', 'Technology', 'US'),
+('10002', 'DevOps Team', 'devops-team', 'Infrastructure and deployment operations', 'devops@imgfactory.com', 'Technology', 'US'),
+('10003', 'Product Team', 'product-team', 'Product management and strategy', 'product@imgfactory.com', 'Technology', 'US'),
+('10004', 'QA & Testing Team', 'qa-testing-team', 'Quality assurance and testing', 'qa@imgfactory.com', 'Technology', 'US'),
+('10005', 'Frontend Team', 'frontend-team', 'User interface and frontend development', 'frontend@imgfactory.com', 'Technology', 'US'),
+('10006', 'Backend Team', 'backend-team', 'Backend services and APIs', 'backend@imgfactory.com', 'Technology', 'US'),
+('10007', 'Data Science Team', 'data-science-team', 'Analytics and machine learning', 'datasci@imgfactory.com', 'Technology', 'US'),
+('10008', 'Security Team', 'security-team', 'Information security and compliance', 'security@imgfactory.com', 'Technology', 'US'),
+('10009', 'Platform Team', 'platform-team', 'Internal platform and tools', 'platform@imgfactory.com', 'Technology', 'US'),
+('10010', 'Finance Team', 'finance-team', 'Financial planning and operations', 'finance@imgfactory.com', 'Finance', 'US'),
+('10011', 'Human Resources', 'human-resources', 'HR and talent management', 'hr@imgfactory.com', 'Administration', 'US'),
+('10012', 'Sales Team', 'sales-team', 'Enterprise sales and business development', 'sales@imgfactory.com', 'Sales', 'US'),
+('10013', 'Marketing Team', 'marketing-team', 'Marketing and communications', 'marketing@imgfactory.com', 'Marketing', 'US'),
+('10014', 'Customer Success', 'customer-success', 'Customer support and success', 'support@imgfactory.com', 'Support', 'US'),
+('10015', 'Legal Team', 'legal-team', 'Legal and compliance', 'legal@imgfactory.com', 'Legal', 'US'),
+('10016', 'Infrastructure Team', 'infrastructure-team', 'Cloud and infrastructure management', 'infra@imgfactory.com', 'Technology', 'US'),
+('10017', 'Mobile Team', 'mobile-team', 'Mobile app development', 'mobile@imgfactory.com', 'Technology', 'US'),
+('10018', 'API Team', 'api-team', 'API design and integration', 'api@imgfactory.com', 'Technology', 'US'),
+('10019', 'Database Team', 'database-team', 'Database administration and optimization', 'database@imgfactory.com', 'Technology', 'US'),
+('10020', 'Research Team', 'research-team', 'Research and innovation', 'research@imgfactory.com', 'Technology', 'US')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
@@ -78,7 +78,7 @@ SELECT
   u.id,
   u.id
 FROM users u
-WHERE u.email = 'admin@imagefactory.local'
+WHERE u.email = 'admin@imgfactory.com'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO system_configs (
@@ -101,7 +101,7 @@ SELECT
   u.id,
   u.id
 FROM users u
-WHERE u.email = 'admin@imagefactory.local'
+WHERE u.email = 'admin@imgfactory.com'
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
@@ -261,17 +261,17 @@ INSERT INTO infrastructure_providers (
         "runtime_auth": {
           "auth_method": "token",
           "apiServer": "https://localhost:6443",
-          "token": "<redacted-service-account-token>"
+          "token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlI1ZklqYnNlWWtBTXBoTm9uS0tUSVU0eXU2U2w4clF3Vm5mRnAwaWVqUGMifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJpbWFnZS1mYWN0b3J5Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImltYWdlLWZhY3Rvcnktc2Etc2VjcmV0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImltYWdlLWZhY3Rvcnktc2EiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIwM2NkZjc3My0xM2UwLTQxOTUtYWRiOS1iOTYxNTM5Y2JlZmUiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6aW1hZ2UtZmFjdG9yeTppbWFnZS1mYWN0b3J5LXNhIn0.lGiYOBtRPLX4dQaTzbY3dDxaoQRmMHdOsXeFRXv2kivmneZijorPaX1AC0JDeHFlmGgwkuJL6RDu_9UPhbx7XSa6OegWeybkAyaXoz2QjG484dtZDBHICwRDhOxr9ySCYGf8e_b6hqaW-v5aa0laXBLS87zMiUCs1vxeUtIsDNI8T0kBJ2XnRQF1kZK2G-SbHc2JOaBn0wks6cK1-3_Wazxuw40DfqG0rdLLfl2sW3eXXYC-cglJZhHlotPShdIbI_r3BLIJb944dA5v32oXePu_UTTOJR7aI8OMEe2mEA-sXArgeQ1fADwygq07uHaRIEZiafiOrtBilMO3otGCjg"
         },
         "bootstrap_auth": {
           "auth_method": "token",
           "apiServer": "https://localhost:6443",
-          "token": "<redacted-service-account-token>"
+          "token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlI1ZklqYnNlWWtBTXBoTm9uS0tUSVU0eXU2U2w4clF3Vm5mRnAwaWVqUGMifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJpbWFnZS1mYWN0b3J5Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImltYWdlLWZhY3Rvcnktc2Etc2VjcmV0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImltYWdlLWZhY3Rvcnktc2EiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIwM2NkZjc3My0xM2UwLTQxOTUtYWRiOS1iOTYxNTM5Y2JlZmUiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6aW1hZ2UtZmFjdG9yeTppbWFnZS1mYWN0b3J5LXNhIn0.lGiYOBtRPLX4dQaTzbY3dDxaoQRmMHdOsXeFRXv2kivmneZijorPaX1AC0JDeHFlmGgwkuJL6RDu_9UPhbx7XSa6OegWeybkAyaXoz2QjG484dtZDBHICwRDhOxr9ySCYGf8e_b6hqaW-v5aa0laXBLS87zMiUCs1vxeUtIsDNI8T0kBJ2XnRQF1kZK2G-SbHc2JOaBn0wks6cK1-3_Wazxuw40DfqG0rdLLfl2sW3eXXYC-cglJZhHlotPShdIbI_r3BLIJb944dA5v32oXePu_UTTOJR7aI8OMEe2mEA-sXArgeQ1fADwygq07uHaRIEZiafiOrtBilMO3otGCjg"
         }
     }'::jsonb,
     'online',
     '["gpu", "high-memory", "arm64", "x86_64"]'::jsonb,
-    (SELECT id FROM users WHERE email = 'admin@imagefactory.local' LIMIT 1)
+    (SELECT id FROM users WHERE email = 'admin@imgfactory.com' LIMIT 1)
 ) ON CONFLICT DO NOTHING;
 
 -- Grant permissions for the rancher-desktop provider to all tenants
@@ -285,7 +285,7 @@ SELECT
     ip.id,
     t.id,
     'infrastructure:select',
-    (SELECT id FROM users WHERE email = 'admin@imagefactory.local' LIMIT 1)
+    (SELECT id FROM users WHERE email = 'admin@imgfactory.com' LIMIT 1)
 FROM infrastructure_providers ip
 CROSS JOIN tenants t
 WHERE ip.name = 'rancher-desktop' AND ip.status = 'online'
@@ -302,7 +302,7 @@ SELECT
     ip.id,
     (SELECT id FROM tenants WHERE tenant_code = 'sysadmin' LIMIT 1),
     'infrastructure:configure',
-    (SELECT id FROM users WHERE email = 'admin@imagefactory.local' LIMIT 1)
+    (SELECT id FROM users WHERE email = 'admin@imgfactory.com' LIMIT 1)
 FROM infrastructure_providers ip
 WHERE ip.name = 'rancher-desktop'
 ON CONFLICT DO NOTHING;
@@ -331,7 +331,7 @@ DECLARE
     v_sbom_node UUID;
     v_sbom_python UUID;
 BEGIN
-    SELECT id INTO v_admin_user_id FROM users WHERE email = 'admin@imagefactory.local' LIMIT 1;
+    SELECT id INTO v_admin_user_id FROM users WHERE email = 'admin@imgfactory.com' LIMIT 1;
     SELECT id INTO v_tenant_id FROM tenants WHERE tenant_code = 'sysadmin' LIMIT 1;
     IF v_tenant_id IS NULL THEN
         SELECT id INTO v_tenant_id FROM tenants ORDER BY created_at ASC LIMIT 1;

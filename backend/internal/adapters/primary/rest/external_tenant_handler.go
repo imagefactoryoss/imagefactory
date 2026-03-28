@@ -34,26 +34,26 @@ func NewExternalTenantHandler(logger *zap.Logger, systemConfigService *systemcon
 
 // ExternalTenant represents a tenant record returned to the frontend.
 type ExternalTenant struct {
-	ID                string `json:"id"`
-	TenantID          string `json:"tenant_id"`
-	Name              string `json:"name"`
-	Slug              string `json:"slug"`
-	Description       string `json:"description"`
-	ContactEmail      string `json:"contact_email"`
-	Status            string `json:"status"`
-	Company           string `json:"company"`
-	CriticalApp       string `json:"critical_app"`
-	Org               string `json:"org"`
-	AppStrategy       string `json:"app_strategy"`
-	RecordType        string `json:"record_type"`
-	InternalFlag      string `json:"internal_flag"`
-	ProdDate          string `json:"prod_date"`
-	TechExecEmail     string `json:"tech_exec_email"`
-	LOBPrimaryEmail   string `json:"lob_primary_email"`
-	AppMgrNetID       string `json:"app_mgr_netid"`
-	AppMgrFirstName   string `json:"app_mgr_first_name"`
-	AppMgrLastName    string `json:"app_mgr_last_name"`
-	AppMgrEmail       string `json:"app_mgr_email"`
+	ID              string `json:"id"`
+	TenantID        string `json:"tenant_id"`
+	Name            string `json:"name"`
+	Slug            string `json:"slug"`
+	Description     string `json:"description"`
+	ContactEmail    string `json:"contact_email"`
+	Status          string `json:"status"`
+	Company         string `json:"company"`
+	CriticalApp     string `json:"critical_app"`
+	Org             string `json:"org"`
+	AppStrategy     string `json:"app_strategy"`
+	RecordType      string `json:"record_type"`
+	InternalFlag    string `json:"internal_flag"`
+	ProdDate        string `json:"prod_date"`
+	TechExecEmail   string `json:"tech_exec_email"`
+	LOBPrimaryEmail string `json:"lob_primary_email"`
+	AppMgrNetID     string `json:"app_mgr_netid"`
+	AppMgrFirstName string `json:"app_mgr_first_name"`
+	AppMgrLastName  string `json:"app_mgr_last_name"`
+	AppMgrEmail     string `json:"app_mgr_email"`
 }
 
 // apphqRequest is the JSON body sent to the AppHQ exec API.
@@ -274,26 +274,26 @@ func mapAppHQToTenant(row map[string]interface{}) ExternalTenant {
 	// (for now, use contactEmail as best effort)
 
 	return ExternalTenant{
-		ID:                appID,
-		TenantID:          appID,
-		Name:              shortName,
-		Slug:              slug,
-		Description:       description,
-		ContactEmail:      contactEmail,
-		Status:            str("APPSTATUS"),
-		Company:           str("COMPANY"),
-		CriticalApp:       str("CRITICAL_APP"),
-		Org:               str("ALGN_CIO_ORG"),
-		AppStrategy:       str("APPSTRATEGY"),
-		RecordType:        str("RECORD_TYPE"),
-		InternalFlag:      str("INTERNAL_FLAG"),
-		ProdDate:          str("APP_STATUS_PROD_DATE"),
-		TechExecEmail:     str("TECHEXEC_MAILID"),
-		LOBPrimaryEmail:   str("LOB_PRIMARY_MAILID"),
-		AppMgrNetID:       appMgrNetID,
-		AppMgrFirstName:   appMgrFirstName,
-		AppMgrLastName:    appMgrLastName,
-		AppMgrEmail:       appMgrEmail,
+		ID:              appID,
+		TenantID:        appID,
+		Name:            shortName,
+		Slug:            slug,
+		Description:     description,
+		ContactEmail:    contactEmail,
+		Status:          str("APPSTATUS"),
+		Company:         str("COMPANY"),
+		CriticalApp:     str("CRITICAL_APP"),
+		Org:             str("ALGN_CIO_ORG"),
+		AppStrategy:     str("APPSTRATEGY"),
+		RecordType:      str("RECORD_TYPE"),
+		InternalFlag:    str("INTERNAL_FLAG"),
+		ProdDate:        str("APP_STATUS_PROD_DATE"),
+		TechExecEmail:   str("TECHEXEC_MAILID"),
+		LOBPrimaryEmail: str("LOB_PRIMARY_MAILID"),
+		AppMgrNetID:     appMgrNetID,
+		AppMgrFirstName: appMgrFirstName,
+		AppMgrLastName:  appMgrLastName,
+		AppMgrEmail:     appMgrEmail,
 	}
 }
 

@@ -1,5 +1,5 @@
-import Drawer from '@/components/ui/Drawer'
 import MermaidSequencePreview from '@/components/common/MermaidSequencePreview'
+import Drawer from '@/components/ui/Drawer'
 import { useCapabilitySurfacesStore } from '@/store/capabilitySurfaces'
 import { ChevronRight } from 'lucide-react'
 import React from 'react'
@@ -200,11 +200,10 @@ const CapabilityAccessPage: React.FC = () => {
                 key={key}
                 type="button"
                 onClick={() => setSelectedCapability(key)}
-                className={`w-full rounded-lg border p-3 text-left transition ${
-                  selectedCapability === key
+                className={`w-full rounded-lg border p-3 text-left transition ${selectedCapability === key
                     ? 'border-sky-400 bg-sky-50 dark:border-sky-600 dark:bg-sky-950/20'
                     : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:border-slate-600 dark:hover:bg-slate-800/60'
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -213,11 +212,10 @@ const CapabilityAccessPage: React.FC = () => {
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        enabled
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${enabled
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200'
                           : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
-                      }`}
+                        }`}
                     >
                       {enabled ? 'Enabled' : 'Not entitled'}
                     </span>

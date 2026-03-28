@@ -1,6 +1,6 @@
 {
     "name": "image-factory-frontend",
-    "version": "1.0.0",
+    "version": "0.2.1",
     "description": "Multi-Tenant Image Factory Frontend",
     "type": "module",
     "scripts": {

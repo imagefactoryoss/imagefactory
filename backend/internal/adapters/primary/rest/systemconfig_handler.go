@@ -817,6 +817,24 @@ func (h *SystemConfigHandler) UpdateTektonTaskImages(w http.ResponseWriter, r *h
 	json.NewEncoder(w).Encode(updatedConfig)
 }
 
+// GetProductInfoMetadata handles GET /api/v1/admin/settings/product-info-metadata
+func (h *SystemConfigHandler) GetProductInfoMetadata(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	metadata, err := h.systemConfigService.GetProductInfoMetadataConfig(r.Context())
+	if err != nil {
+		h.logger.Error("Failed to get product info metadata config", zap.Error(err))
+		http.Error(w, "Failed to get product info metadata configuration", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(metadata)
+}
+
 // GetToolAvailability handles GET /api/v1/admin/settings/tools
 func (h *SystemConfigHandler) GetToolAvailability(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

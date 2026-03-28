@@ -1,15 +1,15 @@
-import { Project } from '@/types'
-import { projectService } from '@/services/projectService'
-import { RepositoryAuthList, RepositoryAuthModal } from '@/components/projects/repository-auth'
-import { RegistryAuthList, RegistryAuthModal } from '@/components/projects/registry-auth'
-import { ProjectMembersUI } from '@/components/projects/ProjectMembersUI'
-import { repositoryAuthClient } from '@/api/repositoryAuthClient'
 import { gitProviderClient } from '@/api/gitProviderClient'
+import { repositoryAuthClient } from '@/api/repositoryAuthClient'
 import { repositoryBranchClient } from '@/api/repositoryBranchClient'
+import { ProjectMembersUI } from '@/components/projects/ProjectMembersUI'
+import { RegistryAuthList, RegistryAuthModal } from '@/components/projects/registry-auth'
+import { RepositoryAuthList, RepositoryAuthModal } from '@/components/projects/repository-auth'
+import { projectService } from '@/services/projectService'
+import { useAuthStore } from '@/store/auth'
+import { Project } from '@/types'
 import { GitProvider } from '@/types/gitProvider'
 import { RegistryAuth } from '@/types/registryAuth'
 import { RepositoryAuth, RepositoryAuthSummary } from '@/types/repositoryAuth'
-import { useAuthStore } from '@/store/auth'
 import { Check, Info, Loader, Pencil, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
@@ -504,23 +504,23 @@ export default function EditProjectWizardModal({
                         <div className="border-b border-gray-200 dark:border-gray-700 px-6">
                             <div className="flex space-x-6">
                                 {effectiveStepOrder.map((step) => (
-                                <button
-                                    key={step}
-                                    onClick={() => goToStep(step)}
-                                    className={`py-4 px-1 border-b-2 text-sm font-medium ${activeStep === step
-                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                        : step === 'basics' && basicsSaved
-                                            ? 'border-green-500 text-green-600 dark:text-green-400'
-                                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                        }`}
-                                >
-                                    <span className="inline-flex items-center gap-2">
-                                        {stepLabels[step]}
-                                        {step === 'basics' && basicsSaved && (
-                                            <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                        )}
-                                    </span>
-                                </button>
+                                    <button
+                                        key={step}
+                                        onClick={() => goToStep(step)}
+                                        className={`py-4 px-1 border-b-2 text-sm font-medium ${activeStep === step
+                                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                            : step === 'basics' && basicsSaved
+                                                ? 'border-green-500 text-green-600 dark:text-green-400'
+                                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                            }`}
+                                    >
+                                        <span className="inline-flex items-center gap-2">
+                                            {stepLabels[step]}
+                                            {step === 'basics' && basicsSaved && (
+                                                <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                            )}
+                                        </span>
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -681,304 +681,304 @@ export default function EditProjectWizardModal({
                                         </div>
 
                                         <div>
-                                    {mode === 'create' && (
-                                        <div className="mb-3">
-                                            <label htmlFor="sourceName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                <span className="inline-flex items-center gap-2">
-                                                    Initial Source Name
-                                                    <span title="A friendly label for the source used in build source selection.">
-                                                        <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" aria-hidden="true" />
-                                                    </span>
-                                                </span>
-                                            </label>
-                                            <input
-                                                type="text"
-                                                id="sourceName"
-                                                value={formData.sourceName}
-                                                onChange={(e) => setFormData({ ...formData, sourceName: e.target.value })}
-                                                placeholder="primary"
-                                                className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.sourceName
-                                                    ? 'border-red-500'
-                                                    : 'border-gray-300 dark:border-gray-600'
-                                                    }`}
-                                            />
-                                            {errors.sourceName && (
-                                                <p className="mt-1 text-sm text-red-500 dark:text-red-400">{errors.sourceName}</p>
-                                            )}
-                                        </div>
-                                    )}
-                                    <label htmlFor="repositoryUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        {mode === 'create' ? 'Initial Source Repository URL' : 'Repository URL'}
-                                    </label>
-                                    <input
-                                        type="url"
-                                        id="repositoryUrl"
-                                        value={formData.repositoryUrl}
-                                        onChange={(e) => setFormData({ ...formData, repositoryUrl: e.target.value })}
-                                        placeholder="https://github.com/username/repo.git or git@github.com:username/repo.git"
-                                        className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                                    />
-                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                        {mode === 'create'
-                                            ? 'Optional during project creation. If provided, this becomes the default project source.'
-                                            : 'Git repository URL (HTTPS or SSH).'}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label htmlFor="gitProvider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Git Provider
-                                    </label>
-                                    <select
-                                        id="gitProvider"
-                                        value={formData.gitProvider}
-                                        onChange={(e) => setFormData({ ...formData, gitProvider: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                                    >
-                                        <option value="">Select a provider</option>
-                                        {gitProviders.map((provider) => (
-                                            <option key={provider.key} value={provider.key}>
-                                                {provider.display_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {providersLoading && (
-                                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading providers...</p>
-                                    )}
-                                    {providersError && (
-                                        <p className="mt-1 text-sm text-red-500 dark:text-red-400">{providersError}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label htmlFor="repositoryAuthId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        <span className="flex items-center gap-2">
-                                            Repository Auth
-                                            {!formData.repositoryAuthId && (
-                                                <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 px-2 py-0.5 text-xs font-semibold">
-                                                    Required to load branches
-                                                </span>
-                                            )}
-                                        </span>
-                                    </label>
-                                    <select
-                                        id="repositoryAuthId"
-                                        value={formData.repositoryAuthId}
-                                        onChange={(e) => setFormData({ ...formData, repositoryAuthId: e.target.value })}
-                                        disabled={authsLoading || repositoryAuths.length === 0}
-                                        className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                                    >
-                                        <option value="">
-                                            {repositoryAuths.length === 0 ? 'No auths in this project yet' : 'Select authentication'}
-                                        </option>
-                                        {repositoryAuths.map((auth) => (
-                                            <option key={auth.id} value={auth.id}>
-                                                {auth.name} — {auth.id}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        UUIDs are shown for direct mapping to config references.
-                                    </p>
-                                    {authsLoading && (
-                                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading repository auth...</p>
-                                    )}
-                                    {authsError && (
-                                        <p className="mt-1 text-sm text-red-500 dark:text-red-400">{authsError}</p>
-                                    )}
-                                    {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && availableAuths.length === 0 && (
-                                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                            No repository auth methods yet.
-                                        </p>
-                                    )}
-                                    {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && availableAuths.length > 0 && (
-                                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                            No auths in this project yet. Choose one from “Use Existing Auth (Clone)” or create a new auth.
-                                        </p>
-                                    )}
-                                </div>
-
-                                {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && availableAuths.length === 0 && (
-                                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                                                    Create repository authentication
-                                                </h4>
-                                                <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
-                                                    You need at least one auth method before you can fetch branches.
-                                                </p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowAuthModal(true)}
-                                                className="px-3 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700"
-                                            >
-                                                Create Auth
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && (
-                                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/40 p-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                                    No repository auth selected
-                                                </h4>
-                                                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                                                    You can create a new auth or clone an existing one, then come back to Basics.
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowAuthModal(true)}
-                                                    className="px-3 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                                                >
-                                                    Add Auth
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setActiveStep('repository-auth')}
-                                                    className="px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-                                                >
-                                                    Go to Auth Step
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && availableAuths.length === 0 && (
-                                    <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
-                                        <p className="text-sm text-blue-800 dark:text-blue-300">
-                                            Authentication is required to continue to the next step. Create or clone a repository auth to proceed.
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <label htmlFor="availableRepositoryAuthId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Use Existing Auth (Clone)
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                        <select
-                                            id="availableRepositoryAuthId"
-                                            value={selectedAvailableAuthId}
-                                            onChange={(e) => setSelectedAvailableAuthId(e.target.value)}
-                                            className="flex-1 px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                                        >
-                                            <option value="">Select an auth to clone</option>
-                                            {filteredAvailableAuths.map((auth) => (
-                                                <option key={auth.id} value={auth.id}>
-                                                    {auth.name} — {auth.id} — {auth.project_name}{auth.git_provider_key ? ` (${auth.git_provider_key})` : ''}{auth.auth_type ? ` — ${auth.auth_type.replace('_', ' ')}` : ''}{auth.created_by ? ` — Created by ${auth.created_by === currentUserId ? 'you' : (auth.created_by_email || 'unknown')}` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <button
-                                            type="button"
-                                            onClick={handleCloneAuth}
-                                            disabled={!selectedAvailableAuthId || cloningAuth}
-                                            className="px-3 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {cloningAuth ? 'Cloning...' : 'Use'}
-                                        </button>
-                                    </div>
-                                    {selectedAvailableAuthId && formData.gitProvider && filteredAvailableAuths.some(auth => auth.id === selectedAvailableAuthId && auth.git_provider_key && auth.git_provider_key !== formData.gitProvider) && (
-                                        <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
-                                            Warning: This auth was created for a different provider than the current selection.
-                                        </p>
-                                    )}
-                                    {availableAuthsLoading && (
-                                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading available auths...</p>
-                                    )}
-                                    {availableAuthsError && (
-                                        <p className="mt-1 text-sm text-red-500 dark:text-red-400">{availableAuthsError}</p>
-                                    )}
-                                    {!availableAuthsLoading && filteredAvailableAuths.length === 0 && (
-                                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                            No existing auths available to clone.
-                                        </p>
-                                    )}
-                                    {cloneTestStatus !== 'idle' && (
-                                        <p className={`mt-1 text-sm ${cloneTestStatus === 'success' ? 'text-green-600 dark:text-green-400' : cloneTestStatus === 'testing' ? 'text-blue-600 dark:text-blue-400' : 'text-red-500 dark:text-red-400'}`}>
-                                            {cloneTestStatus === 'testing' ? 'Testing cloned authentication...' : cloneTestMessage}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label htmlFor="branch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        {mode === 'create' ? 'Initial Source Default Branch' : 'Default Branch'}
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                        {branches.length > 0 ? (
-                                            <div className="flex-1 space-y-2">
-                                                <select
-                                                    id="branch"
-                                                    value={branches.includes(formData.branch ?? '') ? formData.branch : '__custom__'}
-                                                    onChange={(e) => {
-                                                        const next = e.target.value
-                                                        setFormData({ ...formData, branch: next === '__custom__' ? '' : next })
-                                                    }}
-                                                    className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                                                >
-                                                    <option value="" disabled>Select a branch</option>
-                                                    {branches.map((branch) => (
-                                                        <option key={branch} value={branch}>
-                                                            {branch}
-                                                        </option>
-                                                    ))}
-                                                    <option value="__custom__">Custom branch…</option>
-                                                </select>
-                                                {(!formData.branch || !branches.includes(formData.branch)) && (
+                                            {mode === 'create' && (
+                                                <div className="mb-3">
+                                                    <label htmlFor="sourceName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                        <span className="inline-flex items-center gap-2">
+                                                            Initial Source Name
+                                                            <span title="A friendly label for the source used in build source selection.">
+                                                                <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+                                                            </span>
+                                                        </span>
+                                                    </label>
                                                     <input
                                                         type="text"
+                                                        id="sourceName"
+                                                        value={formData.sourceName}
+                                                        onChange={(e) => setFormData({ ...formData, sourceName: e.target.value })}
+                                                        placeholder="primary"
+                                                        className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.sourceName
+                                                            ? 'border-red-500'
+                                                            : 'border-gray-300 dark:border-gray-600'
+                                                            }`}
+                                                    />
+                                                    {errors.sourceName && (
+                                                        <p className="mt-1 text-sm text-red-500 dark:text-red-400">{errors.sourceName}</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <label htmlFor="repositoryUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                {mode === 'create' ? 'Initial Source Repository URL' : 'Repository URL'}
+                                            </label>
+                                            <input
+                                                type="url"
+                                                id="repositoryUrl"
+                                                value={formData.repositoryUrl}
+                                                onChange={(e) => setFormData({ ...formData, repositoryUrl: e.target.value })}
+                                                placeholder="https://github.com/username/repo.git or git@github.com:username/repo.git"
+                                                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                            />
+                                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                {mode === 'create'
+                                                    ? 'Optional during project creation. If provided, this becomes the default project source.'
+                                                    : 'Git repository URL (HTTPS or SSH).'}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="gitProvider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Git Provider
+                                            </label>
+                                            <select
+                                                id="gitProvider"
+                                                value={formData.gitProvider}
+                                                onChange={(e) => setFormData({ ...formData, gitProvider: e.target.value })}
+                                                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                            >
+                                                <option value="">Select a provider</option>
+                                                {gitProviders.map((provider) => (
+                                                    <option key={provider.key} value={provider.key}>
+                                                        {provider.display_name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {providersLoading && (
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading providers...</p>
+                                            )}
+                                            {providersError && (
+                                                <p className="mt-1 text-sm text-red-500 dark:text-red-400">{providersError}</p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="repositoryAuthId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                <span className="flex items-center gap-2">
+                                                    Repository Auth
+                                                    {!formData.repositoryAuthId && (
+                                                        <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 px-2 py-0.5 text-xs font-semibold">
+                                                            Required to load branches
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </label>
+                                            <select
+                                                id="repositoryAuthId"
+                                                value={formData.repositoryAuthId}
+                                                onChange={(e) => setFormData({ ...formData, repositoryAuthId: e.target.value })}
+                                                disabled={authsLoading || repositoryAuths.length === 0}
+                                                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                            >
+                                                <option value="">
+                                                    {repositoryAuths.length === 0 ? 'No auths in this project yet' : 'Select authentication'}
+                                                </option>
+                                                {repositoryAuths.map((auth) => (
+                                                    <option key={auth.id} value={auth.id}>
+                                                        {auth.name} — {auth.id}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                UUIDs are shown for direct mapping to config references.
+                                            </p>
+                                            {authsLoading && (
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading repository auth...</p>
+                                            )}
+                                            {authsError && (
+                                                <p className="mt-1 text-sm text-red-500 dark:text-red-400">{authsError}</p>
+                                            )}
+                                            {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && availableAuths.length === 0 && (
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                    No repository auth methods yet.
+                                                </p>
+                                            )}
+                                            {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && availableAuths.length > 0 && (
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                    No auths in this project yet. Choose one from “Use Existing Auth (Clone)” or create a new auth.
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && availableAuths.length === 0 && (
+                                            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                                            Create repository authentication
+                                                        </h4>
+                                                        <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                                                            You need at least one auth method before you can fetch branches.
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowAuthModal(true)}
+                                                        className="px-3 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700"
+                                                    >
+                                                        Create Auth
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && (
+                                            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/40 p-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                            No repository auth selected
+                                                        </h4>
+                                                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                                            You can create a new auth or clone an existing one, then come back to Basics.
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowAuthModal(true)}
+                                                            className="px-3 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                                                        >
+                                                            Add Auth
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setActiveStep('repository-auth')}
+                                                            className="px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                                                        >
+                                                            Go to Auth Step
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {!!formData.repositoryUrl?.trim() && !authsLoading && !availableAuthsLoading && repositoryAuths.length === 0 && availableAuths.length === 0 && (
+                                            <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
+                                                <p className="text-sm text-blue-800 dark:text-blue-300">
+                                                    Authentication is required to continue to the next step. Create or clone a repository auth to proceed.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <label htmlFor="availableRepositoryAuthId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Use Existing Auth (Clone)
+                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    id="availableRepositoryAuthId"
+                                                    value={selectedAvailableAuthId}
+                                                    onChange={(e) => setSelectedAvailableAuthId(e.target.value)}
+                                                    className="flex-1 px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                                >
+                                                    <option value="">Select an auth to clone</option>
+                                                    {filteredAvailableAuths.map((auth) => (
+                                                        <option key={auth.id} value={auth.id}>
+                                                            {auth.name} — {auth.id} — {auth.project_name}{auth.git_provider_key ? ` (${auth.git_provider_key})` : ''}{auth.auth_type ? ` — ${auth.auth_type.replace('_', ' ')}` : ''}{auth.created_by ? ` — Created by ${auth.created_by === currentUserId ? 'you' : (auth.created_by_email || 'unknown')}` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCloneAuth}
+                                                    disabled={!selectedAvailableAuthId || cloningAuth}
+                                                    className="px-3 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {cloningAuth ? 'Cloning...' : 'Use'}
+                                                </button>
+                                            </div>
+                                            {selectedAvailableAuthId && formData.gitProvider && filteredAvailableAuths.some(auth => auth.id === selectedAvailableAuthId && auth.git_provider_key && auth.git_provider_key !== formData.gitProvider) && (
+                                                <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+                                                    Warning: This auth was created for a different provider than the current selection.
+                                                </p>
+                                            )}
+                                            {availableAuthsLoading && (
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading available auths...</p>
+                                            )}
+                                            {availableAuthsError && (
+                                                <p className="mt-1 text-sm text-red-500 dark:text-red-400">{availableAuthsError}</p>
+                                            )}
+                                            {!availableAuthsLoading && filteredAvailableAuths.length === 0 && (
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                    No existing auths available to clone.
+                                                </p>
+                                            )}
+                                            {cloneTestStatus !== 'idle' && (
+                                                <p className={`mt-1 text-sm ${cloneTestStatus === 'success' ? 'text-green-600 dark:text-green-400' : cloneTestStatus === 'testing' ? 'text-blue-600 dark:text-blue-400' : 'text-red-500 dark:text-red-400'}`}>
+                                                    {cloneTestStatus === 'testing' ? 'Testing cloned authentication...' : cloneTestMessage}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="branch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                {mode === 'create' ? 'Initial Source Default Branch' : 'Default Branch'}
+                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                {branches.length > 0 ? (
+                                                    <div className="flex-1 space-y-2">
+                                                        <select
+                                                            id="branch"
+                                                            value={branches.includes(formData.branch ?? '') ? formData.branch : '__custom__'}
+                                                            onChange={(e) => {
+                                                                const next = e.target.value
+                                                                setFormData({ ...formData, branch: next === '__custom__' ? '' : next })
+                                                            }}
+                                                            className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                                        >
+                                                            <option value="" disabled>Select a branch</option>
+                                                            {branches.map((branch) => (
+                                                                <option key={branch} value={branch}>
+                                                                    {branch}
+                                                                </option>
+                                                            ))}
+                                                            <option value="__custom__">Custom branch…</option>
+                                                        </select>
+                                                        {(!formData.branch || !branches.includes(formData.branch)) && (
+                                                            <input
+                                                                type="text"
+                                                                value={formData.branch}
+                                                                onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+                                                                placeholder="Enter custom branch"
+                                                                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        id="branch"
+                                                        list="branch-options"
                                                         value={formData.branch}
                                                         onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                                                        placeholder="Enter custom branch"
-                                                        className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                                        placeholder="main"
+                                                        className="flex-1 px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
                                                     />
                                                 )}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleFetchBranches}
+                                                    disabled={branchesLoading || !formData.repositoryUrl || !formData.repositoryAuthId}
+                                                    className="px-3 py-2 text-sm font-medium text-white bg-slate-900 dark:bg-slate-100 dark:text-slate-900 rounded-lg hover:bg-slate-800 dark:hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {branchesLoading ? 'Loading...' : 'Load Branches'}
+                                                </button>
                                             </div>
-                                        ) : (
-                                            <input
-                                                type="text"
-                                                id="branch"
-                                                list="branch-options"
-                                                value={formData.branch}
-                                                onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                                                placeholder="main"
-                                                className="flex-1 px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                                            />
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={handleFetchBranches}
-                                            disabled={branchesLoading || !formData.repositoryUrl || !formData.repositoryAuthId}
-                                            className="px-3 py-2 text-sm font-medium text-white bg-slate-900 dark:bg-slate-100 dark:text-slate-900 rounded-lg hover:bg-slate-800 dark:hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {branchesLoading ? 'Loading...' : 'Load Branches'}
-                                        </button>
-                                    </div>
-                                    {branches.length > 0 && (
-                                        <datalist id="branch-options">
-                                            {branches.map((branch) => (
-                                                <option key={branch} value={branch} />
-                                            ))}
-                                        </datalist>
-                                    )}
-                                    {branchesError && (
-                                        <p className="mt-1 text-sm text-red-500 dark:text-red-400">{branchesError}</p>
-                                    )}
-                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                        {mode === 'create'
-                                            ? 'Default branch for the initial project source (usually main or master).'
-                                            : 'Default branch for builds (usually main or master).'}
-                                    </p>
-                                </div>
+                                            {branches.length > 0 && (
+                                                <datalist id="branch-options">
+                                                    {branches.map((branch) => (
+                                                        <option key={branch} value={branch} />
+                                                    ))}
+                                                </datalist>
+                                            )}
+                                            {branchesError && (
+                                                <p className="mt-1 text-sm text-red-500 dark:text-red-400">{branchesError}</p>
+                                            )}
+                                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                {mode === 'create'
+                                                    ? 'Default branch for the initial project source (usually main or master).'
+                                                    : 'Default branch for builds (usually main or master).'}
+                                            </p>
+                                        </div>
                                     </>
                                 )}
                             </div>
