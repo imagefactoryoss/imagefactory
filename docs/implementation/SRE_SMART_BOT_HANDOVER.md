@@ -87,7 +87,7 @@ That objective is now materially achieved:
 
 ## Recommended Next Steps
 
-0. `AIOps Assistant` PR track is complete through `AIOPS-09`
+0. `AIOps Assistant` PR track is complete through `AIOPS-10`
 - backlog tracker: `docs/implementation/ENGINEERING_BACKLOG.md` (`AIOps Assistant v1 PR Track`)
 - keep each next-phase slice deterministic and approval-safe, with one validation artifact per slice.
 
