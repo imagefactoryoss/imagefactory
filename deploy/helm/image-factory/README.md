@@ -281,6 +281,8 @@ The chart can also deploy a lightweight in-cluster log path for SRE Smart Bot:
 
 Recommended external-cluster profile:
 
+Use `deploy/helm/image-factory/values.external-cluster.example.yaml` as the canonical OSS starter values file.
+
 ```bash
 helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factory \
   -f deploy/helm/image-factory/values.external-cluster.example.yaml
