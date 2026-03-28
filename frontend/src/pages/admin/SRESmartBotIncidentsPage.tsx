@@ -1,6 +1,6 @@
 import Drawer from '@/components/ui/Drawer'
 import { adminService } from '@/services/adminService'
-import type { SREActionAttempt, SREAgentDraftResponse, SREAgentInterpretationResponse, SREAgentSeverityResponse, SREAgentSuggestedActionResponse, SREAgentTriageResponse, SREApproval, SREDemoScenario, SREEvidence, SREFinding, SREIncident, SREIncidentWorkspaceResponse, SREMCPToolDescriptor, SREMCPToolInvocationResponse, SRERemediationPack, SRERemediationPackRun, SRESmartBotChannelProvider, SRESmartBotPolicyConfig } from '@/types'
+import type { SREActionAttempt, SREAgentDraftResponse, SREAgentIncidentScorecardResponse, SREAgentInterpretationResponse, SREAgentSeverityResponse, SREAgentSuggestedActionResponse, SREAgentTriageResponse, SREApproval, SREDemoScenario, SREEvidence, SREFinding, SREIncident, SREIncidentWorkspaceResponse, SREMCPToolDescriptor, SREMCPToolInvocationResponse, SRERemediationPack, SRERemediationPackRun, SRESmartBotChannelProvider, SRESmartBotPolicyConfig } from '@/types'
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -78,7 +78,9 @@ const SRESmartBotIncidentsPage: React.FC = () => {
     const [agentDraft, setAgentDraft] = useState<SREAgentDraftResponse | null>(null)
     const [agentTriage, setAgentTriage] = useState<SREAgentTriageResponse | null>(null)
     const [agentSeverity, setAgentSeverity] = useState<SREAgentSeverityResponse | null>(null)
+    const [agentScorecard, setAgentScorecard] = useState<SREAgentIncidentScorecardResponse | null>(null)
     const [agentSuggestedAction, setAgentSuggestedAction] = useState<SREAgentSuggestedActionResponse | null>(null)
+    const [generatingAgentScorecard, setGeneratingAgentScorecard] = useState(false)
     const [generatingAgentSeverity, setGeneratingAgentSeverity] = useState(false)
     const [generatingAgentSuggestedAction, setGeneratingAgentSuggestedAction] = useState(false)
     const [generatingAgentTriage, setGeneratingAgentTriage] = useState(false)
@@ -211,6 +213,7 @@ const SRESmartBotIncidentsPage: React.FC = () => {
         setAgentDraft(null)
         setAgentTriage(null)
         setAgentSeverity(null)
+        setAgentScorecard(null)
         setAgentSuggestedAction(null)
         setAgentInterpretation(null)
         setApprovalComments({})
@@ -265,6 +268,7 @@ const SRESmartBotIncidentsPage: React.FC = () => {
         setAgentDraft(null)
         setAgentTriage(null)
         setAgentSeverity(null)
+        setAgentScorecard(null)
         setAgentSuggestedAction(null)
         setAgentInterpretation(null)
         setApprovalComments({})
@@ -443,6 +447,20 @@ const SRESmartBotIncidentsPage: React.FC = () => {
             toast.error(err instanceof Error ? err.message : 'Failed to generate severity correlation')
         } finally {
             setGeneratingAgentSeverity(false)
+        }
+    }
+
+    const handleGenerateAgentScorecard = async () => {
+        if (!selectedIncident) return
+        try {
+            setGeneratingAgentScorecard(true)
+            const response = await adminService.getSREIncidentAgentScorecard(selectedIncident.id)
+            setAgentScorecard(response)
+            toast.success('Incident scorecard generated')
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to generate incident scorecard')
+        } finally {
+            setGeneratingAgentScorecard(false)
         }
     }
 
@@ -1436,6 +1454,14 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                             </button>
                                             <button
                                                 type="button"
+                                                onClick={() => void handleGenerateAgentScorecard()}
+                                                disabled={generatingAgentScorecard}
+                                                className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50"
+                                            >
+                                                {generatingAgentScorecard ? 'Generating...' : 'Generate Scorecard'}
+                                            </button>
+                                            <button
+                                                type="button"
                                                 onClick={() => void handleGenerateAgentTriage()}
                                                 disabled={generatingAgentTriage}
                                                 className="rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-medium text-cyan-800 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200 dark:hover:bg-cyan-950/50"
@@ -1488,11 +1514,33 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                             </Link>
                                         </div>
 
-                                        {agentDraft || agentInterpretation || agentSuggestedAction ? (
+                                        {agentDraft || agentInterpretation || agentSuggestedAction || agentScorecard ? (
                                             <div className="mt-4 grid gap-4 xl:grid-cols-2">
                                                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
                                                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Bot Guidance</div>
                                                     <div className="mt-3 space-y-3">
+                                                        {agentScorecard ? (
+                                                            <div className={`rounded-lg border px-3 py-3 text-sm ${agentSeverityTone(agentScorecard.severity_level)}`}>
+                                                                <div className="text-xs font-semibold uppercase tracking-[0.16em]">Incident Scorecard</div>
+                                                                <div className="mt-2 font-medium">Score {agentScorecard.severity_score} ({agentScorecard.severity_level})</div>
+                                                                <div className="mt-1">{agentScorecard.summary}</div>
+                                                                <div className="mt-2 rounded-md border border-current/25 bg-white/60 px-2.5 py-2 text-xs dark:bg-slate-950/30">
+                                                                    <div><span className="font-semibold">Probable cause:</span> {agentScorecard.probable_cause}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Confidence:</span> {agentScorecard.confidence}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Action key:</span> {agentScorecard.action_key}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Blast radius:</span> {agentScorecard.blast_radius}</div>
+                                                                </div>
+                                                                {(agentScorecard.why_severe_cards || []).length > 0 ? (
+                                                                    <div className="mt-2 space-y-2">
+                                                                        {(agentScorecard.why_severe_cards || []).map((card) => (
+                                                                            <div key={card.key} className="rounded-md border border-current/25 bg-white/60 px-2.5 py-2 text-xs dark:bg-slate-950/30">
+                                                                                <span className="font-semibold">{card.label}</span> (+{card.contribution}): {card.reason}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        ) : null}
                                                         {agentSuggestedAction ? (
                                                             <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50/70 px-3 py-3 text-sm text-fuchsia-900 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/30 dark:text-fuchsia-100">
                                                                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1963,6 +2011,14 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                 </button>
                                                                 <button
                                                                     type="button"
+                                                                    onClick={() => void handleGenerateAgentScorecard()}
+                                                                    disabled={generatingAgentScorecard}
+                                                                    className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50"
+                                                                >
+                                                                    {generatingAgentScorecard ? 'Generating...' : 'Generate Scorecard'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
                                                                     onClick={() => void handleGenerateAgentTriage()}
                                                                     disabled={generatingAgentTriage}
                                                                     className="rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-medium text-cyan-800 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200 dark:hover:bg-cyan-950/50"
@@ -1996,6 +2052,30 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                             </div>
                                                         </div>
                                                         <div className="mt-4 space-y-4">
+                                                            {agentScorecard ? (
+                                                                <div className={`rounded-xl border px-4 py-3 ${agentSeverityTone(agentScorecard.severity_level)}`}>
+                                                                    <div className="text-xs font-semibold uppercase tracking-[0.16em]">Incident Scorecard</div>
+                                                                    <div className="mt-2 text-sm font-medium">Score {agentScorecard.severity_score} ({agentScorecard.severity_level})</div>
+                                                                    <div className="mt-1 text-sm">{agentScorecard.summary}</div>
+                                                                    <div className="mt-3 rounded-lg border border-current/25 bg-white/70 px-3 py-2 text-sm dark:bg-slate-950/30">
+                                                                        <div><span className="font-semibold">Probable cause:</span> {agentScorecard.probable_cause}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Confidence:</span> {agentScorecard.confidence}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Action key:</span> {agentScorecard.action_key}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Blast radius:</span> {agentScorecard.blast_radius}</div>
+                                                                    </div>
+                                                                    {(agentScorecard.why_severe_cards || []).length > 0 ? (
+                                                                        <div className="mt-3 grid gap-2">
+                                                                            {(agentScorecard.why_severe_cards || []).map((card) => (
+                                                                                <div key={card.key} className="rounded-lg border border-current/25 bg-white/70 px-3 py-2 text-xs dark:bg-slate-950/30">
+                                                                                    <span className="font-semibold">{card.label}</span> (+{card.contribution}): {card.reason}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            ) : (
+                                                                <EmptyState title="No incident scorecard yet" description="Generate Scorecard for a compact incident view: probable cause, confidence, severity score, top why-severe cards, and approval-safe action guidance." />
+                                                            )}
                                                             {agentSuggestedAction ? (
                                                                 <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/70 px-4 py-3 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/30">
                                                                     <div className="flex flex-wrap items-center justify-between gap-2">

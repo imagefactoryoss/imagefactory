@@ -960,6 +960,22 @@ export interface SREAgentSeverityResponse {
     human_confirmation_required: boolean
 }
 
+export interface SREAgentIncidentScorecardResponse {
+    incident_id: string
+    mode: string
+    summary: string
+    probable_cause: string
+    confidence: string
+    severity_score: number
+    severity_level: string
+    why_severe_cards: SREAgentSeverityFactor[]
+    recommended_action: string
+    action_key: string
+    blast_radius: 'low' | 'medium' | 'high' | string
+    execution_requires_approval: boolean
+    human_confirmation_required: boolean
+}
+
 export interface SREAgentSuggestedActionResponse {
     incident_id: string
     mode: string
