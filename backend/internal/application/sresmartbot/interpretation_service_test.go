@@ -44,6 +44,12 @@ func TestBuildBoundedSummaries_CacheHitByEvidenceHash(t *testing.T) {
 	if first.EvidenceHash != second.EvidenceHash {
 		t.Fatalf("expected stable evidence hash, got %q vs %q", first.EvidenceHash, second.EvidenceHash)
 	}
+	if err := validateCitationContract(first.Citations); err != nil {
+		t.Fatalf("expected valid citation contract for first outcome: %v", err)
+	}
+	if err := validateCitationContract(second.Citations); err != nil {
+		t.Fatalf("expected valid citation contract for second outcome: %v", err)
+	}
 }
 
 func TestBuildBoundedSummaries_CacheMissWhenEvidenceChanges(t *testing.T) {
@@ -78,6 +84,12 @@ func TestBuildBoundedSummaries_CacheMissWhenEvidenceChanges(t *testing.T) {
 	if second.CacheHit {
 		t.Fatal("expected second call to be cache miss")
 	}
+	if err := validateCitationContract(first.Citations); err != nil {
+		t.Fatalf("expected valid citation contract for first outcome: %v", err)
+	}
+	if err := validateCitationContract(second.Citations); err != nil {
+		t.Fatalf("expected valid citation contract for changed outcome: %v", err)
+	}
 }
 
 func TestBuildBoundedSummaries_FallbackWhenModelUnavailable(t *testing.T) {
@@ -108,6 +120,9 @@ func TestBuildBoundedSummaries_FallbackWhenModelUnavailable(t *testing.T) {
 	}
 	if outcome.TimelineSummary == "" || outcome.ChangeDetection15m == "" || outcome.OperatorHandoffNote == "" {
 		t.Fatalf("expected deterministic fallback summaries, got timeline=%q change=%q handoff=%q", outcome.TimelineSummary, outcome.ChangeDetection15m, outcome.OperatorHandoffNote)
+	}
+	if err := validateCitationContract(outcome.Citations); err != nil {
+		t.Fatalf("expected valid citation contract for fallback outcome: %v", err)
 	}
 }
 

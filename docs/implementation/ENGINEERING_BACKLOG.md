@@ -424,13 +424,17 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - interpretation now returns deterministic grounded fallback summaries when local model runtime is unavailable instead of failing request flow.
 
 4. `AIOPS-04` Runbook grounding + citation contract
-- Status: `planned`
+- Status: `done`
 - Scope:
   - build retrieval index over approved runbooks/docs.
   - require agent outputs to cite runbook sections and current incident evidence references.
 - Validation:
   - responses without citations fail validation gate.
   - retrieval contract tests enforce runbook-only source allowlist.
+- Completion note:
+  - interpretation responses now include `citations[]` with mixed `runbook` and `evidence` citation kinds.
+  - added allowlisted in-memory runbook grounding index with section-level keyword matching for incident draft context.
+  - citation validation gate now rejects interpretation output lacking runbook/evidence citations or referencing non-allowlisted runbook sources.
 
 5. `AIOPS-05` Approval-safe suggested action reasoning
 - Status: `planned`
