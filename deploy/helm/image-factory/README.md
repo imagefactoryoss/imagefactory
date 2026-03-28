@@ -4,12 +4,11 @@ This chart deploys Image Factory and required runtime dependencies:
 
 - Backend API
 - Frontend UI
-- User-facing documentation server
+- User-facing docs server
 - Dispatcher worker
 - Notification worker
 - Email worker
 - Internal registry GC worker
-- External tenant service
 - PostgreSQL
 - Redis
 - NATS (JetStream)
@@ -17,12 +16,13 @@ This chart deploys Image Factory and required runtime dependencies:
 - Docker Registry
 - Mailpit
 - GLAuth (LDAP simulation)
+- Optional Ollama runtime for local/in-cluster SRE Smart Bot interpretation
 
 ## Prerequisites
 
 - Kubernetes 1.25+
 - Helm 3.12+
-- Published images for backend/frontend/docs (and optional per-worker overrides)
+- Published images for backend/frontend (and optional per-worker overrides)
 
 ## Quick Start
 
@@ -30,14 +30,16 @@ This chart deploys Image Factory and required runtime dependencies:
 kubectl create ns image-factory
 
 # If images are private, create pull secret first
-kubectl -n image-factory create secret generic registry-credentials \
+kubectl -n image-factory create secret generic gitlab-registry \
   --from-file=.dockerconfigjson=$HOME/.config/containers/auth.json \
   --type=kubernetes.io/dockerconfigjson
 
 helm upgrade --install image-factory ./deploy/helm/image-factory \
   -n image-factory \
-  --set imagePullSecrets[0].name=registry-credentials
+  --set imagePullSecrets[0].name=gitlab-registry
 ```
+
+To expose the docs server on a separate hostname, enable ingress and set `ingress.docsHost`.
 
 ## OKE Ingress + TLS (NLB, Static IP, cert-manager)
 
@@ -87,26 +89,38 @@ helm upgrade --install ingress-nginx ingress-nginx \
 export IMAGE_TAG=v0.1.0-$(git rev-parse --short HEAD)
 
 helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factory \
-  --set imagePullSecrets[0].name=registry-credentials \
-  --set backend.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend \
+  --set imagePullSecrets[0].name=gitlab-registry \
+  --set backend.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-backend \
   --set backend.image.tag=$IMAGE_TAG \
   --set backend.image.pullPolicy=Always \
-  --set frontend.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-frontend \
+  --set frontend.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-frontend \
   --set frontend.image.tag=$IMAGE_TAG \
   --set frontend.image.pullPolicy=Always \
-  --set docs.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-docs \
+  --set docs.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-docs \
   --set docs.image.tag=$IMAGE_TAG \
   --set docs.image.pullPolicy=Always \
   --set frontend.service.type=LoadBalancer \
-  --set workers.dispatcher.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-dispatcher \
+  --set workers.dispatcher.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-dispatcher \
   --set workers.dispatcher.image.tag=$IMAGE_TAG \
-  --set workers.notification.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-notification-worker \
+  --set workers.notification.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-notification-worker \
   --set workers.notification.image.tag=$IMAGE_TAG \
-  --set workers.email.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-email-worker \
+  --set workers.email.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-email-worker \
   --set workers.email.image.tag=$IMAGE_TAG \
-  --set workers.internalRegistryGc.image.repository=registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-internal-registry-gc-worker \
+  --set workers.internalRegistryGc.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-internal-registry-gc-worker \
   --set workers.internalRegistryGc.image.tag=$IMAGE_TAG
 ```
+
+The chart defaults are intended to pull both application images and bundled runtime dependencies from GitLab. If you mirror runtime dependencies into a different registry, override `postgres.image.repository`, `redis.image.repository`, `nats.image.repository`, `minio.image.repository`, `registry.image.repository`, `mailpit.image.repository`, and `glauth.image.repository` explicitly.
+
+Before deploying with GitLab as the source of truth, verify that the mirrored runtime images really exist in the registry:
+
+```bash
+GITLAB_USER=<registry-user> \
+GITLAB_PASSWORD=<registry-password-or-token> \
+./scripts/verify-gitlab-runtime-images.sh
+```
+
+If you mirror runtime images with `./scripts/mirror-runtime-images.sh`, set the same `GITLAB_USER` and `GITLAB_PASSWORD` so the script verifies each pushed manifest after upload.
 
 ## External Postgres / Supabase
 
@@ -137,6 +151,24 @@ helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factor
   -f deploy/helm/image-factory/values.external.yaml
 ```
 
+## Docs Service
+
+The chart can deploy the user-facing OSS documentation server separately from the application UI.
+
+- `docs.enabled=true` deploys the docs workload and service
+- `docs.image.*` controls the docs image
+- `ingress.docsHost` exposes the docs site on a dedicated host such as `docs.imagefactory.dev`
+
+Example:
+
+```bash
+helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factory \
+  --set ingress.enabled=true \
+  --set ingress.docsHost=docs.imagefactory.dev \
+  --set docs.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-docs \
+  --set docs.image.tag=$IMAGE_TAG
+```
+
 ## Database Mode Guardrails
 
 The chart now fails fast on ambiguous DB config. No implicit DB fallback is used.
@@ -151,12 +183,152 @@ The chart now fails fast on ambiguous DB config. No implicit DB fallback is used
 The chart intentionally rejects ambiguous component config at render time.
 
 - Worker images no longer inherit backend image values.
-- External tenant service image no longer inherits backend image values.
 - Storage types (`postgres/redis/nats/minio/registry`) must be explicitly set to one of:
   - `emptyDir`
   - `pvc`
   - `hostPath`
 - Invalid or incomplete storage/image configuration now fails `helm template/upgrade` with explicit errors.
+- `ollama.storage.mode` must be explicitly set to one of:
+  - `baked`
+  - `emptyDir`
+  - `pvc`
+  - `hostPath`
+- `loki.storage.mode` must be explicitly set to one of:
+  - `emptyDir`
+  - `pvc`
+  - `hostPath`
+
+## Optional Ollama Runtime
+
+The chart can also deploy an internal Ollama service for SRE Smart Bot's optional local interpretation layer.
+
+- `ollama.enabled=true` deploys the Ollama runtime and service
+- `ollama.storage.mode=baked` means no PVC or runtime volume is created; the model is expected to already be inside the image
+- `ollama.storage.mode=pvc` uses a PVC-backed model store
+- `ollama.storage.mode=hostPath` or `emptyDir` are also supported for controlled environments
+
+Recommended air-gapped demo profile:
+
+```bash
+make docker-build-ollama-baked \
+  OLLAMA_MODEL_STORE=$HOME/.ollama \
+  OLLAMA_MODEL_NAME=llama3.2:3b \
+  OLLAMA_IMAGE_TAG=registry.gitlab.com/s4cna/image-factory/image-factory-ollama:llama3.2-3b
+
+helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factory \
+  --set ollama.enabled=true \
+  --set ollama.image.repository=registry.gitlab.com/s4cna/image-factory/image-factory-ollama \
+  --set ollama.image.tag=llama3.2-3b \
+  --set ollama.storage.mode=baked
+```
+
+To publish that baked image into your normal registry workflow:
+
+```bash
+make docker-build-ollama-baked-push \
+  IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory \
+  IMAGE_TAG=v0.1.0-abc123 \
+  OLLAMA_MODEL_STORE=$HOME/.ollama \
+  OLLAMA_MODEL_NAME=llama3.2:3b
+```
+
+Or include it as part of `release-deploy`:
+
+```bash
+make release-deploy \
+  IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory \
+  OLLAMA_ENABLED=true \
+  OLLAMA_STORAGE_MODE=baked \
+  OLLAMA_MODEL_STORE=$HOME/.ollama \
+  OLLAMA_MODEL_NAME=llama3.2:3b
+```
+
+Note: the baked image path is intentionally treated as a controlled release artifact rather than part of the generic multi-arch image set, because it depends on a pre-seeded local model store.
+
+Recommended larger-enterprise/runtime-managed profile:
+
+```bash
+helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factory \
+  --set ollama.enabled=true \
+  --set ollama.storage.mode=pvc \
+  --set ollama.persistence.enabled=true \
+  --set ollama.persistence.size=20Gi
+```
+
+When using the in-cluster runtime, point SRE Smart Bot at:
+
+```text
+http://image-factory-ollama.image-factory.svc.cluster.local:11434
+```
+
+Adjust the release name/namespace as needed. If you want first-run installs to persist the deployment-aware SRE Smart Bot runtime into the saved `robot_sre_policy`, enable:
+
+```bash
+--set bootstrap.seedRobotSREPolicyDefaults=true
+```
+
+This only seeds the saved policy during bootstrap/reset when `ollama.enabled=true` and the config does not already exist. It does not overwrite an operator-customized policy on later upgrades.
+
+## Optional Loki + Alloy Runtime
+
+The chart can also deploy a lightweight in-cluster log path for SRE Smart Bot:
+
+- `loki.enabled=true` deploys a single-binary Loki instance for detector queries and MCP log evidence
+- `alloy.enabled=true` deploys an Alloy `DaemonSet` that tails node pod logs and pushes them into Loki
+- `sre.logDetector.enabled=true` enables the backend log-detector runner that turns Loki matches into SRE incidents
+- `IF_SRE_LOG_DETECTOR_LOKI_BASE_URL` is automatically pointed at the in-cluster Loki service when `loki.enabled=true`
+- if you want Alloy to push to an external Loki instead, leave `loki.enabled=false` and set `alloy.loki.pushUrl`
+
+Recommended external-cluster profile:
+
+Use `deploy/helm/image-factory/values.external-cluster.example.yaml` as the canonical OSS starter values file.
+
+```bash
+helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factory \
+  -f deploy/helm/image-factory/values.external-cluster.example.yaml
+```
+
+Minimal direct example:
+
+```bash
+helm upgrade --install image-factory ./deploy/helm/image-factory -n image-factory \
+  --set loki.enabled=true \
+  --set loki.storage.mode=pvc \
+  --set loki.persistence.enabled=true \
+  --set loki.persistence.size=20Gi \
+  --set alloy.enabled=true \
+  --set alloy.clusterName=image-factory-external \
+  --set sre.logDetector.enabled=true
+```
+
+When Loki is deployed in-cluster, the detector/MCP path uses:
+
+```text
+http://image-factory-loki.image-factory.svc.cluster.local:3100
+```
+
+Operational recommendation:
+
+- use Loki in monolithic mode first
+- keep retention short initially, such as `7d`
+- keep labels low-cardinality
+- use Alloy for pod log tailing instead of pushing raw logs through NATS
+- the chart defaults to GitLab-mirrored `image-factory-loki` and `image-factory-alloy` images for controlled cluster installs
+
+If you have not mirrored those runtime images yet:
+
+```bash
+GITLAB_USER=<user> GITLAB_PASSWORD=<token> ./scripts/mirror-runtime-images.sh
+GITLAB_USER=<user> GITLAB_PASSWORD=<token> ./scripts/verify-gitlab-runtime-images.sh
+```
+
+To build/push the changed app images and deploy the external-cluster profile in one workflow:
+
+```bash
+make release-deploy-external-cluster \
+  IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory \
+  HELM_NAMESPACE=image-factory
+```
 
 ## Quarantine Reviewer Bootstrap Check
 
@@ -169,6 +341,8 @@ For central reviewer workflow (`/admin/quarantine/review`), ensure bootstrap see
 
 The chart bootstrap job runs `seed-essential-data.sql` and `essential-config-seeder --action seed`.
 If your environment was provisioned before these rows existed, re-run bootstrap/seed jobs or apply the seed SQL once.
+
+When `bootstrap.seedRobotSREPolicyDefaults=true` and `ollama.enabled=true`, the same bootstrap flow also seeds the global `robot_sre_policy` with the deployment-aware agent runtime defaults (provider/base URL/model) while leaving the AI runtime disabled until an operator enables it.
 
 ## Current Bootstrap Flow
 
@@ -229,23 +403,17 @@ Safety behavior:
 - `app.encryptionKey`: **base64-encoded 32-byte key** for AES-GCM (required)
 - `backend.image.*`: backend image settings
 - `frontend.image.*`: frontend image settings
-- `docs.image.*`: docs server image settings
-- `docs.enabled`: deploy the user-facing documentation server
-- `docs.service.port`: docs server service port
 - `frontend.apiBaseUrl`: optional external API origin/path root (for separate API host). Example: `https://api.example.com` or `https://api.example.com/api`.
 - `frontend.extraEnv`: additional frontend container env vars
-- `ingress.docsHost`: dedicated host for the docs server. Use a separate host rather than `/docs` because the docs server generates root-relative links.
 - `build.tektonEnabled`: enables Tekton executor wiring in backend/dispatcher (default `true` for chart deployments)
 - `build.tektonKubeconfig`: optional kubeconfig path override (usually empty for in-cluster config)
 - `database.mode`: required DB wiring mode (`incluster` or `external`)
 - `database.maxOpenConns` / `database.maxIdleConns` / `database.connMaxLifetime`: app DB pool tuning (applies to all services)
 - `workers.*.enabled`: enable/disable workers
 - `workers.*.image.*`: per-worker image override
-- `externalTenantService.enabled`: deploy in-cluster external tenant service
-- `externalTenantService.apiKey`: API key used by backend and the service
-- `externalTenantService.image.*`: optional image override (defaults to backend image)
 - `bootstrap.enabled`: enable bootstrap hook job
 - `bootstrap.seedDemoData`: run demo SQL seed during bootstrap (default `false`)
+- `bootstrap.seedRobotSREPolicyDefaults`: seed global `robot_sre_policy` on first bootstrap/reset when `ollama.enabled=true` (default `false`)
 - `dbReset.enabled`: enable destructive reset hook job (default `false`)
 - `dbReset.runOnUpgrade`: allow running reset job on `helm upgrade`
 - `dbReset.confirmation`: must be `RESET_IMAGE_FACTORY` for reset to execute
@@ -312,53 +480,13 @@ make docker-build-all-multiarch CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry
 make release-deploy CONTAINER_ENGINE=podman IMAGE_REGISTRY=<registry>
 ```
 
-### Registry Naming Notes
-
-GitLab Container Registry supports nested paths such as:
-
-```bash
-registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend:<tag>
-```
-
-Docker Hub does not. If you need Docker Hub, flatten the repository names and use:
-
-```bash
-docker.io/imagefactoryoss/image-factory-backend:<tag>
-```
-
-Examples:
-
-```bash
-# GitLab Container Registry
-make docker-build-all-multiarch \
-  CONTAINER_ENGINE=podman \
-  IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory \
-  IMAGE_TAG=<tag>
-
-# Docker Hub
-make docker-build-all-multiarch \
-  CONTAINER_ENGINE=podman \
-  IMAGE_REGISTRY=docker.io/imagefactoryoss \
-  IMAGE_TAG=<tag>
-```
-
-When targeting Docker Hub, keep the image names flat:
-
-- `image-factory-backend`
-- `image-factory-frontend`
-- `image-factory-docs`
-- `image-factory-dispatcher`
-- `image-factory-notification-worker`
-- `image-factory-email-worker`
-- `image-factory-internal-registry-gc-worker`
-
 ## Quirks And Troubleshooting
 
 - If reusing mutable tags (`backend`, `frontend`, etc.), set `imagePullPolicy=Always`.
 - If builds fail with `docker not installed (required for kaniko)`, verify `build.tektonEnabled=true` and redeploy backend + dispatcher.
 - `app.encryptionKey` must be base64 for exactly 32 bytes. Example:
   - `openssl rand -base64 32 | tr -d '\n'`
-- If backend fails with bootstrap/admin errors, verify `admin@imagefactory.local` exists in `users` and bootstrap job completed.
+- If backend fails with bootstrap/admin errors, verify `admin@imgfactory.com` exists in `users` and bootstrap job completed.
 - If using Supabase pooler (session mode on `:5432`) and you see `MaxClientsInSessionMode`, reduce `database.maxOpenConns` and `database.maxIdleConns` (for example `5`/`2`) or move to transaction pooler endpoint/port.
 - If PostgreSQL fails with `lost+found` errors, ensure PGDATA points to a subdirectory (`/var/lib/postgresql/data/pgdata`) as configured by this chart.
 - Verify bootstrap hook status with:
@@ -424,20 +552,3 @@ Expected end state:
 - Prefer managed Postgres/Redis/NATS/object storage/registry for production.
 - Disable bundled dependencies when using managed services.
 - Replace default secrets and tune resource requests/limits before production rollout.
-## Docker Hub Notes
-
-Docker Hub does not support nested repository paths like:
-
-- `registry.gitlab.com/<namespace>/<project>/<image>:<tag>`
-
-If you publish Image Factory images to Docker Hub, use flat repository names instead:
-
-- `docker.io/<namespace>/image-factory-backend:<tag>`
-- `docker.io/<namespace>/image-factory-frontend:<tag>`
-- `docker.io/<namespace>/image-factory-docs:<tag>`
-- `docker.io/<namespace>/image-factory-dispatcher:<tag>`
-- `docker.io/<namespace>/image-factory-notification-worker:<tag>`
-- `docker.io/<namespace>/image-factory-email-worker:<tag>`
-- `docker.io/<namespace>/image-factory-internal-registry-gc-worker:<tag>`
-
-To deploy from Docker Hub, create a local Helm override file and replace the application image repositories with your Docker Hub namespace and tags.

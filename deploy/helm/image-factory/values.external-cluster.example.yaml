@@ -1,0 +1,73 @@
+# Example: external-cluster deployment profile for OSS installs.
+# Use this as a starting point and replace placeholders before production use.
+
+ingress:
+  enabled: true
+
+database:
+  mode: "external"
+  host: "postgres-rw.database.svc.cluster.local"
+  port: 5432
+  name: "image_factory"
+  user: "image_factory"
+  password: "change-me"
+  sslMode: "require"
+
+postgres:
+  enabled: false
+
+# Keep external tenant lookup service disabled for manual onboarding flows.
+externalTenantService:
+  enabled: false
+
+redis:
+  enabled: true
+  storage:
+    type: "pvc"
+  persistence:
+    enabled: true
+    size: 10Gi
+
+nats:
+  enabled: true
+  storage:
+    type: "pvc"
+  persistence:
+    enabled: true
+    size: 10Gi
+
+minio:
+  enabled: true
+  storage:
+    type: "pvc"
+  persistence:
+    enabled: true
+    size: 50Gi
+
+registry:
+  enabled: true
+  storage:
+    type: "pvc"
+  persistence:
+    enabled: true
+    size: 50Gi
+
+# Optional SRE log path. Enable only when Loki/Alloy support is configured for your chart build.
+loki:
+  enabled: true
+  storage:
+    mode: "pvc"
+  persistence:
+    enabled: true
+    size: 20Gi
+
+alloy:
+  enabled: true
+  clusterName: "image-factory-external"
+
+sre:
+  logDetector:
+    enabled: true
+
+ollama:
+  enabled: false
