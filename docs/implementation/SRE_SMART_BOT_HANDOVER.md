@@ -87,7 +87,7 @@ That objective is now materially achieved:
 
 ## Recommended Next Steps
 
-0. Execute `AIOps Assistant v1` PR track in order (`AIOPS-04` through `AIOPS-06`)
+0. Execute `AIOps Assistant v1` PR track in order (`AIOPS-05` through `AIOPS-06`)
 - backlog tracker: `docs/implementation/ENGINEERING_BACKLOG.md` (`AIOps Assistant v1 PR Track`)
 - keep each slice deterministic and approval-safe, with one validation artifact per slice.
 
@@ -181,7 +181,7 @@ Known test-harness noise:
   - `timeline_summary`
   - `change_detection_15m`
   - `operator_handoff_note`
-  - plus `evidence_hash`, `cache_hit`, and `fallback_reason` metadata
+  - plus `evidence_hash`, `cache_hit`, `fallback_reason`, and `citations[]` metadata
 - That draft flow:
   - gathers a bounded set of read-only MCP tool results
   - ranks a few likely hypotheses
@@ -191,6 +191,8 @@ Known test-harness noise:
   - stays downstream of the deterministic draft
   - now caches local-model output by `incident + evidence hash` to reduce repeated inference cost
   - now returns grounded deterministic fallback summaries when local runtime is unavailable
+  - now enforces citation validation (runbook + evidence) before returning interpretation output
+  - runbook citations are constrained to an allowlisted retrieval index over approved SRE docs/runbooks
   - currently supports `provider=ollama`
   - uses `agent_runtime.base_url` plus the configured local model name
   - does not add any action authority

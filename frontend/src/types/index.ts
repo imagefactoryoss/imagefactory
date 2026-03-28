@@ -975,8 +975,16 @@ export interface SREAgentInterpretationResponse {
     operator_summary?: string
     likely_root_cause?: string
     watchouts?: string[]
+    citations?: SREAgentCitation[]
     operator_message_draft?: string
     raw_response?: string
+}
+
+export interface SREAgentCitation {
+    kind: 'runbook' | 'evidence' | string
+    source: string
+    section?: string
+    note: string
 }
 
 export interface SREAgentRuntimeProbeResponse {
