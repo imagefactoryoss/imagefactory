@@ -984,6 +984,8 @@ export interface SREAgentIncidentSnapshotResponse {
     severity?: SREAgentSeverityResponse
     scorecard?: SREAgentIncidentScorecardResponse
     suggested_action?: SREAgentSuggestedActionResponse
+    operator_handoff_note: string
+    policy_guardrails?: string[]
     human_confirmation_required: boolean
 }
 
