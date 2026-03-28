@@ -66,6 +66,28 @@ func TestResolveVMLifecycleExecutionMode(t *testing.T) {
 	})
 }
 
+func TestResolveVMLifecycleProviderNativeEnabled(t *testing.T) {
+	t.Run("defaults enabled for known provider", func(t *testing.T) {
+		if !resolveVMLifecycleProviderNativeEnabled("aws") {
+			t.Fatal("expected aws provider-native execution enabled by default")
+		}
+	})
+
+	t.Run("respects explicit disable flag", func(t *testing.T) {
+		t.Setenv("IF_VM_LIFECYCLE_PROVIDER_AWS_ENABLED", "false")
+		if resolveVMLifecycleProviderNativeEnabled("aws") {
+			t.Fatal("expected aws provider-native execution disabled")
+		}
+	})
+
+	t.Run("invalid flag falls back to enabled", func(t *testing.T) {
+		t.Setenv("IF_VM_LIFECYCLE_PROVIDER_AWS_ENABLED", "not-a-bool")
+		if !resolveVMLifecycleProviderNativeEnabled("aws") {
+			t.Fatal("expected invalid flag to fall back to enabled")
+		}
+	})
+}
+
 func TestVMDispatchLifecycleExecutor(t *testing.T) {
 	t.Run("metadata_only mode returns metadata_only transition", func(t *testing.T) {
 		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeMetadataOnly}
@@ -170,6 +192,21 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		}
 	})
 
+	t.Run("require_provider_native fails closed when provider disabled", func(t *testing.T) {
+		t.Setenv("IF_VM_LIFECYCLE_PROVIDER_AWS_ENABLED", "false")
+		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
+		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "deleted",
+			ProviderArtifactIdentifiers: map[string][]string{
+				"aws": {"us-west-2:ami-0123456789abcdef0"},
+			},
+		})
+		if !errors.Is(err, errUnsupportedProviderLifecycleTransition) {
+			t.Fatalf("expected unsupported provider transition error when aws disabled, got %v", err)
+		}
+	})
+
 	t.Run("prefer_provider_native executes aws delete", func(t *testing.T) {
 		fake := &fakeVMAWSLifecycleClient{}
 		exec := vmDispatchLifecycleExecutor{
@@ -210,6 +247,30 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
 			TargetProvider: "aws",
 			TargetState:    "archived",
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "metadata_only" {
+			t.Fatalf("expected metadata_only fallback transition mode, got %q", result.TransitionMode)
+		}
+	})
+
+	t.Run("prefer_provider_native falls back when provider disabled", func(t *testing.T) {
+		t.Setenv("IF_VM_LIFECYCLE_PROVIDER_AWS_ENABLED", "false")
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModePreferProviderNative,
+			awsClientFactory: func(ctx context.Context, region string) (vmAWSLifecycleClient, error) {
+				t.Fatal("aws client factory should not be called when aws provider is disabled")
+				return nil, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "deleted",
+			ProviderArtifactIdentifiers: map[string][]string{
+				"aws": {"us-west-2:ami-0123456789abcdef0"},
+			},
 		})
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
