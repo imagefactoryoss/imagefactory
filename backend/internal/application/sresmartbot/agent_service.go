@@ -52,10 +52,12 @@ type AgentTriageResponse struct {
 }
 
 type AgentSeverityFactor struct {
-	Key          string `json:"key"`
-	Label        string `json:"label"`
-	Contribution int64  `json:"contribution"`
-	Reason       string `json:"reason"`
+	Key               string `json:"key"`
+	Label             string `json:"label"`
+	Contribution      int64  `json:"contribution"`
+	WeightPercent     int64  `json:"weight_percent"`
+	Reason            string `json:"reason"`
+	OperatorRationale string `json:"operator_rationale"`
 }
 
 type AgentSeverityResponse struct {
@@ -367,6 +369,7 @@ func buildSeverityFromDraft(draft *AgentDraftResponse) *AgentSeverityResponse {
 	if len(factors) > 4 {
 		factors = factors[:4]
 	}
+	applySeverityFactorWeights(factors, score, level)
 
 	summary := fmt.Sprintf("Severity score is %d (%s) based on correlated logs, HTTP signals, async backlog, and transport evidence.", score, level)
 	return &AgentSeverityResponse{
@@ -378,6 +381,37 @@ func buildSeverityFromDraft(draft *AgentDraftResponse) *AgentSeverityResponse {
 		Factors:           factors,
 		HumanConfirmation: draft.HumanConfirmation,
 	}
+}
+
+func applySeverityFactorWeights(factors []AgentSeverityFactor, score int64, level string) {
+	if len(factors) == 0 {
+		return
+	}
+	base := score
+	if base <= 0 {
+		base = 1
+	}
+	for i := range factors {
+		weight := int64((factors[i].Contribution * 100) / base)
+		if weight > 100 {
+			weight = 100
+		}
+		factors[i].WeightPercent = weight
+		factors[i].OperatorRationale = buildOperatorRationaleForSeverityFactor(factors[i], level)
+	}
+}
+
+func buildOperatorRationaleForSeverityFactor(factor AgentSeverityFactor, level string) string {
+	levelText := strings.ToLower(strings.TrimSpace(level))
+	if levelText == "" {
+		levelText = "active"
+	}
+	return fmt.Sprintf(
+		"%s contributes %d%% of the current severity score; verify this signal first while the incident remains %s.",
+		factor.Label,
+		factor.WeightPercent,
+		levelText,
+	)
 }
 
 func buildSuggestedActionFromDraft(draft *AgentDraftResponse) *AgentSuggestedActionResponse {

@@ -947,7 +947,9 @@ export interface SREAgentSeverityFactor {
     key: string
     label: string
     contribution: number
+    weight_percent: number
     reason: string
+    operator_rationale: string
 }
 
 export interface SREAgentSeverityResponse {

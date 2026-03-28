@@ -1588,7 +1588,8 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                     <div className="mt-2 space-y-2">
                                                                         {(agentScorecard.why_severe_cards || []).map((card) => (
                                                                             <div key={card.key} className="rounded-md border border-current/25 bg-white/60 px-2.5 py-2 text-xs dark:bg-slate-950/30">
-                                                                                <span className="font-semibold">{card.label}</span> (+{card.contribution}): {card.reason}
+                                                                                <span className="font-semibold">{card.label}</span> (+{card.contribution}, {card.weight_percent}%): {card.reason}
+                                                                                <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">{card.operator_rationale}</div>
                                                                             </div>
                                                                         ))}
                                                                     </div>
@@ -1621,7 +1622,8 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                     <div className="mt-2 space-y-2">
                                                                         {agentSeverity.factors.map((factor) => (
                                                                             <div key={factor.key} className="rounded-md border border-current/25 bg-white/60 px-2.5 py-2 text-xs dark:bg-slate-950/30">
-                                                                                <span className="font-semibold">{factor.label}</span> (+{factor.contribution}): {factor.reason}
+                                                                                <span className="font-semibold">{factor.label}</span> (+{factor.contribution}, {factor.weight_percent}%): {factor.reason}
+                                                                                <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">{factor.operator_rationale}</div>
                                                                             </div>
                                                                         ))}
                                                                     </div>
@@ -2155,7 +2157,8 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                         <div className="mt-3 grid gap-2">
                                                                             {(agentScorecard.why_severe_cards || []).map((card) => (
                                                                                 <div key={card.key} className="rounded-lg border border-current/25 bg-white/70 px-3 py-2 text-xs dark:bg-slate-950/30">
-                                                                                    <span className="font-semibold">{card.label}</span> (+{card.contribution}): {card.reason}
+                                                                                    <span className="font-semibold">{card.label}</span> (+{card.contribution}, {card.weight_percent}%): {card.reason}
+                                                                                    <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">{card.operator_rationale}</div>
                                                                                 </div>
                                                                             ))}
                                                                         </div>
@@ -2192,7 +2195,8 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                         <div className="mt-3 grid gap-2">
                                                                             {agentSeverity.factors.map((factor) => (
                                                                                 <div key={factor.key} className="rounded-lg border border-current/25 bg-white/70 px-3 py-2 text-xs dark:bg-slate-950/30">
-                                                                                    <span className="font-semibold">{factor.label}</span> (+{factor.contribution}): {factor.reason}
+                                                                                    <span className="font-semibold">{factor.label}</span> (+{factor.contribution}, {factor.weight_percent}%): {factor.reason}
+                                                                                    <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">{factor.operator_rationale}</div>
                                                                                 </div>
                                                                             ))}
                                                                         </div>
