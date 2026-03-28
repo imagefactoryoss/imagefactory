@@ -46,9 +46,18 @@ type AgentTriageResponse struct {
 	ProbableCause     string                  `json:"probable_cause"`
 	Confidence        string                  `json:"confidence"`
 	NextChecks        []string                `json:"next_checks"`
+	NextCheckRefs     []AgentTriageCheckRef   `json:"next_check_refs,omitempty"`
 	RecommendedAction string                  `json:"recommended_action"`
 	EvidenceRefs      []AgentDraftEvidenceRef `json:"evidence_refs,omitempty"`
 	HumanConfirmation bool                    `json:"human_confirmation_required"`
+}
+
+type AgentTriageCheckRef struct {
+	Check           string   `json:"check"`
+	RunbookSource   string   `json:"runbook_source"`
+	RunbookSection  string   `json:"runbook_section"`
+	EvidenceSignals []string `json:"evidence_signals,omitempty"`
+	EvidenceNote    string   `json:"evidence_note"`
 }
 
 type AgentSeverityFactor struct {
@@ -251,13 +260,15 @@ func buildTriageFromDraft(draft *AgentDraftResponse) *AgentTriageResponse {
 		evidenceRefs = evidenceRefsForSignals([]string{"findings.list", "evidence.list"}, draft.ToolRuns)
 	}
 
+	nextChecks := buildTriageNextChecks(draft)
 	return &AgentTriageResponse{
 		IncidentID:        draft.IncidentID,
 		Mode:              "deterministic_triage",
 		Summary:           draft.Summary,
 		ProbableCause:     probableCause,
 		Confidence:        confidence,
-		NextChecks:        buildTriageNextChecks(draft),
+		NextChecks:        nextChecks,
+		NextCheckRefs:     buildTriageCheckRefs(draft, nextChecks),
 		RecommendedAction: deriveTriageRecommendedAction(draft),
 		EvidenceRefs:      evidenceRefs,
 		HumanConfirmation: draft.HumanConfirmation,
@@ -998,6 +1009,85 @@ func buildTriageNextChecks(draft *AgentDraftResponse) []string {
 		}
 	}
 	return checks
+}
+
+func buildTriageCheckRefs(draft *AgentDraftResponse, checks []string) []AgentTriageCheckRef {
+	if len(checks) == 0 {
+		return nil
+	}
+	signals := triageReferenceSignals(draft)
+	refs := make([]AgentTriageCheckRef, 0, len(checks))
+	for idx, check := range checks {
+		signal := "findings.list"
+		if idx < len(signals) && strings.TrimSpace(signals[idx]) != "" {
+			signal = strings.TrimSpace(signals[idx])
+		}
+		runbookSource, runbookSection := triageRunbookForSignal(signal)
+		evidenceNote := triageEvidenceNoteForSignal(draft, signal)
+		refs = append(refs, AgentTriageCheckRef{
+			Check:           strings.TrimSpace(check),
+			RunbookSource:   runbookSource,
+			RunbookSection:  runbookSection,
+			EvidenceSignals: []string{signal},
+			EvidenceNote:    evidenceNote,
+		})
+	}
+	return refs
+}
+
+func triageReferenceSignals(draft *AgentDraftResponse) []string {
+	ordered := make([]string, 0, 8)
+	seen := map[string]struct{}{}
+	push := func(signal string) {
+		value := strings.TrimSpace(signal)
+		if value == "" {
+			return
+		}
+		if _, exists := seen[value]; exists {
+			return
+		}
+		seen[value] = struct{}{}
+		ordered = append(ordered, value)
+	}
+	if draft != nil && len(draft.Hypotheses) > 0 {
+		for _, signal := range draft.Hypotheses[0].SignalsUsed {
+			push(signal)
+		}
+	}
+	if draft != nil {
+		for _, run := range draft.ToolRuns {
+			push(run.ToolName)
+		}
+	}
+	push("findings.list")
+	push("evidence.list")
+	return ordered
+}
+
+func triageRunbookForSignal(signal string) (string, string) {
+	switch strings.TrimSpace(signal) {
+	case "async_backlog.recent", "messaging_transport.recent":
+		return "docs/implementation/SRE_SMART_BOT_ASYNC_BACKLOG_TRANSPORT_PRESSURE_EPIC.md", "Async backlog and transport pressure correlation"
+	case "messaging_consumers.recent":
+		return "docs/implementation/SRE_SMART_BOT_NATS_CONSUMER_LAG_PRESSURE_EPIC.md", "NATS consumer lag diagnostics"
+	case "cluster_overview.get", "runtime_health.get":
+		return "docs/implementation/SRE_SMART_BOT_EXTERNAL_CLUSTER_DEPLOYMENT_RUNBOOK.md", "External cluster health and rollout checks"
+	case "release_drift.summary", "http_signals.recent", "http_signals.history", "logs.recent":
+		return "docs/implementation/ROBOT_SRE_INCIDENT_TAXONOMY_AND_POLICY_MATRIX.md", "Incident taxonomy and response policy"
+	default:
+		return "docs/implementation/ROBOT_SRE_OPS_PERSONA_REQUIREMENTS_AND_DESIGN.md", "Deterministic and approval-safe actions"
+	}
+}
+
+func triageEvidenceNoteForSignal(draft *AgentDraftResponse, signal string) string {
+	if draft != nil {
+		for _, run := range draft.ToolRuns {
+			if strings.TrimSpace(run.ToolName) == strings.TrimSpace(signal) {
+				return summarizeToolRun(run)
+			}
+		}
+	}
+	return fmt.Sprintf("No direct tool payload for %s in this draft; use findings/evidence rows to validate the check.", strings.TrimSpace(signal))
 }
 
 func deriveTriageRecommendedAction(draft *AgentDraftResponse) string {

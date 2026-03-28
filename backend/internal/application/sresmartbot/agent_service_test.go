@@ -109,6 +109,12 @@ func TestBuildTriageFromDraft_UsesTopHypothesis(t *testing.T) {
 	if len(triage.NextChecks) != 3 {
 		t.Fatalf("expected 3 next checks, got %d", len(triage.NextChecks))
 	}
+	if len(triage.NextCheckRefs) != len(triage.NextChecks) {
+		t.Fatalf("expected triage check refs to align with checks, got %d refs for %d checks", len(triage.NextCheckRefs), len(triage.NextChecks))
+	}
+	if strings.TrimSpace(triage.NextCheckRefs[0].RunbookSource) == "" || strings.TrimSpace(triage.NextCheckRefs[0].RunbookSection) == "" {
+		t.Fatal("expected runbook mapping for first triage check")
+	}
 	if !strings.Contains(triage.RecommendedAction, "review_messaging_transport_health") {
 		t.Fatalf("expected transport recommendation, got %q", triage.RecommendedAction)
 	}
@@ -137,6 +143,43 @@ func TestBuildTriageFromDraft_FallsBackWhenHypothesesMissing(t *testing.T) {
 	}
 	if len(triage.EvidenceRefs) == 0 {
 		t.Fatal("expected fallback evidence refs")
+	}
+	if len(triage.NextCheckRefs) != len(triage.NextChecks) {
+		t.Fatalf("expected padded triage checks to include mapping refs, got %d refs for %d checks", len(triage.NextCheckRefs), len(triage.NextChecks))
+	}
+}
+
+func TestBuildTriageCheckRefs_MapsRunbookAndEvidence(t *testing.T) {
+	draft := &AgentDraftResponse{
+		ToolRuns: []MCPToolInvocationResult{
+			{
+				ToolName:   "messaging_transport.recent",
+				ServerName: "Observability",
+				Payload: map[string]any{
+					"reconnects":          int64(4),
+					"disconnects":         int64(1),
+					"reconnect_threshold": int64(3),
+				},
+			},
+		},
+	}
+	checks := []string{
+		"Validate transport stability before scaling",
+		"Confirm backlog trend",
+		"Keep remediation approval-bound",
+	}
+	refs := buildTriageCheckRefs(draft, checks)
+	if len(refs) != len(checks) {
+		t.Fatalf("expected %d refs, got %d", len(checks), len(refs))
+	}
+	if !strings.Contains(refs[0].RunbookSource, "SRE_SMART_BOT_ASYNC_BACKLOG_TRANSPORT_PRESSURE_EPIC.md") {
+		t.Fatalf("expected transport runbook mapping, got %q", refs[0].RunbookSource)
+	}
+	if strings.TrimSpace(refs[0].EvidenceNote) == "" {
+		t.Fatal("expected evidence note for mapped check")
+	}
+	if len(refs[0].EvidenceSignals) == 0 {
+		t.Fatal("expected evidence signal for mapped check")
 	}
 }
 
@@ -449,6 +492,9 @@ func TestBuildIncidentSnapshotFromDraft_ComposesDeterministicViews(t *testing.T)
 	}
 	if len(snapshot.PolicyGuardrails) == 0 {
 		t.Fatal("expected snapshot policy guardrails")
+	}
+	if snapshot.Triage == nil || len(snapshot.Triage.NextCheckRefs) == 0 {
+		t.Fatal("expected snapshot triage check refs")
 	}
 	if snapshot.EvidenceCoveragePercent <= 0 {
 		t.Fatalf("expected positive evidence coverage, got %d", snapshot.EvidenceCoveragePercent)

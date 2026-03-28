@@ -1563,6 +1563,18 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                     <div><span className="font-semibold">Operator handoff:</span> {agentSnapshot.operator_handoff_note || 'n/a'}</div>
                                                                     <div className="mt-1"><span className="font-semibold">Evidence health:</span> {agentSnapshot.evidence_health_note || 'n/a'}</div>
                                                                     <div className="mt-1"><span className="font-semibold">Signals observed:</span> {(agentSnapshot.evidence_signals_observed || []).join(', ') || 'n/a'}</div>
+                                                                    {(agentSnapshot.triage?.next_check_refs || []).length > 0 ? (
+                                                                        <div className="mt-2 space-y-1">
+                                                                            <div className="font-semibold">Runbook-grounded next checks:</div>
+                                                                            {(agentSnapshot.triage?.next_check_refs || []).slice(0, 3).map((ref, idx) => (
+                                                                                <div key={`snapshot-triage-ref-${idx}`} className="rounded-md border border-emerald-200/70 bg-white/80 px-2 py-1.5 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                                                                                    <div>{idx + 1}. {ref.check}</div>
+                                                                                    <div className="mt-0.5 text-emerald-800 dark:text-emerald-200">{ref.runbook_source} • {ref.runbook_section}</div>
+                                                                                    <div className="mt-0.5 text-emerald-800 dark:text-emerald-200">{ref.evidence_note}</div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : null}
                                                                     {(agentSnapshot.policy_guardrails || []).length > 0 ? (
                                                                         <div className="mt-1 space-y-1">
                                                                             {(agentSnapshot.policy_guardrails || []).map((guardrail, idx) => (
@@ -1636,6 +1648,25 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                 <div className="mt-2"><span className="font-semibold">Probable cause:</span> {agentTriage.probable_cause}</div>
                                                                 <div className="mt-1"><span className="font-semibold">Confidence:</span> {agentTriage.confidence}</div>
                                                                 <div className="mt-2"><span className="font-semibold">Recommended action:</span> {agentTriage.recommended_action}</div>
+                                                                <div className="mt-2 space-y-1">
+                                                                    {(agentTriage.next_checks || []).map((check, index) => (
+                                                                        <div key={`desktop-triage-check-${index}`} className="rounded-md border border-cyan-200 bg-white/80 px-2.5 py-2 text-xs dark:border-cyan-900/40 dark:bg-cyan-950/30">
+                                                                            {index + 1}. {check}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                                {(agentTriage.next_check_refs || []).length > 0 ? (
+                                                                    <div className="mt-2 space-y-1">
+                                                                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-300">Runbook Mapping</div>
+                                                                        {(agentTriage.next_check_refs || []).slice(0, 3).map((ref, index) => (
+                                                                            <div key={`desktop-triage-ref-${index}`} className="rounded-md border border-cyan-200 bg-white/80 px-2.5 py-2 text-xs dark:border-cyan-900/40 dark:bg-cyan-950/30">
+                                                                                <div className="font-medium">{index + 1}. {ref.check}</div>
+                                                                                <div className="mt-0.5">{ref.runbook_source} • {ref.runbook_section}</div>
+                                                                                <div className="mt-0.5">{ref.evidence_note}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : null}
                                                             </div>
                                                         ) : null}
                                                         {agentDraft ? (
@@ -2130,6 +2161,18 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                         <div><span className="font-semibold">Operator handoff:</span> {agentSnapshot.operator_handoff_note || 'n/a'}</div>
                                                                         <div className="mt-1"><span className="font-semibold">Evidence health:</span> {agentSnapshot.evidence_health_note || 'n/a'}</div>
                                                                         <div className="mt-1"><span className="font-semibold">Signals observed:</span> {(agentSnapshot.evidence_signals_observed || []).join(', ') || 'n/a'}</div>
+                                                                        {(agentSnapshot.triage?.next_check_refs || []).length > 0 ? (
+                                                                            <div className="mt-2 space-y-1">
+                                                                                <div className="font-semibold">Runbook-grounded next checks:</div>
+                                                                                {(agentSnapshot.triage?.next_check_refs || []).slice(0, 3).map((ref, idx) => (
+                                                                                    <div key={`mobile-snapshot-triage-ref-${idx}`} className="rounded-md border border-emerald-200/70 bg-white/80 px-2 py-1.5 text-xs dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                                                                                        <div>{idx + 1}. {ref.check}</div>
+                                                                                        <div className="mt-0.5 text-emerald-800 dark:text-emerald-200">{ref.runbook_source} • {ref.runbook_section}</div>
+                                                                                        <div className="mt-0.5 text-emerald-800 dark:text-emerald-200">{ref.evidence_note}</div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        ) : null}
                                                                         {(agentSnapshot.policy_guardrails || []).length > 0 ? (
                                                                             <div className="mt-2 space-y-1 text-xs">
                                                                                 {(agentSnapshot.policy_guardrails || []).map((guardrail, idx) => (
@@ -2224,6 +2267,20 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                             ))}
                                                                         </div>
                                                                     </div>
+                                                                    {(agentTriage.next_check_refs || []).length > 0 ? (
+                                                                        <div className="mt-3">
+                                                                            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-300">Runbook Mapping</div>
+                                                                            <div className="mt-2 space-y-2">
+                                                                                {(agentTriage.next_check_refs || []).slice(0, 3).map((ref, index) => (
+                                                                                    <div key={`mobile-triage-ref-${index}`} className="rounded-lg border border-cyan-200 bg-white/80 px-3 py-2 text-xs text-cyan-900 dark:border-cyan-900/40 dark:bg-cyan-950/30 dark:text-cyan-100">
+                                                                                        <div className="font-medium">{index + 1}. {ref.check}</div>
+                                                                                        <div className="mt-0.5">{ref.runbook_source} • {ref.runbook_section}</div>
+                                                                                        <div className="mt-0.5">{ref.evidence_note}</div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : null}
                                                                 </div>
                                                             ) : (
                                                                 <EmptyState title="No triage snapshot yet" description="Generate Triage to get a quick probable cause, confidence, and next-3-checks view before deeper investigation." />
