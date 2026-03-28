@@ -8,6 +8,7 @@ SMOKE_SCRIPT="${SCRIPT_DIR}/packer-lifecycle-provider-native-smoke.sh"
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 AUTH_TOKEN="${AUTH_TOKEN:-}"
 TENANT_ID="${TENANT_ID:-}"
+SMOKE_MODE="${SMOKE_MODE:-api}"
 
 TARGET_PROVIDERS="${TARGET_PROVIDERS:-aws,vmware,azure,gcp}"
 ACTION_SEQUENCE="${ACTION_SEQUENCE:-promote,deprecate,delete}"
@@ -65,6 +66,15 @@ normalize_bool() {
   esac
 }
 
+normalize_smoke_mode() {
+  local raw
+  raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | xargs)"
+  case "$raw" in
+    api|mock_success) echo "$raw" ;;
+    *) fail "unsupported SMOKE_MODE: $1 (expected api|mock_success)" ;;
+  esac
+}
+
 execution_ids_for_provider() {
   local provider="$1"
   case "$provider" in
@@ -94,6 +104,7 @@ run_provider_smoke() {
   BASE_URL="$BASE_URL" \
   AUTH_TOKEN="$AUTH_TOKEN" \
   TENANT_ID="$TENANT_ID" \
+  SMOKE_MODE="$SMOKE_MODE" \
   EXECUTION_IDS="$ids" \
   EXPECTED_PROVIDER="$provider" \
   ACTION_SEQUENCE="$ACTION_SEQUENCE" \
@@ -125,8 +136,11 @@ main() {
   need_cmd bash
   need_cmd date
   need_cmd tee
-  need_env AUTH_TOKEN
-  need_env TENANT_ID
+  SMOKE_MODE="$(normalize_smoke_mode "$SMOKE_MODE")"
+  if [[ "$SMOKE_MODE" == "api" ]]; then
+    need_env AUTH_TOKEN
+    need_env TENANT_ID
+  fi
 
   [[ -x "$SMOKE_SCRIPT" ]] || fail "smoke script not found or not executable: $SMOKE_SCRIPT"
   : > "$REPORT_FILE"
@@ -138,6 +152,7 @@ main() {
   append_report "vm lifecycle provider-native matrix run"
   append_report "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   append_report "target_providers=$TARGET_PROVIDERS"
+  append_report "smoke_mode=$SMOKE_MODE"
   append_report "action_sequence=$ACTION_SEQUENCE"
   append_report "require_provider_native=$REQUIRE_PROVIDER_NATIVE"
 

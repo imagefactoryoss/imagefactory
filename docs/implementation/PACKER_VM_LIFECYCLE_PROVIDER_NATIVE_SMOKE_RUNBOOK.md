@@ -26,10 +26,15 @@ Safety + behavior:
 
 - `CONFIRM_DESTRUCTIVE=true` (required; delete is destructive)
 - `ACTION_SEQUENCE` (default: `promote,deprecate,delete`)
+- `SMOKE_MODE` (default: `api`; set `mock_success` for no-cloud deterministic validation)
 - `REQUIRE_PROVIDER_NATIVE` (default: `true`)
 - `EXPECTED_PROVIDER` (optional; one of `aws|vmware|azure|gcp`)
 - `REQUEST_TIMEOUT_SECONDS` (default: `30`)
 - `REASON_PREFIX` (default: `provider-native smoke`)
+- `MOCK_INITIAL_STATE` (mock mode only; default: `released`)
+- `MOCK_TRANSITION_MODE` (mock mode only; default: `provider_native`)
+- `MOCK_PROVIDER_OUTCOME` (mock mode only; default: `success`)
+- `MOCK_PROVIDER_DEFAULT` (mock mode only; default: `aws`)
 
 Lifecycle execution mode + provider toggles:
 
@@ -76,6 +81,25 @@ For each action:
   - `lifecycle_last_provider_action`
   - `lifecycle_last_provider_identifier`
   - `lifecycle_last_provider_outcome=success`
+
+## No-Cloud Validation Mode
+
+Use `SMOKE_MODE=mock_success` when cloud APIs are unavailable. In mock mode:
+
+- script does not require `AUTH_TOKEN` / `TENANT_ID`;
+- provider lifecycle payload shape and transition assertions still run;
+- API/network calls are skipped and deterministic payloads are generated.
+
+Example:
+
+```bash
+EXECUTION_IDS='mock-aws-1' \
+EXPECTED_PROVIDER=aws \
+CONFIRM_DESTRUCTIVE=true \
+REQUIRE_PROVIDER_NATIVE=true \
+SMOKE_MODE=mock_success \
+./scripts/packer-lifecycle-provider-native-smoke.sh
+```
 
 ## Rollback / Safety
 
