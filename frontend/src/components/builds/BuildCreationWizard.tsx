@@ -2,15 +2,14 @@ import { buildService } from '@/services/buildService'
 import { projectService } from '@/services/projectService'
 import { useTenantStore } from '@/store/tenant'
 import { BuildConfig, BuildType, InfrastructureType, Project, RegistryType, SBOMTool, ScanTool, SecretManagerType } from '@/types'
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link, useNavigate } from 'react-router-dom'
 
-// Step Components
-import BuildMethodStep from './steps/BuildMethodStep'
-import ConfigurationStep from './steps/ConfigurationStep'
-import ToolSelectionStep from './steps/ToolSelectionStep'
-import ValidationStep from './steps/ValidationStep'
+const BuildMethodStep = lazy(() => import('./steps/BuildMethodStep'))
+const ConfigurationStep = lazy(() => import('./steps/ConfigurationStep'))
+const ToolSelectionStep = lazy(() => import('./steps/ToolSelectionStep'))
+const ValidationStep = lazy(() => import('./steps/ValidationStep'))
 
 // Types for wizard state
 export interface WizardState {
@@ -38,6 +37,15 @@ const STEPS = [
     { id: 3, title: 'Configuration', description: 'Configure build settings' },
     { id: 4, title: 'Validation', description: 'Review and create build' }
 ]
+
+const stepLoadingFallback = (
+    <div className="flex min-h-[320px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-900/50">
+        <div className="text-center">
+            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Loading wizard step...</p>
+        </div>
+    </div>
+)
 
 const isDockerfileProvided = (dockerfile?: BuildConfig['dockerfile']): boolean => {
     if (!dockerfile) return false
@@ -652,7 +660,9 @@ const BuildCreationWizard: React.FC = () => {
 
             {/* Step Content */}
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
-                {renderCurrentStep()}
+                <Suspense fallback={stepLoadingFallback}>
+                    {renderCurrentStep()}
+                </Suspense>
             </div>
 
             {/* Navigation */}

@@ -8,8 +8,8 @@ import {
 
 test.describe('Tenant → Owner → Member → Project → Build (E2E)', () => {
     const externalTenantSearch = 'Engineering'; // stable external tenant used in other tests
-    const ownerEmail = 'alice.johnson@imagefactory.local';
-    const memberEmail = 'bob.smith@imagefactory.local';
+    const ownerEmail = 'alice.johnson@imgfactory.com';
+    const memberEmail = 'bob.smith@imgfactory.com';
 
     test('full lifecycle: admin onboards tenant, owner manages tenant and member, member creates build', async ({ page }) => {
         // 1) Admin onboards a tenant and selects an LDAP user as owner

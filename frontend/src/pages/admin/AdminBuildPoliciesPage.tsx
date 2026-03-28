@@ -1,9 +1,9 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Clock, HardDrive, Settings, Users, RefreshCw, Plus } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
 import { adminService } from '@/services/adminService'
+import { Clock, HardDrive, Plus, RefreshCw, Settings, Users } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
 interface BuildPolicy {

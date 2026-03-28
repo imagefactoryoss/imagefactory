@@ -23,7 +23,7 @@ test.describe('Error Handling & Edge Cases', () => {
             const passwordInput = page.locator('input[type="password"], input[name*="password"]').first();
 
             if (await emailInput.isVisible()) {
-                await emailInput.fill('alice.johnson@imagefactory.local');
+                await emailInput.fill('alice.johnson@imgfactory.com');
                 if (await firstNameInput.isVisible()) await firstNameInput.fill('Alice');
                 if (await lastNameInput.isVisible()) await lastNameInput.fill('Johnson');
                 if (await passwordInput.isVisible()) await passwordInput.fill('Password@123');

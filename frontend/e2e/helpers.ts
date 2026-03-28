@@ -34,7 +34,7 @@ export async function loginAsAdmin(page: Page) {
     if (isLoginFormVisible) {
         // Use test credentials from seed data
         // These are LDAP users created in migrations
-        await emailInput.fill('admin@imagefactory.local');
+        await emailInput.fill('admin@imgfactory.com');
         await passwordInput.fill('password');
 
         // Find and click login button

@@ -4,20 +4,30 @@ import { buildService } from '@/services/buildService'
 import { infrastructureService } from '@/services/infrastructureService'
 import { projectService } from '@/services/projectService'
 import { BuildConfig, BuildContextSuggestionsResponse, InfrastructureProvider, InfrastructureRecommendation, InfrastructureType, ProjectBuildSettings, ProjectSource, WizardState } from '@/types'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import InfrastructureSelector from '../InfrastructureSelector'
-import BuildxConfigForm from './BuildxConfigForm'
-import DockerConfigForm from './DockerConfigForm'
-import KanikoConfigForm from './KanikoConfigForm'
-import NixConfigForm from './NixConfigForm'
-import PackerConfigForm from './PackerConfigForm'
-import PaketoConfigForm from './PaketoConfigForm'
+
+const InfrastructureSelector = lazy(() => import('../InfrastructureSelector'))
+const BuildxConfigForm = lazy(() => import('./BuildxConfigForm'))
+const DockerConfigForm = lazy(() => import('./DockerConfigForm'))
+const KanikoConfigForm = lazy(() => import('./KanikoConfigForm'))
+const NixConfigForm = lazy(() => import('./NixConfigForm'))
+const PackerConfigForm = lazy(() => import('./PackerConfigForm'))
+const PaketoConfigForm = lazy(() => import('./PaketoConfigForm'))
 
 interface ConfigurationStepProps {
     wizardState: WizardState
     onUpdate: (updates: Partial<WizardState>) => void
 }
+
+const sectionLoadingFallback = (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-900/40">
+        <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+            <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-blue-600" />
+            <span>Loading configuration section...</span>
+        </div>
+    </div>
+)
 
 const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
     wizardState,
@@ -773,7 +783,9 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
                     </p>
                 </div>
 
-                {getFormComponent(buildMethod)}
+                <Suspense fallback={sectionLoadingFallback}>
+                    {getFormComponent(buildMethod)}
+                </Suspense>
             </div>
         )
     }
@@ -1031,13 +1043,15 @@ const ConfigurationStep: React.FC<ConfigurationStepProps> = ({
                             {recommendationLoading ? 'Refreshing…' : 'Refresh Recommendation'}
                         </button>
                     </div>
-                    <InfrastructureSelector
-                        recommendation={infrastructureRecommendation}
-                        value={selectedInfrastructure || ''}
-                        onChange={handleInfrastructureSelect}
-                        selectedProviderId={selectedProviderId}
-                        onProviderChange={handleProviderSelect}
-                    />
+                    <Suspense fallback={sectionLoadingFallback}>
+                        <InfrastructureSelector
+                            recommendation={infrastructureRecommendation}
+                            value={selectedInfrastructure || ''}
+                            onChange={handleInfrastructureSelect}
+                            selectedProviderId={selectedProviderId}
+                            onProviderChange={handleProviderSelect}
+                        />
+                    </Suspense>
                 </>
             ) : (
                 <div className="text-center py-8">

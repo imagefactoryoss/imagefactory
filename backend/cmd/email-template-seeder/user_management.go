@@ -46,9 +46,9 @@ Use your credentials to access the Image Factory platform and start building con
 NEED HELP?
 ==========
 If you have any questions, please contact our support team.
-📧 Email: support@imagefactory.local
-📚 Docs: https://docs.imagefactory.local
-🔗 Status: https://status.imagefactory.local
+📧 Email: support@imgfactory.com
+📚 Docs: https://docs.imgfactory.com
+🔗 Status: https://status.imgfactory.com
 
 Best regards,
 The Image Factory Team
@@ -346,7 +346,7 @@ Image Factory - Secure Container Platform for Modern Development`,
         <div class="footer">
             <h5>Image Factory</h5>
             <p>Secure Container Platform for Modern Development<br>
-            <a href="mailto:support@imagefactory.local">support@imagefactory.local</a> | <a href="#">Documentation</a> | <a href="#">Status Page</a></p>
+            <a href="mailto:support@imgfactory.com">support@imgfactory.com</a> | <a href="#">Documentation</a> | <a href="#">Status Page</a></p>
             <p style="margin-top: 16px; font-size: 11px;">
                 You received this email because your tenant account was created in Image Factory.
             </p>
@@ -390,7 +390,7 @@ The Image Factory Team
 
 ---
 Image Factory - Secure Container Platform for Modern Development
-support@imagefactory.local | Documentation | Status Page`,
+support@imgfactory.com | Documentation | Status Page`,
 		HTMLTemplate: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -544,7 +544,7 @@ support@imagefactory.local | Documentation | Status Page`,
         </div>
         <div class="footer">
             <p>Image Factory - Secure Container Platform for Modern Development</p>
-            <p><a href="mailto:support@imagefactory.local">support@imagefactory.local</a></p>
+            <p><a href="mailto:support@imgfactory.com">support@imgfactory.com</a></p>
         </div>
     </div>
 </body>
@@ -752,7 +752,7 @@ Image Factory - Secure Container Platform for Modern Development`,
         </div>
         <div class="footer">
             <p>Image Factory - Secure Container Platform for Modern Development</p>
-            <p><a href="mailto:support@imagefactory.local">support@imagefactory.local</a></p>
+            <p><a href="mailto:support@imgfactory.com">support@imgfactory.com</a></p>
         </div>
     </div>
 </body>
@@ -796,8 +796,8 @@ Please contact your tenant administrator or support team to resolve this issue.
 NEED HELP?
 ==========
 If you believe this suspension was made in error, please contact:
-📧 Email: support@imagefactory.local
-📚 Docs: https://docs.imagefactory.local
+📧 Email: support@imgfactory.com
+📚 Docs: https://docs.imgfactory.com
 
 Best regards,
 The Image Factory Team
@@ -957,13 +957,13 @@ Image Factory - Secure Container Platform for Modern Development`,
             <div class="help-section">
                 <h3>Need Help?</h3>
                 <p>If you believe this suspension was made in error, please contact our support team:</p>
-                <p>📧 <a href="mailto:support@imagefactory.local">support@imagefactory.local</a><br>
-                📚 <a href="https://docs.imagefactory.local">Documentation</a></p>
+                <p>📧 <a href="mailto:support@imgfactory.com">support@imgfactory.com</a><br>
+                📚 <a href="https://docs.imgfactory.com">Documentation</a></p>
             </div>
         </div>
         <div class="footer">
             <p><strong>Image Factory</strong> - Secure Container Platform for Modern Development</p>
-            <p><a href="mailto:support@imagefactory.local">support@imagefactory.local</a></p>
+            <p><a href="mailto:support@imgfactory.com">support@imgfactory.com</a></p>
         </div>
     </div>
 </body>
@@ -1004,8 +1004,8 @@ If you have any questions about your account reactivation, please contact your t
 
 NEED HELP?
 ==========
-📧 Email: support@imagefactory.local
-📚 Docs: https://docs.imagefactory.local
+📧 Email: support@imgfactory.com
+📚 Docs: https://docs.imgfactory.com
 
 Welcome back!
 The Image Factory Team
@@ -1175,13 +1175,13 @@ Image Factory - Secure Container Platform for Modern Development`,
             <div class="help-section">
                 <h3>Need Help?</h3>
                 <p>If you have any questions about your account reactivation, please contact your tenant administrator or our support team:</p>
-                <p>📧 <a href="mailto:support@imagefactory.local">support@imagefactory.local</a><br>
-                📚 <a href="https://docs.imagefactory.local">Documentation</a></p>
+                <p>📧 <a href="mailto:support@imgfactory.com">support@imgfactory.com</a><br>
+                📚 <a href="https://docs.imgfactory.com">Documentation</a></p>
             </div>
         </div>
         <div class="footer">
             <p><strong>Image Factory</strong> - Secure Container Platform for Modern Development</p>
-            <p><a href="mailto:support@imagefactory.local">support@imagefactory.local</a></p>
+            <p><a href="mailto:support@imgfactory.com">support@imgfactory.com</a></p>
         </div>
     </div>
 </body>

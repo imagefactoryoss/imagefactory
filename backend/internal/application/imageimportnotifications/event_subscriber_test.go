@@ -425,8 +425,8 @@ func TestEventSubscriber_EPRRequestedTargetsSecurityReviewersAndCCsRequester(t *
 	repo := &deliveryRepoStub{
 		reviewerIDs: []uuid.UUID{reviewerID},
 		userEmailByID: map[uuid.UUID]string{
-			reviewerID:  "reviewer@imagefactory.local",
-			requesterID: "requester@imagefactory.local",
+			reviewerID:  "reviewer@imgfactory.com",
+			requesterID: "requester@imgfactory.com",
 		},
 	}
 	emailSender := &emailSenderStub{}
@@ -453,7 +453,7 @@ func TestEventSubscriber_EPRRequestedTargetsSecurityReviewersAndCCsRequester(t *
 	if emailSender.calls != 1 {
 		t.Fatalf("expected one email notification, got %d", emailSender.calls)
 	}
-	if len(emailSender.ccCalls) != 1 || emailSender.ccCalls[0] != "requester@imagefactory.local" {
+	if len(emailSender.ccCalls) != 1 || emailSender.ccCalls[0] != "requester@imgfactory.com" {
 		t.Fatalf("expected requester cc, got %#v", emailSender.ccCalls)
 	}
 }
@@ -465,7 +465,7 @@ func TestEventSubscriber_EPRRequestedFallsBackToRequesterWhenNoSecurityReviewers
 
 	repo := &deliveryRepoStub{
 		userEmailByID: map[uuid.UUID]string{
-			requesterID: "requester@imagefactory.local",
+			requesterID: "requester@imgfactory.com",
 		},
 	}
 	emailSender := &emailSenderStub{}
@@ -506,8 +506,8 @@ func TestEventSubscriber_EPRRequestedFallsBackToSystemAdminsWhenNoSecurityReview
 	repo := &deliveryRepoStub{
 		systemAdminUserIDs: []uuid.UUID{systemAdminID},
 		userEmailByID: map[uuid.UUID]string{
-			systemAdminID: "admin@imagefactory.local",
-			requesterID:   "requester@imagefactory.local",
+			systemAdminID: "admin@imgfactory.com",
+			requesterID:   "requester@imgfactory.com",
 		},
 	}
 	emailSender := &emailSenderStub{}
@@ -534,7 +534,7 @@ func TestEventSubscriber_EPRRequestedFallsBackToSystemAdminsWhenNoSecurityReview
 	if emailSender.calls != 1 {
 		t.Fatalf("expected one fallback email notification, got %d", emailSender.calls)
 	}
-	if len(emailSender.ccCalls) != 1 || emailSender.ccCalls[0] != "requester@imagefactory.local" {
+	if len(emailSender.ccCalls) != 1 || emailSender.ccCalls[0] != "requester@imgfactory.com" {
 		t.Fatalf("expected requester cc for system admin fallback, got %#v", emailSender.ccCalls)
 	}
 }
@@ -548,8 +548,8 @@ func TestEventSubscriber_ApprovalRequestedFallsBackToSystemAdminsWhenNoSecurityR
 	repo := &deliveryRepoStub{
 		systemAdminUserIDs: []uuid.UUID{systemAdminID},
 		userEmailByID: map[uuid.UUID]string{
-			systemAdminID: "admin@imagefactory.local",
-			requesterID:   "requester@imagefactory.local",
+			systemAdminID: "admin@imgfactory.com",
+			requesterID:   "requester@imgfactory.com",
 		},
 	}
 	emailSender := &emailSenderStub{}
@@ -579,7 +579,7 @@ func TestEventSubscriber_ApprovalRequestedFallsBackToSystemAdminsWhenNoSecurityR
 	if emailSender.calls != 1 {
 		t.Fatalf("expected one fallback email notification, got %d", emailSender.calls)
 	}
-	if len(emailSender.ccCalls) != 1 || emailSender.ccCalls[0] != "requester@imagefactory.local" {
+	if len(emailSender.ccCalls) != 1 || emailSender.ccCalls[0] != "requester@imgfactory.com" {
 		t.Fatalf("expected requester cc for system admin fallback, got %#v", emailSender.ccCalls)
 	}
 }
@@ -591,7 +591,7 @@ func TestEventSubscriber_ApprovalRequestedFallsBackToRequesterWhenNoSecurityRevi
 
 	repo := &deliveryRepoStub{
 		userEmailByID: map[uuid.UUID]string{
-			requesterID: "requester@imagefactory.local",
+			requesterID: "requester@imgfactory.com",
 		},
 	}
 	emailSender := &emailSenderStub{}
@@ -632,8 +632,8 @@ func TestEventSubscriber_EPRLifecycleExpiringTargetsSecurityReviewers(t *testing
 	repo := &deliveryRepoStub{
 		reviewerIDs: []uuid.UUID{reviewerID},
 		userEmailByID: map[uuid.UUID]string{
-			reviewerID:  "reviewer@imagefactory.local",
-			requesterID: "requester@imagefactory.local",
+			reviewerID:  "reviewer@imgfactory.com",
+			requesterID: "requester@imgfactory.com",
 		},
 	}
 	emailSender := &emailSenderStub{}
@@ -660,7 +660,7 @@ func TestEventSubscriber_EPRLifecycleExpiringTargetsSecurityReviewers(t *testing
 	if emailSender.calls != 1 {
 		t.Fatalf("expected one email notification, got %d", emailSender.calls)
 	}
-	if len(emailSender.ccCalls) != 1 || emailSender.ccCalls[0] != "requester@imagefactory.local" {
+	if len(emailSender.ccCalls) != 1 || emailSender.ccCalls[0] != "requester@imgfactory.com" {
 		t.Fatalf("expected requester cc for expiring notification, got %#v", emailSender.ccCalls)
 	}
 }
@@ -674,8 +674,8 @@ func TestEventSubscriber_EPRRegistrationSuspendedTargetsTenantAdminsAndRequester
 	repo := &deliveryRepoStub{
 		adminUserIDs: []uuid.UUID{adminID},
 		userEmailByID: map[uuid.UUID]string{
-			adminID:     "admin@imagefactory.local",
-			requesterID: "requester@imagefactory.local",
+			adminID:     "admin@imgfactory.com",
+			requesterID: "requester@imgfactory.com",
 		},
 	}
 	sub := NewEventSubscriber(repo, zap.NewNop())
@@ -721,7 +721,7 @@ func TestEventSubscriber_DispatchFailedEmailTemplateIncludesFailureMetadata(t *t
 	repo := &deliveryRepoStub{
 		systemAdminUserIDs: []uuid.UUID{systemAdminID},
 		userEmailByID: map[uuid.UUID]string{
-			systemAdminID: "admin@imagefactory.local",
+			systemAdminID: "admin@imgfactory.com",
 		},
 	}
 	emailSender := &emailSenderStub{}

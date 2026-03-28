@@ -134,6 +134,26 @@ type sreDetectorRuleSuggestionModel struct {
 	UpdatedAt       time.Time       `db:"updated_at"`
 }
 
+type sreRemediationPackRunModel struct {
+	ID              uuid.UUID       `db:"id"`
+	TenantID        *uuid.UUID      `db:"tenant_id"`
+	IncidentID      uuid.UUID       `db:"incident_id"`
+	PackKey         string          `db:"pack_key"`
+	PackVersion     string          `db:"pack_version"`
+	RunKind         string          `db:"run_kind"`
+	Status          string          `db:"status"`
+	RequestedBy     sql.NullString  `db:"requested_by"`
+	RequestID       sql.NullString  `db:"request_id"`
+	ApprovalID      *uuid.UUID      `db:"approval_id"`
+	ActionAttemptID *uuid.UUID      `db:"action_attempt_id"`
+	Summary         string          `db:"summary"`
+	ResultPayload   json.RawMessage `db:"result_payload"`
+	StartedAt       *time.Time      `db:"started_at"`
+	CompletedAt     *time.Time      `db:"completed_at"`
+	CreatedAt       time.Time       `db:"created_at"`
+	UpdatedAt       time.Time       `db:"updated_at"`
+}
+
 func (r *SRESmartBotRepository) CreateIncident(ctx context.Context, incident *sresmartbot.Incident) error {
 	query := `
 		INSERT INTO sre_incidents (
@@ -745,6 +765,61 @@ func (r *SRESmartBotRepository) ListDetectorRuleSuggestions(ctx context.Context,
 	return out, nil
 }
 
+func (r *SRESmartBotRepository) CreateRemediationPackRun(ctx context.Context, run *sresmartbot.RemediationPackRun) error {
+	query := `
+		INSERT INTO sre_remediation_pack_runs (
+			id, tenant_id, incident_id, pack_key, pack_version, run_kind, status,
+			requested_by, request_id, approval_id, action_attempt_id, summary,
+			result_payload, started_at, completed_at, created_at, updated_at
+		) VALUES (
+			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+		)`
+	_, err := r.db.ExecContext(ctx, query,
+		run.ID,
+		run.TenantID,
+		run.IncidentID,
+		run.PackKey,
+		run.PackVersion,
+		run.RunKind,
+		run.Status,
+		nullableOptionalString(run.RequestedBy),
+		nullableOptionalString(run.RequestID),
+		run.ApprovalID,
+		run.ActionAttemptID,
+		run.Summary,
+		normalizeJSON(run.ResultPayload),
+		run.StartedAt,
+		run.CompletedAt,
+		run.CreatedAt,
+		run.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("create remediation pack run: %w", err)
+	}
+	return nil
+}
+
+func (r *SRESmartBotRepository) ListRemediationPackRunsByIncident(ctx context.Context, incidentID uuid.UUID) ([]*sresmartbot.RemediationPackRun, error) {
+	models := make([]sreRemediationPackRunModel, 0)
+	query := `
+		SELECT id, tenant_id, incident_id, pack_key, pack_version, run_kind, status,
+		       requested_by, request_id, approval_id, action_attempt_id, summary,
+		       result_payload, started_at, completed_at, created_at, updated_at
+		FROM sre_remediation_pack_runs
+		WHERE incident_id = $1
+		ORDER BY created_at DESC`
+	if err := r.db.SelectContext(ctx, &models, query, incidentID); err != nil {
+		return nil, fmt.Errorf("list remediation pack runs by incident: %w", err)
+	}
+
+	out := make([]*sresmartbot.RemediationPackRun, 0, len(models))
+	for _, model := range models {
+		run := remediationPackRunModelToDomain(model)
+		out = append(out, &run)
+	}
+	return out, nil
+}
+
 func incidentModelToDomain(model sreIncidentModel) sresmartbot.Incident {
 	return sresmartbot.Incident{
 		ID:              model.ID,
@@ -863,6 +938,28 @@ func detectorRuleSuggestionModelToDomain(model sreDetectorRuleSuggestionModel) s
 		ReviewedBy:      model.ReviewedBy.String,
 		ReviewedAt:      model.ReviewedAt,
 		ActivatedRuleID: model.ActivatedRuleID.String,
+		CreatedAt:       model.CreatedAt,
+		UpdatedAt:       model.UpdatedAt,
+	}
+}
+
+func remediationPackRunModelToDomain(model sreRemediationPackRunModel) sresmartbot.RemediationPackRun {
+	return sresmartbot.RemediationPackRun{
+		ID:              model.ID,
+		TenantID:        model.TenantID,
+		IncidentID:      model.IncidentID,
+		PackKey:         model.PackKey,
+		PackVersion:     model.PackVersion,
+		RunKind:         model.RunKind,
+		Status:          model.Status,
+		RequestedBy:     model.RequestedBy.String,
+		RequestID:       model.RequestID.String,
+		ApprovalID:      model.ApprovalID,
+		ActionAttemptID: model.ActionAttemptID,
+		Summary:         model.Summary,
+		ResultPayload:   model.ResultPayload,
+		StartedAt:       model.StartedAt,
+		CompletedAt:     model.CompletedAt,
 		CreatedAt:       model.CreatedAt,
 		UpdatedAt:       model.UpdatedAt,
 	}

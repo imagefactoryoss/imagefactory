@@ -36,7 +36,7 @@ func TestResolveBootstrapLDAPDefaults_UsesExplicitLDAPEnv(t *testing.T) {
 func TestResolveBootstrapLDAPDefaults_FallsBackToGLAuth(t *testing.T) {
 	t.Setenv("IMAGE_FACTORY_GLAUTH_SERVICE_HOST", "image-factory-glauth")
 	t.Setenv("IMAGE_FACTORY_GLAUTH_SERVICE_PORT", "3893")
-	t.Setenv("IF_SMTP_FROM_EMAIL", "noreply@imagefactory.local")
+	t.Setenv("IF_SMTP_FROM_EMAIL", "noreply@imgfactory.com")
 
 	defaults := resolveBootstrapLDAPDefaults()
 
@@ -58,7 +58,7 @@ func TestResolveBootstrapLDAPDefaults_FallsBackToGLAuth(t *testing.T) {
 	if !defaults.Enabled {
 		t.Fatalf("expected ldap enabled from glauth fallback")
 	}
-	if len(defaults.AllowedDomains) != 1 || defaults.AllowedDomains[0] != "imagefactory.local" {
+	if len(defaults.AllowedDomains) != 1 || defaults.AllowedDomains[0] != "imgfactory.com" {
 		t.Fatalf("expected allowed domain fallback from smtp email, got %+v", defaults.AllowedDomains)
 	}
 }
