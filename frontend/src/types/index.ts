@@ -943,6 +943,23 @@ export interface SREAgentTriageResponse {
     human_confirmation_required: boolean
 }
 
+export interface SREAgentSeverityFactor {
+    key: string
+    label: string
+    contribution: number
+    reason: string
+}
+
+export interface SREAgentSeverityResponse {
+    incident_id: string
+    mode: string
+    score: number
+    level: string
+    summary: string
+    factors: SREAgentSeverityFactor[]
+    human_confirmation_required: boolean
+}
+
 export interface SREAgentInterpretationResponse {
     draft?: SREAgentDraftResponse
     provider: string
