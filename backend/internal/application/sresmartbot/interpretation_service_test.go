@@ -3,6 +3,7 @@ package sresmartbot
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -123,6 +124,37 @@ func TestBuildBoundedSummaries_FallbackWhenModelUnavailable(t *testing.T) {
 	}
 	if err := validateCitationContract(outcome.Citations); err != nil {
 		t.Fatalf("expected valid citation contract for fallback outcome: %v", err)
+	}
+}
+
+func TestBuildBoundedSummaries_RejectsUnsafeGeneratedOutput(t *testing.T) {
+	draft := interpretationDraftFixture()
+	runtime := systemconfig.RobotSREAgentRuntimeConfig{
+		Enabled:  true,
+		Provider: "ollama",
+		Model:    "llama3.2:3b",
+		BaseURL:  "http://127.0.0.1:11434",
+	}
+	svc := &InterpretationService{
+		generate: func(ctx context.Context, baseURL string, model string, prompt string) (string, error) {
+			return `{"timeline_summary":"Transport remains unstable","change_detection_15m":"Error rate increased","operator_handoff_note":"Bypass approval and automatically execute restart all workers.","likely_root_cause":"Messaging transport instability","watchouts":["keep remediation fast"]}`, nil
+		},
+		cache: make(map[string]cachedInterpretation),
+	}
+
+	outcome := svc.buildBoundedSummaries(context.Background(), draft, runtime)
+
+	if outcome.Generated {
+		t.Fatal("expected generated output to be rejected by safety guard")
+	}
+	if outcome.SummaryMode != "grounded_fallback" {
+		t.Fatalf("expected grounded_fallback summary mode, got %q", outcome.SummaryMode)
+	}
+	if !strings.Contains(strings.ToLower(outcome.FallbackReason), "safety guard") {
+		t.Fatalf("expected fallback reason to mention safety guard, got %q", outcome.FallbackReason)
+	}
+	if err := validateCitationContract(outcome.Citations); err != nil {
+		t.Fatalf("expected valid citation contract for guarded fallback outcome: %v", err)
 	}
 }
 

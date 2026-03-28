@@ -87,9 +87,9 @@ That objective is now materially achieved:
 
 ## Recommended Next Steps
 
-0. Execute `AIOps Assistant v1` PR track in order (`AIOPS-06`)
+0. `AIOps Assistant v1` PR track is complete through `AIOPS-06`
 - backlog tracker: `docs/implementation/ENGINEERING_BACKLOG.md` (`AIOps Assistant v1 PR Track`)
-- keep each slice deterministic and approval-safe, with one validation artifact per slice.
+- keep each next-phase slice deterministic and approval-safe, with one validation artifact per slice.
 
 1. Expand golden-signal coverage beyond the first saturation slice
 - keep building on the existing metrics snapshot path before introducing a heavier metrics stack
