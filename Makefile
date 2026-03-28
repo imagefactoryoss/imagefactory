@@ -9,21 +9,24 @@ DOCKER_COMPOSE := $(COMPOSE_CMD)
 DOCKER_COMPOSE_DEV := $(COMPOSE_CMD) -f docker-compose.yml -f docker-compose.dev.yml
 RUNTIME_SERVICE_IMAGES := postgres:15-alpine redis:7-alpine nats:2.10-alpine minio/minio:latest registry:2 axllent/mailpit:latest glauth/glauth:latest
 PLATFORMS ?= linux/amd64,linux/arm64
-IMAGE_VERSION ?= v0.2.2
+IMAGE_VERSION ?= v0.3.0
 IMAGE_ID ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 IMAGE_TAG ?= $(IMAGE_VERSION)-$(IMAGE_ID)
 IMAGE_REGISTRY ?=
+APP_VERSION ?= $(patsubst v%,%,$(IMAGE_VERSION))
+APP_BUILD_DATE ?= $(shell date -u +%Y-%m-%d)
+PRODUCT_INFO_LAST_SYNC ?= $(APP_BUILD_DATE)
 FRONTEND_USE_LOCAL_DIST ?= true
 HELM_RELEASE ?= image-factory
 HELM_NAMESPACE ?= image-factory
 HELM_CHART ?= ./deploy/helm/image-factory
-RELEASE_DIST_DIR ?= ./release/dist
-RELEASE_TARGETS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
-SOURCE_IMAGE ?= image-factory-source
-SOURCE_EXTRACT_DIR ?= ./dist/image-factory-source
-SOURCE_BUILD_CONTEXT ?= ./dist/source-context
-SOURCE_SERVER_CONTAINER ?= image-factory-source-server
-SOURCE_SERVER_PORT ?= 8099
+OLLAMA_MODEL_STORE ?= $(HOME)/.ollama
+OLLAMA_MODEL_NAME ?= llama3.2:3b
+OLLAMA_IMAGE_TAG ?= image-factory-ollama:llama3.2-3b
+OLLAMA_BASE_IMAGE ?= docker.io/ollama/ollama:latest
+OLLAMA_ENABLED ?= false
+OLLAMA_STORAGE_MODE ?= baked
+OLLAMA_IMAGE_REPOSITORY ?= $(IMAGE_REGISTRY)/image-factory-ollama
 
 # Colors for output
 RED := \033[0;31m
@@ -235,6 +238,10 @@ test-e2e: ## Run end-to-end tests
 	@echo "$(GREEN)Running end-to-end tests...$(NC)"
 	cd $(FRONTEND_DIR) && npm run test:e2e
 
+.PHONY: qa-packer-provider-native-matrix
+qa-packer-provider-native-matrix: ## Run Packer provider-native matrix validation (defaults to mock mode; writes docs/qa/artifacts log)
+	@./scripts/qa/packer_provider_native_matrix_validate.sh
+
 ##@ Quality
 
 .PHONY: lint
@@ -246,19 +253,6 @@ format: backend-format frontend-format ## Format all code
 .PHONY: quality-check
 quality-check: lint test ## Run quality checks
 
-##@ Release
-
-.PHONY: release-binaries
-release-binaries: ## Build release tarballs for runtime binaries
-	@echo "$(GREEN)Building release binaries for $(RELEASE_TARGETS)...$(NC)"
-	VERSION=$(IMAGE_VERSION) TARGETS="$(RELEASE_TARGETS)" DIST_DIR=$(RELEASE_DIST_DIR) ./scripts/release-binaries.sh
-
-.PHONY: release-upload-assets
-release-upload-assets: ## Upload built release tarballs to GitHub release (requires TAG)
-	@echo "$(GREEN)Uploading release assets for $(TAG)...$(NC)"
-	@test -n "$(TAG)" || { echo "$(RED)TAG is required. Example: make release-upload-assets TAG=v0.1.0$(NC)"; exit 1; }
-	TAG=$(TAG) DIST_DIR=$(RELEASE_DIST_DIR) ./scripts/upload-release-assets.sh
-
 ##@ Docker
 
 .PHONY: docker-build
@@ -267,7 +261,7 @@ docker-build: ## Build Docker images
 	@FRONTEND_TARGET=runtime; \
 	if [ "$(FRONTEND_USE_LOCAL_DIST)" = "true" ]; then \
 		echo "$(YELLOW)Using local frontend dist for image build...$(NC)"; \
-		(cd $(FRONTEND_DIR) && (npm run build || npx vite build)); \
+		(cd $(FRONTEND_DIR) && (VITE_APP_VERSION=$(APP_VERSION) VITE_APP_BUILD_DATE=$(APP_BUILD_DATE) VITE_PRODUCT_INFO_LAST_SYNC=$(PRODUCT_INFO_LAST_SYNC) npm run build || VITE_APP_VERSION=$(APP_VERSION) VITE_APP_BUILD_DATE=$(APP_BUILD_DATE) VITE_PRODUCT_INFO_LAST_SYNC=$(PRODUCT_INFO_LAST_SYNC) npx vite build)); \
 		if [ ! -d "$(FRONTEND_DIR)/dist" ]; then \
 			echo "$(RED)frontend/dist not found after local build. Aborting.$(NC)"; \
 			exit 1; \
@@ -277,7 +271,7 @@ docker-build: ## Build Docker images
 		echo "$(YELLOW)Using container frontend build stage...$(NC)"; \
 	fi; \
 	$(CONTAINER_ENGINE) build -t image-factory-backend:latest $(BACKEND_DIR); \
-	$(CONTAINER_ENGINE) build --target $$FRONTEND_TARGET -t image-factory-frontend:latest $(FRONTEND_DIR); \
+	$(CONTAINER_ENGINE) build --build-arg VITE_APP_VERSION=$(APP_VERSION) --build-arg VITE_APP_BUILD_DATE=$(APP_BUILD_DATE) --build-arg VITE_PRODUCT_INFO_LAST_SYNC=$(PRODUCT_INFO_LAST_SYNC) --target $$FRONTEND_TARGET -t image-factory-frontend:latest $(FRONTEND_DIR); \
 	$(CONTAINER_ENGINE) build -f Dockerfile.docs -t image-factory-docs:latest .
 
 .PHONY: docker-build-workers
@@ -288,42 +282,39 @@ docker-build-workers: ## Build worker Docker images
 	$(CONTAINER_ENGINE) build -f $(BACKEND_DIR)/Dockerfile.email-worker -t image-factory-email-worker:latest $(BACKEND_DIR)
 	$(CONTAINER_ENGINE) build -f $(BACKEND_DIR)/Dockerfile.internal-registry-gc-worker -t image-factory-internal-registry-gc-worker:latest $(BACKEND_DIR)
 
-.PHONY: docker-build-source
-docker-build-source: ## Build source distribution image from tracked files at HEAD
-	@echo "$(GREEN)Building source distribution image with $(CONTAINER_ENGINE)...$(NC)"
-	@mkdir -p $(dir $(SOURCE_BUILD_CONTEXT))
-	@rm -rf $(SOURCE_BUILD_CONTEXT)
-	@mkdir -p $(SOURCE_BUILD_CONTEXT)
-	@git archive --format=tar HEAD | tar -xf - -C $(SOURCE_BUILD_CONTEXT)
-	$(CONTAINER_ENGINE) build -f Dockerfile.source -t $(SOURCE_IMAGE):$(IMAGE_TAG) $(SOURCE_BUILD_CONTEXT)
+.PHONY: docker-export-source-tar
+docker-export-source-tar: ## Export source from image to tar (set IMAGE=<image>, optional SERVE=true PORT=8089)
+	@test -n "$(IMAGE)" || { echo "$(RED)IMAGE is required. Example: make docker-export-source-tar IMAGE=image-factory-backend:latest$(NC)"; exit 1; }
+	@ARGS="--image $(IMAGE) --engine $(CONTAINER_ENGINE)"; \
+	if [ -n "$(SOURCE_PATH)" ]; then ARGS="$$ARGS --source-path $(SOURCE_PATH)"; fi; \
+	if [ -n "$(OUTPUT_DIR)" ]; then ARGS="$$ARGS --output-dir $(OUTPUT_DIR)"; fi; \
+	if [ -n "$(TAR_NAME)" ]; then ARGS="$$ARGS --tar-name $(TAR_NAME)"; fi; \
+	if [ "$(SERVE)" = "true" ]; then ARGS="$$ARGS --serve"; fi; \
+	if [ -n "$(PORT)" ]; then ARGS="$$ARGS --port $(PORT)"; fi; \
+	if [ -n "$(BIND_ADDR)" ]; then ARGS="$$ARGS --bind $(BIND_ADDR)"; fi; \
+	./scripts/export-image-source-tar.sh $$ARGS
 
-.PHONY: docker-run-source-server
-docker-run-source-server: docker-build-source ## Run source image server (serves /source.tar on SOURCE_SERVER_PORT)
-	@echo "$(GREEN)Starting source tar server from $(SOURCE_IMAGE):$(IMAGE_TAG)...$(NC)"
-	@$(CONTAINER_ENGINE) rm -f $(SOURCE_SERVER_CONTAINER) >/dev/null 2>/dev/null || true
-	@$(CONTAINER_ENGINE) run -d --name $(SOURCE_SERVER_CONTAINER) -p $(SOURCE_SERVER_PORT):8080 $(SOURCE_IMAGE):$(IMAGE_TAG) >/dev/null
-	@echo "$(GREEN)Source tar URL: http://localhost:$(SOURCE_SERVER_PORT)/source.tar$(NC)"
+.PHONY: docker-build-ollama-baked
+docker-build-ollama-baked: ## Build a baked Ollama image from a pre-seeded local model store
+	@echo "$(GREEN)Building baked Ollama image with $(CONTAINER_ENGINE)...$(NC)"
+	./scripts/build-baked-ollama-image.sh \
+		--engine "$(CONTAINER_ENGINE)" \
+		--source "$(OLLAMA_MODEL_STORE)" \
+		--tag "$(OLLAMA_IMAGE_TAG)" \
+		--base-image "$(OLLAMA_BASE_IMAGE)" \
+		--model "$(OLLAMA_MODEL_NAME)"
 
-.PHONY: docker-stop-source-server
-docker-stop-source-server: ## Stop/remove source tar server container
-	@echo "$(YELLOW)Stopping source tar server container $(SOURCE_SERVER_CONTAINER)...$(NC)"
-	@$(CONTAINER_ENGINE) rm -f $(SOURCE_SERVER_CONTAINER) >/dev/null 2>/dev/null || true
-
-.PHONY: docker-push-source
-docker-push-source: docker-build-source ## Push source image (set SOURCE_IMAGE to dockerhub repo, e.g. docker.io/user/image-factory-source)
-	@echo "$(GREEN)Pushing source image $(SOURCE_IMAGE):$(IMAGE_TAG) with $(CONTAINER_ENGINE)...$(NC)"
-	@$(CONTAINER_ENGINE) push $(SOURCE_IMAGE):$(IMAGE_TAG)
-
-.PHONY: docker-extract-source
-docker-extract-source: ## Extract source tree from source distribution image
-	@echo "$(GREEN)Extracting source from $(SOURCE_IMAGE):$(IMAGE_TAG) to $(SOURCE_EXTRACT_DIR)...$(NC)"
-	@rm -rf $(SOURCE_EXTRACT_DIR)
-	@mkdir -p $(SOURCE_EXTRACT_DIR)
-	@CONTAINER_ID=$$($(CONTAINER_ENGINE) create $(SOURCE_IMAGE):$(IMAGE_TAG)); \
-		trap "$(CONTAINER_ENGINE) rm -f $$CONTAINER_ID >/dev/null 2>/dev/null || true" EXIT; \
-		$(CONTAINER_ENGINE) cp $$CONTAINER_ID:/src/. $(SOURCE_EXTRACT_DIR); \
-		$(CONTAINER_ENGINE) rm $$CONTAINER_ID >/dev/null; \
-		trap - EXIT
+.PHONY: docker-build-ollama-baked-push
+docker-build-ollama-baked-push: ## Build and push a baked Ollama image (single-arch / pre-seeded local store)
+	@echo "$(GREEN)Building and pushing baked Ollama image with $(CONTAINER_ENGINE)...$(NC)"
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make docker-build-ollama-baked-push IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory$(NC)"; exit 1; }
+	./scripts/build-baked-ollama-image.sh \
+		--engine "$(CONTAINER_ENGINE)" \
+		--source "$(OLLAMA_MODEL_STORE)" \
+		--tag "$(OLLAMA_IMAGE_REPOSITORY):$(IMAGE_TAG)" \
+		--base-image "$(OLLAMA_BASE_IMAGE)" \
+		--model "$(OLLAMA_MODEL_NAME)"
+	$(CONTAINER_ENGINE) push "$(OLLAMA_IMAGE_REPOSITORY):$(IMAGE_TAG)"
 
 .PHONY: build-all-images docker-build-all
 build-all-images: docker-build docker-build-workers ## Build app and worker container images
@@ -336,7 +327,7 @@ docker-build-all-multiarch: ## Build amd64/arm64 images and push manifest list (
 	@FRONTEND_TARGET=runtime; \
 	if [ "$(FRONTEND_USE_LOCAL_DIST)" = "true" ]; then \
 		echo "$(YELLOW)Using local frontend dist for image build...$(NC)"; \
-		(cd $(FRONTEND_DIR) && (npm run build || npx vite build)); \
+		(cd $(FRONTEND_DIR) && (VITE_APP_VERSION=$(APP_VERSION) VITE_APP_BUILD_DATE=$(APP_BUILD_DATE) VITE_PRODUCT_INFO_LAST_SYNC=$(PRODUCT_INFO_LAST_SYNC) npm run build || VITE_APP_VERSION=$(APP_VERSION) VITE_APP_BUILD_DATE=$(APP_BUILD_DATE) VITE_PRODUCT_INFO_LAST_SYNC=$(PRODUCT_INFO_LAST_SYNC) npx vite build)); \
 		if [ ! -d "$(FRONTEND_DIR)/dist" ]; then \
 			echo "$(RED)frontend/dist not found after local build. Aborting.$(NC)"; \
 			exit 1; \
@@ -347,7 +338,7 @@ docker-build-all-multiarch: ## Build amd64/arm64 images and push manifest list (
 	fi; \
 	if [ "$(CONTAINER_ENGINE)" = "docker" ]; then \
 		docker buildx build --platform $(PLATFORMS) -t $(IMAGE_REGISTRY)/image-factory-backend:$(IMAGE_TAG) --push $(BACKEND_DIR); \
-		docker buildx build --target $$FRONTEND_TARGET --platform $(PLATFORMS) -t $(IMAGE_REGISTRY)/image-factory-frontend:$(IMAGE_TAG) --push $(FRONTEND_DIR); \
+		docker buildx build --build-arg VITE_APP_VERSION=$(APP_VERSION) --build-arg VITE_APP_BUILD_DATE=$(APP_BUILD_DATE) --build-arg VITE_PRODUCT_INFO_LAST_SYNC=$(PRODUCT_INFO_LAST_SYNC) --target $$FRONTEND_TARGET --platform $(PLATFORMS) -t $(IMAGE_REGISTRY)/image-factory-frontend:$(IMAGE_TAG) --push $(FRONTEND_DIR); \
 		docker buildx build --platform $(PLATFORMS) -f Dockerfile.docs -t $(IMAGE_REGISTRY)/image-factory-docs:$(IMAGE_TAG) --push .; \
 		docker buildx build --platform $(PLATFORMS) -f $(BACKEND_DIR)/Dockerfile.dispatcher -t $(IMAGE_REGISTRY)/image-factory-dispatcher:$(IMAGE_TAG) --push $(BACKEND_DIR); \
 		docker buildx build --platform $(PLATFORMS) -f $(BACKEND_DIR)/Dockerfile.notification-worker -t $(IMAGE_REGISTRY)/image-factory-notification-worker:$(IMAGE_TAG) --push $(BACKEND_DIR); \
@@ -356,7 +347,7 @@ docker-build-all-multiarch: ## Build amd64/arm64 images and push manifest list (
 	elif [ "$(CONTAINER_ENGINE)" = "podman" ]; then \
 		podman build --platform $(PLATFORMS) --manifest $(IMAGE_REGISTRY)/image-factory-backend:$(IMAGE_TAG) $(BACKEND_DIR); \
 		podman manifest push --all $(IMAGE_REGISTRY)/image-factory-backend:$(IMAGE_TAG) docker://$(IMAGE_REGISTRY)/image-factory-backend:$(IMAGE_TAG); \
-		podman build --target $$FRONTEND_TARGET --platform $(PLATFORMS) --manifest $(IMAGE_REGISTRY)/image-factory-frontend:$(IMAGE_TAG) $(FRONTEND_DIR); \
+		podman build --build-arg VITE_APP_VERSION=$(APP_VERSION) --build-arg VITE_APP_BUILD_DATE=$(APP_BUILD_DATE) --build-arg VITE_PRODUCT_INFO_LAST_SYNC=$(PRODUCT_INFO_LAST_SYNC) --target $$FRONTEND_TARGET --platform $(PLATFORMS) --manifest $(IMAGE_REGISTRY)/image-factory-frontend:$(IMAGE_TAG) $(FRONTEND_DIR); \
 		podman manifest push --all $(IMAGE_REGISTRY)/image-factory-frontend:$(IMAGE_TAG) docker://$(IMAGE_REGISTRY)/image-factory-frontend:$(IMAGE_TAG); \
 		podman build --platform $(PLATFORMS) -f Dockerfile.docs --manifest $(IMAGE_REGISTRY)/image-factory-docs:$(IMAGE_TAG) .; \
 		podman manifest push --all $(IMAGE_REGISTRY)/image-factory-docs:$(IMAGE_TAG) docker://$(IMAGE_REGISTRY)/image-factory-docs:$(IMAGE_TAG); \
@@ -373,11 +364,28 @@ docker-build-all-multiarch: ## Build amd64/arm64 images and push manifest list (
 		exit 1; \
 	fi
 
+.PHONY: docker-build-docs-multiarch
+docker-build-docs-multiarch: ## Build docs image for PLATFORMS and push (requires IMAGE_REGISTRY)
+	@echo "$(GREEN)Building docs image for $(PLATFORMS) using $(CONTAINER_ENGINE)...$(NC)"
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make docker-build-docs-multiarch IMAGE_REGISTRY=ghcr.io/acme$(NC)"; exit 1; }
+	@if [ "$(CONTAINER_ENGINE)" = "docker" ]; then \
+		docker buildx build --platform $(PLATFORMS) -f Dockerfile.docs -t $(IMAGE_REGISTRY)/image-factory-docs:$(IMAGE_TAG) --push .; \
+	elif [ "$(CONTAINER_ENGINE)" = "podman" ]; then \
+		podman build --platform $(PLATFORMS) -f Dockerfile.docs --manifest $(IMAGE_REGISTRY)/image-factory-docs:$(IMAGE_TAG) .; \
+		podman manifest push --all $(IMAGE_REGISTRY)/image-factory-docs:$(IMAGE_TAG) docker://$(IMAGE_REGISTRY)/image-factory-docs:$(IMAGE_TAG); \
+	else \
+		echo "$(RED)Unsupported CONTAINER_ENGINE=$(CONTAINER_ENGINE). Use docker or podman.$(NC)"; \
+		exit 1; \
+	fi
+
 .PHONY: release-deploy
 release-deploy: ## Build+push multiarch images and helm upgrade release with IMAGE_TAG
 	@echo "$(GREEN)Release deploy with tag $(IMAGE_TAG)$(NC)"
-	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy IMAGE_REGISTRY=registry.gitlab.com/imagefactoryoss/imagefactory$(NC)"; exit 1; }
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory$(NC)"; exit 1; }
 	@$(MAKE) docker-build-all-multiarch IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) PLATFORMS=$(PLATFORMS) FRONTEND_USE_LOCAL_DIST=$(FRONTEND_USE_LOCAL_DIST)
+	@if [ "$(OLLAMA_ENABLED)" = "true" ] && [ "$(OLLAMA_STORAGE_MODE)" = "baked" ]; then \
+		$(MAKE) docker-build-ollama-baked-push IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) OLLAMA_MODEL_STORE="$(OLLAMA_MODEL_STORE)" OLLAMA_MODEL_NAME="$(OLLAMA_MODEL_NAME)" OLLAMA_BASE_IMAGE="$(OLLAMA_BASE_IMAGE)" OLLAMA_IMAGE_REPOSITORY="$(OLLAMA_IMAGE_REPOSITORY)"; \
+	fi
 	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(HELM_NAMESPACE) --reuse-values \
 		--set backend.image.repository=$(IMAGE_REGISTRY)/image-factory-backend \
 		--set backend.image.tag=$(IMAGE_TAG) \
@@ -395,10 +403,125 @@ release-deploy: ## Build+push multiarch images and helm upgrade release with IMA
 		--set workers.email.image.repository=$(IMAGE_REGISTRY)/image-factory-email-worker \
 		--set workers.email.image.tag=$(IMAGE_TAG) \
 		--set workers.internalRegistryGc.image.repository=$(IMAGE_REGISTRY)/image-factory-internal-registry-gc-worker \
-		--set workers.internalRegistryGc.image.tag=$(IMAGE_TAG)
+		--set workers.internalRegistryGc.image.tag=$(IMAGE_TAG) \
+		--set ollama.enabled=$(OLLAMA_ENABLED) \
+		--set ollama.storage.mode=$(OLLAMA_STORAGE_MODE) \
+		--set ollama.image.repository=$(OLLAMA_IMAGE_REPOSITORY) \
+		--set ollama.image.tag=$(IMAGE_TAG)
 	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-backend --timeout=300s
 	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-frontend --timeout=300s
 	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-docs --timeout=300s
+
+.PHONY: release
+release: release-deploy ## Alias for release deploy
+
+.PHONY: release-deploy-external-cluster
+release-deploy-external-cluster: ## Build+push images and deploy using the external-cluster Helm profile
+	@echo "$(GREEN)External cluster release deploy with tag $(IMAGE_TAG)$(NC)"
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy-external-cluster IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory$(NC)"; exit 1; }
+	@$(MAKE) docker-build-all-multiarch IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) PLATFORMS=$(PLATFORMS) FRONTEND_USE_LOCAL_DIST=$(FRONTEND_USE_LOCAL_DIST)
+	@if [ "$(OLLAMA_ENABLED)" = "true" ] && [ "$(OLLAMA_STORAGE_MODE)" = "baked" ]; then \
+		$(MAKE) docker-build-ollama-baked-push IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) OLLAMA_MODEL_STORE="$(OLLAMA_MODEL_STORE)" OLLAMA_MODEL_NAME="$(OLLAMA_MODEL_NAME)" OLLAMA_BASE_IMAGE="$(OLLAMA_BASE_IMAGE)" OLLAMA_IMAGE_REPOSITORY="$(OLLAMA_IMAGE_REPOSITORY)"; \
+	fi
+	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(HELM_NAMESPACE) \
+		-f deploy/helm/image-factory/values.external-cluster.example.yaml \
+		--set backend.image.repository=$(IMAGE_REGISTRY)/image-factory-backend \
+		--set backend.image.tag=$(IMAGE_TAG) \
+		--set backend.image.pullPolicy=Always \
+		--set frontend.image.repository=$(IMAGE_REGISTRY)/image-factory-frontend \
+		--set frontend.image.tag=$(IMAGE_TAG) \
+		--set frontend.image.pullPolicy=Always \
+		--set docs.image.repository=$(IMAGE_REGISTRY)/image-factory-docs \
+		--set docs.image.tag=$(IMAGE_TAG) \
+		--set docs.image.pullPolicy=Always \
+		--set workers.dispatcher.image.repository=$(IMAGE_REGISTRY)/image-factory-dispatcher \
+		--set workers.dispatcher.image.tag=$(IMAGE_TAG) \
+		--set workers.notification.image.repository=$(IMAGE_REGISTRY)/image-factory-notification-worker \
+		--set workers.notification.image.tag=$(IMAGE_TAG) \
+		--set workers.email.image.repository=$(IMAGE_REGISTRY)/image-factory-email-worker \
+		--set workers.email.image.tag=$(IMAGE_TAG) \
+		--set workers.internalRegistryGc.image.repository=$(IMAGE_REGISTRY)/image-factory-internal-registry-gc-worker \
+		--set workers.internalRegistryGc.image.tag=$(IMAGE_TAG) \
+		--set loki.image.repository=$(IMAGE_REGISTRY)/image-factory-loki \
+		--set loki.image.tag=3.0.0 \
+		--set alloy.image.repository=$(IMAGE_REGISTRY)/image-factory-alloy \
+		--set alloy.image.tag=v1.6.1 \
+		--set ollama.enabled=$(OLLAMA_ENABLED) \
+		--set ollama.storage.mode=$(OLLAMA_STORAGE_MODE) \
+		--set ollama.image.repository=$(OLLAMA_IMAGE_REPOSITORY) \
+		--set ollama.image.tag=$(IMAGE_TAG)
+	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-backend --timeout=300s
+	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-frontend --timeout=300s
+	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-docs --timeout=300s
+
+.PHONY: release-deploy-existing-external-cluster
+release-deploy-existing-external-cluster: ## Build+push images and upgrade an existing external-cluster release with --reuse-values
+	@echo "$(GREEN)Existing external cluster release deploy with tag $(IMAGE_TAG)$(NC)"
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy-existing-external-cluster IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory$(NC)"; exit 1; }
+	@$(MAKE) docker-build-all-multiarch IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) PLATFORMS=$(PLATFORMS) FRONTEND_USE_LOCAL_DIST=$(FRONTEND_USE_LOCAL_DIST)
+	@if [ "$(OLLAMA_ENABLED)" = "true" ] && [ "$(OLLAMA_STORAGE_MODE)" = "baked" ]; then \
+		$(MAKE) docker-build-ollama-baked-push IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) OLLAMA_MODEL_STORE="$(OLLAMA_MODEL_STORE)" OLLAMA_MODEL_NAME="$(OLLAMA_MODEL_NAME)" OLLAMA_BASE_IMAGE="$(OLLAMA_BASE_IMAGE)" OLLAMA_IMAGE_REPOSITORY="$(OLLAMA_IMAGE_REPOSITORY)"; \
+	fi
+	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(HELM_NAMESPACE) --reuse-values \
+		--set backend.image.repository=$(IMAGE_REGISTRY)/image-factory-backend \
+		--set backend.image.tag=$(IMAGE_TAG) \
+		--set backend.image.pullPolicy=Always \
+		--set frontend.image.repository=$(IMAGE_REGISTRY)/image-factory-frontend \
+		--set frontend.image.tag=$(IMAGE_TAG) \
+		--set frontend.image.pullPolicy=Always \
+		--set docs.image.repository=$(IMAGE_REGISTRY)/image-factory-docs \
+		--set docs.image.tag=$(IMAGE_TAG) \
+		--set docs.image.pullPolicy=Always \
+		--set workers.dispatcher.image.repository=$(IMAGE_REGISTRY)/image-factory-dispatcher \
+		--set workers.dispatcher.image.tag=$(IMAGE_TAG) \
+		--set workers.notification.image.repository=$(IMAGE_REGISTRY)/image-factory-notification-worker \
+		--set workers.notification.image.tag=$(IMAGE_TAG) \
+		--set workers.email.image.repository=$(IMAGE_REGISTRY)/image-factory-email-worker \
+		--set workers.email.image.tag=$(IMAGE_TAG) \
+		--set workers.internalRegistryGc.image.repository=$(IMAGE_REGISTRY)/image-factory-internal-registry-gc-worker \
+		--set workers.internalRegistryGc.image.tag=$(IMAGE_TAG) \
+		--set loki.enabled=true \
+		--set loki.image.repository=$(IMAGE_REGISTRY)/image-factory-loki \
+		--set loki.image.tag=3.0.0 \
+		--set alloy.enabled=true \
+		--set alloy.image.repository=$(IMAGE_REGISTRY)/image-factory-alloy \
+		--set alloy.image.tag=v1.6.1 \
+		--set ollama.enabled=$(OLLAMA_ENABLED) \
+		--set ollama.storage.mode=$(OLLAMA_STORAGE_MODE) \
+		--set ollama.image.repository=$(OLLAMA_IMAGE_REPOSITORY) \
+		--set ollama.image.tag=$(IMAGE_TAG)
+	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-backend --timeout=300s
+	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-frontend --timeout=300s
+	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-docs --timeout=300s
+
+.PHONY: release-deploy-docs-existing-external-cluster
+release-deploy-docs-existing-external-cluster: ## Build+push docs image and upgrade existing external-cluster release with --reuse-values
+	@echo "$(GREEN)Existing external cluster docs deploy with tag $(IMAGE_TAG)$(NC)"
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy-docs-existing-external-cluster IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory$(NC)"; exit 1; }
+	@$(MAKE) docker-build-docs-multiarch IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) PLATFORMS=$(PLATFORMS)
+	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(HELM_NAMESPACE) --reuse-values \
+		--set docs.image.repository=$(IMAGE_REGISTRY)/image-factory-docs \
+		--set docs.image.tag=$(IMAGE_TAG) \
+		--set docs.image.pullPolicy=Always
+	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-docs --timeout=300s
+
+.PHONY: release-deploy-docs-external-cluster
+release-deploy-docs-external-cluster: ## Build+push docs image and deploy external-cluster profile (no --reuse-values)
+	@echo "$(GREEN)External cluster docs deploy with tag $(IMAGE_TAG)$(NC)"
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-deploy-docs-external-cluster IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory$(NC)"; exit 1; }
+	@$(MAKE) docker-build-docs-multiarch IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) CONTAINER_ENGINE=$(CONTAINER_ENGINE) PLATFORMS=$(PLATFORMS)
+	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) -n $(HELM_NAMESPACE) \
+		-f deploy/helm/image-factory/values.external-cluster.example.yaml \
+		--set docs.image.repository=$(IMAGE_REGISTRY)/image-factory-docs \
+		--set docs.image.tag=$(IMAGE_TAG) \
+		--set docs.image.pullPolicy=Always
+	kubectl -n $(HELM_NAMESPACE) rollout status deployment/$(HELM_RELEASE)-docs --timeout=300s
+
+.PHONY: release-verify-external-cluster
+release-verify-external-cluster: ## Preflight-check external-cluster Helm release inputs before building/pushing
+	@test -n "$(IMAGE_REGISTRY)" || { echo "$(RED)IMAGE_REGISTRY is required. Example: make release-verify-external-cluster IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory IMAGE_TAG=<tag>$(NC)"; exit 1; }
+	@test -n "$(IMAGE_TAG)" || { echo "$(RED)IMAGE_TAG is required. Example: make release-verify-external-cluster IMAGE_REGISTRY=registry.gitlab.com/s4cna/image-factory IMAGE_TAG=v0.1.0-abc123$(NC)"; exit 1; }
+	IMAGE_REGISTRY=$(IMAGE_REGISTRY) IMAGE_TAG=$(IMAGE_TAG) HELM_RELEASE=$(HELM_RELEASE) HELM_NAMESPACE=$(HELM_NAMESPACE) HELM_CHART=$(HELM_CHART) ./scripts/verify-external-cluster-release.sh
 
 .PHONY: docker-pull-runtime
 docker-pull-runtime: ## Pre-pull runtime service images used by Helm chart

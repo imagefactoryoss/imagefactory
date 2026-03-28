@@ -158,6 +158,10 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 provider-native lifecycle no-cloud mock validation mode completed on `feature/packer-builds`:
     - smoke/matrix tooling now supports `SMOKE_MODE=mock_success` for deterministic no-cloud workflow validation.
     - mock mode keeps transition assertion and report contracts intact while skipping provider API calls and external credentials.
+  - PR8 provider-native staging evidence closure tooling completed on `feature/packer-builds`:
+    - added QA runner `scripts/qa/packer_provider_native_matrix_validate.sh` and `make qa-packer-provider-native-matrix` target for timestamped evidence capture.
+    - added staging runbook + validation template: `docs/qa/PACKER_PROVIDER_NATIVE_MATRIX_STAGING_RUNBOOK.md`, `docs/qa/PACKER_PROVIDER_NATIVE_MATRIX_VALIDATION_LOG.md`.
+    - closure criteria now explicit: run `SMOKE_MODE=api` matrix in staging/prod-like environment, attach artifacts, and capture Platform/Ops + QA signoff.
 
 ## Backlog Review Summary (2026-03-16)
 
