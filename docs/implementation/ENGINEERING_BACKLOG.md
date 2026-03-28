@@ -474,6 +474,18 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - added `GET /api/v1/admin/sre/incidents/{id}/agent/scorecard`.
   - incident AI workspace now includes dedicated `Incident Scorecard` cards with severity + why-severe factor breakdown.
 
+8. `AIOPS-08` One-call deterministic AI snapshot
+- Status: `done`
+- Scope:
+  - add deterministic one-call snapshot endpoint returning triage, severity, scorecard, and suggested action in a single payload.
+  - add operator UI control to generate all core advisory views in one action.
+- Validation:
+  - backend tests for snapshot composition + approval-bound guarantees.
+  - REST contract tests/build/regression and AIOPS eval harness remain green.
+- Completion note:
+  - added `GET /api/v1/admin/sre/incidents/{id}/agent/snapshot`.
+  - incidents AI page now includes `Generate AI Snapshot` and dedicated snapshot cards in both layout variants.
+
 0. Deployment guardrails: strict Helm configuration (no silent fallbacks) + Supabase pooler stability
 - Status: `done`
 - Priority: `P0`
