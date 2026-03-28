@@ -246,6 +246,10 @@ qa-packer-provider-native-matrix: ## Run Packer provider-native matrix validatio
 qa-sre-smartbot-regression: ## Run SRE Smart Bot focused backend+frontend regression suite (writes docs/qa/artifacts log)
 	@./scripts/qa/sre_smartbot_regression_validate.sh
 
+.PHONY: qa-sre-smartbot-aiops-eval
+qa-sre-smartbot-aiops-eval: ## Run SRE Smart Bot AIOPS evaluation harness replay+safety checks (writes docs/qa/artifacts log)
+	@bash ./scripts/qa/sre_smartbot_aiops_eval_validate.sh
+
 ##@ Quality
 
 .PHONY: lint

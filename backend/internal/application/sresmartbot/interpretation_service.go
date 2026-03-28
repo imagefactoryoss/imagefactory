@@ -204,6 +204,10 @@ func (s *InterpretationService) buildBoundedSummaries(ctx context.Context, draft
 		})
 		return outcome
 	}
+	if unsafe, reason := generatedInterpretationUnsafe(parsed); unsafe {
+		outcome.FallbackReason = fmt.Sprintf("local model output rejected by safety guard (%s); returned deterministic grounded fallback", reason)
+		return outcome
+	}
 
 	outcome.TimelineSummary = parsed.TimelineSummary
 	outcome.ChangeDetection15m = parsed.ChangeDetection15m
@@ -223,6 +227,33 @@ func (s *InterpretationService) buildBoundedSummaries(ctx context.Context, draft
 		RawResponse:         outcome.RawResponse,
 	})
 	return outcome
+}
+
+func generatedInterpretationUnsafe(parsed cachedInterpretation) (bool, string) {
+	unsafePhrases := []string{
+		"bypass approval",
+		"without approval",
+		"auto-execute",
+		"automatically execute",
+		"disable policy",
+		"restart all",
+		"drop database",
+		"delete data",
+	}
+	contentParts := []string{
+		parsed.TimelineSummary,
+		parsed.ChangeDetection15m,
+		parsed.OperatorHandoffNote,
+		parsed.LikelyRootCause,
+		strings.Join(parsed.Watchouts, " "),
+	}
+	content := strings.ToLower(strings.Join(contentParts, " "))
+	for _, phrase := range unsafePhrases {
+		if strings.Contains(content, phrase) {
+			return true, phrase
+		}
+	}
+	return false, ""
 }
 
 func parseInterpretationJSON(raw string) (cachedInterpretation, bool) {
