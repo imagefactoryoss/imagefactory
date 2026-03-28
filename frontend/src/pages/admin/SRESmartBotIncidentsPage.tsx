@@ -1,6 +1,6 @@
 import Drawer from '@/components/ui/Drawer'
 import { adminService } from '@/services/adminService'
-import type { SREActionAttempt, SREAgentDraftResponse, SREAgentInterpretationResponse, SREAgentSeverityResponse, SREAgentTriageResponse, SREApproval, SREDemoScenario, SREEvidence, SREFinding, SREIncident, SREIncidentWorkspaceResponse, SREMCPToolDescriptor, SREMCPToolInvocationResponse, SRERemediationPack, SRERemediationPackRun, SRESmartBotChannelProvider, SRESmartBotPolicyConfig } from '@/types'
+import type { SREActionAttempt, SREAgentDraftResponse, SREAgentInterpretationResponse, SREAgentSeverityResponse, SREAgentSuggestedActionResponse, SREAgentTriageResponse, SREApproval, SREDemoScenario, SREEvidence, SREFinding, SREIncident, SREIncidentWorkspaceResponse, SREMCPToolDescriptor, SREMCPToolInvocationResponse, SRERemediationPack, SRERemediationPackRun, SRESmartBotChannelProvider, SRESmartBotPolicyConfig } from '@/types'
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -78,7 +78,9 @@ const SRESmartBotIncidentsPage: React.FC = () => {
     const [agentDraft, setAgentDraft] = useState<SREAgentDraftResponse | null>(null)
     const [agentTriage, setAgentTriage] = useState<SREAgentTriageResponse | null>(null)
     const [agentSeverity, setAgentSeverity] = useState<SREAgentSeverityResponse | null>(null)
+    const [agentSuggestedAction, setAgentSuggestedAction] = useState<SREAgentSuggestedActionResponse | null>(null)
     const [generatingAgentSeverity, setGeneratingAgentSeverity] = useState(false)
+    const [generatingAgentSuggestedAction, setGeneratingAgentSuggestedAction] = useState(false)
     const [generatingAgentTriage, setGeneratingAgentTriage] = useState(false)
     const [generatingAgentDraft, setGeneratingAgentDraft] = useState(false)
     const [agentInterpretation, setAgentInterpretation] = useState<SREAgentInterpretationResponse | null>(null)
@@ -209,6 +211,7 @@ const SRESmartBotIncidentsPage: React.FC = () => {
         setAgentDraft(null)
         setAgentTriage(null)
         setAgentSeverity(null)
+        setAgentSuggestedAction(null)
         setAgentInterpretation(null)
         setApprovalComments({})
         setApprovalRequestActionId(null)
@@ -262,6 +265,7 @@ const SRESmartBotIncidentsPage: React.FC = () => {
         setAgentDraft(null)
         setAgentTriage(null)
         setAgentSeverity(null)
+        setAgentSuggestedAction(null)
         setAgentInterpretation(null)
         setApprovalComments({})
         setApprovalRequestActionId(null)
@@ -439,6 +443,20 @@ const SRESmartBotIncidentsPage: React.FC = () => {
             toast.error(err instanceof Error ? err.message : 'Failed to generate severity correlation')
         } finally {
             setGeneratingAgentSeverity(false)
+        }
+    }
+
+    const handleGenerateAgentSuggestedAction = async () => {
+        if (!selectedIncident) return
+        try {
+            setGeneratingAgentSuggestedAction(true)
+            const response = await adminService.getSREIncidentAgentSuggestedAction(selectedIncident.id)
+            setAgentSuggestedAction(response)
+            toast.success('Advisory suggested action generated')
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to generate advisory suggested action')
+        } finally {
+            setGeneratingAgentSuggestedAction(false)
         }
     }
 
@@ -1426,6 +1444,14 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                             </button>
                                             <button
                                                 type="button"
+                                                onClick={() => void handleGenerateAgentSuggestedAction()}
+                                                disabled={generatingAgentSuggestedAction}
+                                                className="rounded-lg border border-fuchsia-300 bg-fuchsia-50 px-3 py-2 text-xs font-medium text-fuchsia-800 transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-fuchsia-800 dark:bg-fuchsia-950/30 dark:text-fuchsia-200 dark:hover:bg-fuchsia-950/50"
+                                            >
+                                                {generatingAgentSuggestedAction ? 'Generating...' : 'Generate Suggested Action'}
+                                            </button>
+                                            <button
+                                                type="button"
                                                 onClick={() => void handleGenerateAgentDraft()}
                                                 disabled={generatingAgentDraft}
                                                 className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200 dark:hover:bg-sky-950/50"
@@ -1462,11 +1488,28 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                             </Link>
                                         </div>
 
-                                        {agentDraft || agentInterpretation ? (
+                                        {agentDraft || agentInterpretation || agentSuggestedAction ? (
                                             <div className="mt-4 grid gap-4 xl:grid-cols-2">
                                                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
                                                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Bot Guidance</div>
                                                     <div className="mt-3 space-y-3">
+                                                        {agentSuggestedAction ? (
+                                                            <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50/70 px-3 py-3 text-sm text-fuchsia-900 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/30 dark:text-fuchsia-100">
+                                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-fuchsia-700 dark:text-fuchsia-300">Advisory Suggested Action</div>
+                                                                    <span className="rounded-full border border-fuchsia-300 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
+                                                                        advisory only
+                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-2"><span className="font-semibold">Action:</span> {agentSuggestedAction.action_key}</div>
+                                                                <div className="mt-1">{agentSuggestedAction.action_summary}</div>
+                                                                <div className="mt-2 rounded-md border border-fuchsia-200 bg-white/80 px-2.5 py-2 text-xs dark:border-fuchsia-900/40 dark:bg-fuchsia-950/30">
+                                                                    <div><span className="font-semibold">Justification:</span> {agentSuggestedAction.justification}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Blast radius:</span> {agentSuggestedAction.blast_radius}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Guardrail:</span> {agentSuggestedAction.execution_guardrail}</div>
+                                                                </div>
+                                                            </div>
+                                                        ) : null}
                                                         {agentSeverity ? (
                                                             <div className={`rounded-lg border px-3 py-3 text-sm ${agentSeverityTone(agentSeverity.level)}`}>
                                                                 <div className="text-xs font-semibold uppercase tracking-[0.16em]">Why This Is Severe</div>
@@ -1928,6 +1971,14 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                 </button>
                                                                 <button
                                                                     type="button"
+                                                                    onClick={() => void handleGenerateAgentSuggestedAction()}
+                                                                    disabled={generatingAgentSuggestedAction}
+                                                                    className="rounded-lg border border-fuchsia-300 bg-fuchsia-50 px-3 py-2 text-xs font-medium text-fuchsia-800 transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-fuchsia-800 dark:bg-fuchsia-950/30 dark:text-fuchsia-200 dark:hover:bg-fuchsia-950/50"
+                                                                >
+                                                                    {generatingAgentSuggestedAction ? 'Generating...' : 'Generate Suggested Action'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
                                                                     onClick={() => void handleGenerateAgentDraft()}
                                                                     disabled={generatingAgentDraft}
                                                                     className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200 dark:hover:bg-sky-950/50"
@@ -1945,6 +1996,25 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                             </div>
                                                         </div>
                                                         <div className="mt-4 space-y-4">
+                                                            {agentSuggestedAction ? (
+                                                                <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/70 px-4 py-3 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/30">
+                                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-fuchsia-700 dark:text-fuchsia-300">Advisory Suggested Action</div>
+                                                                        <span className="rounded-full border border-fuchsia-300 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
+                                                                            advisory only
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="mt-2 text-sm text-fuchsia-900 dark:text-fuchsia-100"><span className="font-semibold">Action:</span> {agentSuggestedAction.action_key}</div>
+                                                                    <div className="mt-1 text-sm text-fuchsia-900 dark:text-fuchsia-100">{agentSuggestedAction.action_summary}</div>
+                                                                    <div className="mt-2 rounded-lg border border-fuchsia-200 bg-white/80 px-3 py-2 text-sm text-fuchsia-900 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/30 dark:text-fuchsia-100">
+                                                                        <div><span className="font-semibold">Justification:</span> {agentSuggestedAction.justification}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Blast radius:</span> {agentSuggestedAction.blast_radius}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Execution guardrail:</span> {agentSuggestedAction.execution_guardrail}</div>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <EmptyState title="No advisory suggested action yet" description="Generate Suggested Action to get action + justification + blast radius guidance. This is advisory-only and does not execute anything." />
+                                                            )}
                                                             {agentSeverity ? (
                                                                 <div className={`rounded-xl border px-4 py-3 ${agentSeverityTone(agentSeverity.level)}`}>
                                                                     <div className="text-xs font-semibold uppercase tracking-[0.16em]">Why This Is Severe</div>

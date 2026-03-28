@@ -68,6 +68,20 @@ type AgentSeverityResponse struct {
 	HumanConfirmation bool                  `json:"human_confirmation_required"`
 }
 
+type AgentSuggestedActionResponse struct {
+	IncidentID                uuid.UUID               `json:"incident_id"`
+	Mode                      string                  `json:"mode"`
+	ActionKey                 string                  `json:"action_key"`
+	ActionSummary             string                  `json:"action_summary"`
+	Justification             string                  `json:"justification"`
+	BlastRadius               string                  `json:"blast_radius"`
+	AdvisoryOnly              bool                    `json:"advisory_only"`
+	ExecutionRequiresApproval bool                    `json:"execution_requires_approval"`
+	ExecutionGuardrail        string                  `json:"execution_guardrail"`
+	EvidenceRefs              []AgentDraftEvidenceRef `json:"evidence_refs,omitempty"`
+	HumanConfirmation         bool                    `json:"human_confirmation_required"`
+}
+
 type AgentService struct {
 	workspaceService *WorkspaceService
 	mcpService       *MCPService
@@ -150,6 +164,14 @@ func (s *AgentService) BuildSeverity(ctx context.Context, tenantID *uuid.UUID, i
 		return nil, err
 	}
 	return buildSeverityFromDraft(draft), nil
+}
+
+func (s *AgentService) BuildSuggestedAction(ctx context.Context, tenantID *uuid.UUID, incidentID uuid.UUID) (*AgentSuggestedActionResponse, error) {
+	draft, err := s.BuildDraft(ctx, tenantID, incidentID)
+	if err != nil {
+		return nil, err
+	}
+	return buildSuggestedActionFromDraft(draft), nil
 }
 
 func buildTriageFromDraft(draft *AgentDraftResponse) *AgentTriageResponse {
@@ -306,6 +328,78 @@ func buildSeverityFromDraft(draft *AgentDraftResponse) *AgentSeverityResponse {
 		Summary:           summary,
 		Factors:           factors,
 		HumanConfirmation: draft.HumanConfirmation,
+	}
+}
+
+func buildSuggestedActionFromDraft(draft *AgentDraftResponse) *AgentSuggestedActionResponse {
+	if draft == nil {
+		return nil
+	}
+	triage := buildTriageFromDraft(draft)
+	actionKey := "review_runtime_health"
+	actionSummary := "Review runtime and cluster health to confirm if escalation is needed."
+	blastRadius := "low"
+	justification := "Current grounded evidence supports additional read-only verification before any disruptive intervention."
+	evidenceRefs := evidenceRefsForSignals([]string{"runtime_health.get", "cluster_overview.get", "findings.list", "evidence.list"}, draft.ToolRuns)
+
+	signals := []string{}
+	if len(draft.Hypotheses) > 0 {
+		signals = draft.Hypotheses[0].SignalsUsed
+		if len(draft.Hypotheses[0].EvidenceRefs) > 0 {
+			evidenceRefs = draft.Hypotheses[0].EvidenceRefs
+		}
+	}
+	recommended := ""
+	if triage != nil {
+		recommended = strings.TrimSpace(triage.RecommendedAction)
+	}
+
+	switch {
+	case containsSignal(signals, "messaging_transport.recent"):
+		actionKey = "review_messaging_transport_health"
+		actionSummary = "Inspect transport reconnect/disconnect pressure and confirm bus stability."
+		blastRadius = "low"
+		justification = "Transport instability is present; runbooks recommend validating bus stability before throughput or restart actions."
+		evidenceRefs = evidenceRefsForSignals([]string{"messaging_transport.recent", "async_backlog.recent"}, draft.ToolRuns)
+	case containsSignal(signals, "async_backlog.recent"):
+		actionKey = "review_async_worker_capacity"
+		actionSummary = "Validate async queue pressure and worker throughput limits."
+		blastRadius = "medium"
+		justification = "Backlog pressure is elevated and should be verified before wider incident response actions."
+		evidenceRefs = evidenceRefsForSignals([]string{"async_backlog.recent", "http_signals.history", "logs.recent"}, draft.ToolRuns)
+	case containsSignal(signals, "release_drift.summary"):
+		actionKey = "review_release_drift"
+		actionSummary = "Assess rollout drift and configuration mismatch prior to remediation."
+		blastRadius = "high"
+		justification = "Release drift can impact multiple components; approval-gated remediation is required before execution."
+		evidenceRefs = evidenceRefsForSignals([]string{"release_drift.summary", "runtime_health.get", "findings.list"}, draft.ToolRuns)
+	case containsSignal(signals, "cluster_overview.get"), containsSignal(signals, "runtime_health.get"):
+		actionKey = "review_provider_connectivity"
+		actionSummary = "Check infrastructure/provider health pathways for degradation."
+		blastRadius = "medium"
+		justification = "Infrastructure health may be driving symptoms; confirm dependencies first through bounded checks."
+		evidenceRefs = evidenceRefsForSignals([]string{"cluster_overview.get", "runtime_health.get", "findings.list"}, draft.ToolRuns)
+	}
+
+	if recommended != "" {
+		justification = fmt.Sprintf("%s Recommended triage path: %s", justification, recommended)
+	}
+	if len(evidenceRefs) == 0 {
+		evidenceRefs = evidenceRefsForSignals([]string{"findings.list", "evidence.list"}, draft.ToolRuns)
+	}
+
+	return &AgentSuggestedActionResponse{
+		IncidentID:                draft.IncidentID,
+		Mode:                      "deterministic_advisory_suggested_action",
+		ActionKey:                 actionKey,
+		ActionSummary:             actionSummary,
+		Justification:             justification,
+		BlastRadius:               blastRadius,
+		AdvisoryOnly:              true,
+		ExecutionRequiresApproval: true,
+		ExecutionGuardrail:        "Suggestion is advisory-only. Execution must use the existing action + approval workflow and cannot bypass deterministic policy gates.",
+		EvidenceRefs:              evidenceRefs,
+		HumanConfirmation:         draft.HumanConfirmation,
 	}
 }
 
