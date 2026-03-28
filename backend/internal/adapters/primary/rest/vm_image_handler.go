@@ -49,7 +49,10 @@ type vmLifecycleTransitionRequest struct {
 }
 
 type vmLifecycleTransitionResult struct {
-	TransitionMode string
+	TransitionMode     string
+	ProviderAction     string
+	ProviderIdentifier string
+	ProviderOutcome    string
 }
 
 const vmwareLifecycleDeprecationMarker = "[image-factory:deprecated]"
@@ -115,7 +118,7 @@ type vmGCPLifecycleClient interface {
 func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req vmLifecycleTransitionRequest) (vmLifecycleTransitionResult, error) {
 	provider := strings.ToLower(strings.TrimSpace(req.TargetProvider))
 	if e.mode == vmLifecycleExecutionModeMetadataOnly {
-		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
+		return vmLifecycleTransitionResult{TransitionMode: "metadata_only", ProviderOutcome: "metadata_only"}, nil
 	}
 
 	if provider == "aws" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
@@ -136,6 +139,12 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 			if _, err := client.DeregisterImage(ctx, &ec2.DeregisterImageInput{ImageId: awscore.String(ref.ImageID)}); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{
+				TransitionMode:     "provider_native",
+				ProviderAction:     "aws.deregister_image",
+				ProviderIdentifier: ref.ImageID,
+				ProviderOutcome:    "success",
+			}, nil
 		}
 
 		if req.TargetState == "deprecated" {
@@ -146,6 +155,12 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 			}); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{
+				TransitionMode:     "provider_native",
+				ProviderAction:     "aws.enable_image_deprecation",
+				ProviderIdentifier: ref.ImageID,
+				ProviderOutcome:    "success",
+			}, nil
 		}
 		if req.TargetState == "released" {
 			if _, err := client.DisableImageDeprecation(ctx, &ec2.DisableImageDeprecationInput{
@@ -153,9 +168,15 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 			}); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{
+				TransitionMode:     "provider_native",
+				ProviderAction:     "aws.disable_image_deprecation",
+				ProviderIdentifier: ref.ImageID,
+				ProviderOutcome:    "success",
+			}, nil
 		}
 
-		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+		return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderOutcome: "success"}, nil
 	}
 
 	if provider == "vmware" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
@@ -176,16 +197,19 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 			if err := client.DeleteImage(ctx, identifier); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "vmware.delete_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		case "deprecated":
 			if err := client.DeprecateImage(ctx, identifier, req.Reason); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "vmware.deprecate_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		case "released":
 			if err := client.ReleaseImage(ctx, identifier); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "vmware.release_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		}
-		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+		return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderOutcome: "success"}, nil
 	}
 
 	if provider == "azure" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
@@ -206,16 +230,19 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 			if err := client.DeleteImage(ctx, identifier); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "azure.delete_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		case "deprecated":
 			if err := client.DeprecateImage(ctx, identifier, req.Reason); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "azure.deprecate_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		case "released":
 			if err := client.ReleaseImage(ctx, identifier); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "azure.release_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		}
-		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+		return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderOutcome: "success"}, nil
 	}
 
 	if provider == "gcp" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
@@ -236,16 +263,19 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 			if err := client.DeleteImage(ctx, identifier); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "gcp.delete_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		case "deprecated":
 			if err := client.DeprecateImage(ctx, identifier, req.Reason); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "gcp.deprecate_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		case "released":
 			if err := client.ReleaseImage(ctx, identifier); err != nil {
 				return vmLifecycleTransitionResult{}, err
 			}
+			return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderAction: "gcp.release_image", ProviderIdentifier: identifier, ProviderOutcome: "success"}, nil
 		}
-		return vmLifecycleTransitionResult{TransitionMode: "provider_native"}, nil
+		return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderOutcome: "success"}, nil
 	}
 
 	if provider != "aws" && provider != "vmware" && provider != "azure" && provider != "gcp" {
@@ -255,12 +285,12 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 			}
 			return vmLifecycleTransitionResult{}, fmt.Errorf("%w for provider %s", errUnsupportedProviderLifecycleTransition, provider)
 		}
-		return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
+		return vmLifecycleTransitionResult{TransitionMode: "metadata_only", ProviderOutcome: "metadata_only"}, nil
 	}
 	if e.mode == vmLifecycleExecutionModeRequireProviderNative {
 		return vmLifecycleTransitionResult{}, fmt.Errorf("%w for provider %s state %s", errUnsupportedProviderLifecycleTransition, provider, req.TargetState)
 	}
-	return vmLifecycleTransitionResult{TransitionMode: "metadata_only"}, nil
+	return vmLifecycleTransitionResult{TransitionMode: "metadata_only", ProviderOutcome: "metadata_only"}, nil
 }
 
 func newVMAWSLifecycleClient(ctx context.Context, region string) (vmAWSLifecycleClient, error) {
@@ -784,6 +814,9 @@ type vmImageCatalogItem struct {
 	LifecycleLastActionAt       string                   `json:"lifecycle_last_action_at,omitempty"`
 	LifecycleLastActionBy       string                   `json:"lifecycle_last_action_by,omitempty"`
 	LifecycleLastReason         string                   `json:"lifecycle_last_reason,omitempty"`
+	LifecycleLastProviderAction string                   `json:"lifecycle_last_provider_action,omitempty"`
+	LifecycleLastProviderID     string                   `json:"lifecycle_last_provider_identifier,omitempty"`
+	LifecycleLastProviderResult string                   `json:"lifecycle_last_provider_outcome,omitempty"`
 	LifecycleTransitionMode     string                   `json:"lifecycle_transition_mode"`
 	LifecycleHistory            []vmLifecycleHistory     `json:"lifecycle_history,omitempty"`
 	ActionPermissions           vmImageActionPermissions `json:"action_permissions"`
@@ -801,6 +834,9 @@ type vmLifecycleHistory struct {
 	ActorID        string `json:"actor_id,omitempty"`
 	At             string `json:"at,omitempty"`
 	TransitionMode string `json:"transition_mode,omitempty"`
+	ProviderAction string `json:"provider_action,omitempty"`
+	ProviderID     string `json:"provider_identifier,omitempty"`
+	ProviderResult string `json:"provider_outcome,omitempty"`
 }
 
 type vmImageCatalogListResponse struct {
@@ -1048,12 +1084,15 @@ func vmImageLifecycleActionPermissions(executionStatus, lifecycleState string) v
 }
 
 type vmImageLifecycleMetadata struct {
-	State          string
-	LastActionAt   string
-	LastActionBy   string
-	LastReason     string
-	TransitionMode string
-	History        []vmLifecycleHistory
+	State              string
+	LastActionAt       string
+	LastActionBy       string
+	LastReason         string
+	LastProviderAction string
+	LastProviderID     string
+	LastProviderResult string
+	TransitionMode     string
+	History            []vmLifecycleHistory
 }
 
 func defaultVMLifecycleMetadata() vmImageLifecycleMetadata {
@@ -1071,6 +1110,9 @@ func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfi
 		LifecycleLastActionAt       string               `json:"lifecycle_last_action_at"`
 		LifecycleLastActionBy       string               `json:"lifecycle_last_action_by"`
 		LifecycleLastReason         string               `json:"lifecycle_last_reason"`
+		LifecycleLastProviderAction string               `json:"lifecycle_last_provider_action"`
+		LifecycleLastProviderID     string               `json:"lifecycle_last_provider_identifier"`
+		LifecycleLastProviderResult string               `json:"lifecycle_last_provider_outcome"`
 		LifecycleTransitionMode     string               `json:"lifecycle_transition_mode"`
 		LifecycleHistory            []vmLifecycleHistory `json:"lifecycle_history"`
 	}
@@ -1084,12 +1126,15 @@ func parsePackerMetadataFields(raw json.RawMessage) (targetProvider, targetProfi
 	targetProvider = strings.TrimSpace(parsed.Packer.TargetProvider)
 	targetProfileID = strings.TrimSpace(parsed.Packer.TargetProfileID)
 	lifecycle = vmImageLifecycleMetadata{
-		State:          strings.TrimSpace(parsed.Packer.LifecycleState),
-		LastActionAt:   strings.TrimSpace(parsed.Packer.LifecycleLastActionAt),
-		LastActionBy:   strings.TrimSpace(parsed.Packer.LifecycleLastActionBy),
-		LastReason:     strings.TrimSpace(parsed.Packer.LifecycleLastReason),
-		TransitionMode: vmImageLifecycleTransitionMode(parsed.Packer.LifecycleTransitionMode),
-		History:        sanitizeLifecycleHistory(parsed.Packer.LifecycleHistory),
+		State:              strings.TrimSpace(parsed.Packer.LifecycleState),
+		LastActionAt:       strings.TrimSpace(parsed.Packer.LifecycleLastActionAt),
+		LastActionBy:       strings.TrimSpace(parsed.Packer.LifecycleLastActionBy),
+		LastReason:         strings.TrimSpace(parsed.Packer.LifecycleLastReason),
+		LastProviderAction: strings.TrimSpace(parsed.Packer.LifecycleLastProviderAction),
+		LastProviderID:     strings.TrimSpace(parsed.Packer.LifecycleLastProviderID),
+		LastProviderResult: strings.TrimSpace(parsed.Packer.LifecycleLastProviderResult),
+		TransitionMode:     vmImageLifecycleTransitionMode(parsed.Packer.LifecycleTransitionMode),
+		History:            sanitizeLifecycleHistory(parsed.Packer.LifecycleHistory),
 	}
 	out := make(map[string][]string, len(parsed.Packer.ProviderArtifactIdentifiers))
 	for provider, values := range parsed.Packer.ProviderArtifactIdentifiers {
@@ -1275,7 +1320,10 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 		return
 	}
 
-	transitionMode := "metadata_only"
+	transition := vmLifecycleTransitionResult{
+		TransitionMode:  "metadata_only",
+		ProviderOutcome: "metadata_only",
+	}
 	if h.lifecycleExecutor != nil {
 		result, execErr := h.lifecycleExecutor.ExecuteTransition(r.Context(), vmLifecycleTransitionRequest{
 			ExecutionID:                 executionID,
@@ -1304,10 +1352,10 @@ func (h *VMImageHandler) transitionTenantVMImageLifecycle(w http.ResponseWriter,
 			writeVMImageJSON(w, http.StatusBadGateway, map[string]string{"error": "failed to execute provider lifecycle transition"})
 			return
 		}
-		transitionMode = vmImageLifecycleTransitionMode(result.TransitionMode)
+		transition = result
 	}
 
-	nextMetadata, err := updatePackerLifecycleMetadata(row.MetadataRaw, targetState, reason, transitionMode, authCtx.UserID, time.Now().UTC())
+	nextMetadata, err := updatePackerLifecycleMetadata(row.MetadataRaw, targetState, reason, transition, authCtx.UserID, time.Now().UTC())
 	if err != nil {
 		writeVMImageJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to prepare lifecycle metadata"})
 		return
@@ -1383,6 +1431,9 @@ func vmImageCatalogItemFromRow(row vmImageRow) vmImageCatalogItem {
 		LifecycleLastActionAt:       lifecycle.LastActionAt,
 		LifecycleLastActionBy:       lifecycle.LastActionBy,
 		LifecycleLastReason:         lifecycle.LastReason,
+		LifecycleLastProviderAction: lifecycle.LastProviderAction,
+		LifecycleLastProviderID:     lifecycle.LastProviderID,
+		LifecycleLastProviderResult: lifecycle.LastProviderResult,
 		LifecycleTransitionMode:     lifecycleTransitionMode,
 		LifecycleHistory:            lifecycle.History,
 		ActionPermissions:           vmImageLifecycleActionPermissions(row.ExecutionStatus, lifecycleState),
@@ -1419,7 +1470,7 @@ func (h *VMImageHandler) getTenantVMImageRow(r *http.Request, tenantID, executio
 	return &row, nil
 }
 
-func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason, transitionMode string, userID uuid.UUID, at time.Time) (json.RawMessage, error) {
+func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason string, transition vmLifecycleTransitionResult, userID uuid.UUID, at time.Time) (json.RawMessage, error) {
 	metadata := map[string]interface{}{}
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &metadata); err != nil {
@@ -1433,7 +1484,17 @@ func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason, tra
 	if packer == nil {
 		packer = map[string]interface{}{}
 	}
-	transitionMode = vmImageLifecycleTransitionMode(transitionMode)
+	transitionMode := vmImageLifecycleTransitionMode(transition.TransitionMode)
+	providerAction := strings.TrimSpace(transition.ProviderAction)
+	providerID := strings.TrimSpace(transition.ProviderIdentifier)
+	providerOutcome := strings.TrimSpace(transition.ProviderOutcome)
+	if providerOutcome == "" {
+		if transitionMode == "provider_native" || transitionMode == "hybrid" {
+			providerOutcome = "success"
+		} else {
+			providerOutcome = "metadata_only"
+		}
+	}
 	packer["lifecycle_state"] = strings.ToLower(strings.TrimSpace(targetState))
 	packer["lifecycle_transition_mode"] = transitionMode
 	packer["lifecycle_last_action_at"] = at.UTC().Format(time.RFC3339)
@@ -1441,6 +1502,9 @@ func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason, tra
 	if strings.TrimSpace(reason) != "" {
 		packer["lifecycle_last_reason"] = strings.TrimSpace(reason)
 	}
+	packer["lifecycle_last_provider_action"] = providerAction
+	packer["lifecycle_last_provider_identifier"] = providerID
+	packer["lifecycle_last_provider_outcome"] = providerOutcome
 	history := sanitizeLifecycleHistory(interfaceToLifecycleHistory(packer["lifecycle_history"]))
 	history = append(history, vmLifecycleHistory{
 		State:          strings.ToLower(strings.TrimSpace(targetState)),
@@ -1448,6 +1512,9 @@ func updatePackerLifecycleMetadata(raw json.RawMessage, targetState, reason, tra
 		ActorID:        userID.String(),
 		At:             at.UTC().Format(time.RFC3339),
 		TransitionMode: transitionMode,
+		ProviderAction: providerAction,
+		ProviderID:     providerID,
+		ProviderResult: providerOutcome,
 	})
 	if len(history) > 25 {
 		history = history[len(history)-25:]
@@ -1488,6 +1555,9 @@ func sanitizeLifecycleHistory(history []vmLifecycleHistory) []vmLifecycleHistory
 			ActorID:        strings.TrimSpace(entry.ActorID),
 			At:             strings.TrimSpace(entry.At),
 			TransitionMode: vmImageLifecycleTransitionMode(entry.TransitionMode),
+			ProviderAction: strings.TrimSpace(entry.ProviderAction),
+			ProviderID:     strings.TrimSpace(entry.ProviderID),
+			ProviderResult: strings.TrimSpace(entry.ProviderResult),
 		})
 	}
 	if len(out) == 0 {

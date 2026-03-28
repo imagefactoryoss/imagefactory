@@ -847,6 +847,9 @@ Progress update (2026-03-27):
 - lifecycle history audit depth now includes transition mode:
   - lifecycle history entries include `transition_mode` for each transition event.
   - VM catalog lifecycle history view surfaces each entry's transition mode for operator traceability.
+- lifecycle provider execution audit depth now includes provider action context:
+  - lifecycle metadata/history entries now include `provider_action`, `provider_identifier`, and `provider_outcome`.
+  - VM catalog payloads now expose latest provider execution audit context to improve provider-native failure triage.
 - lifecycle action responses now use a consistent payload shape:
   - idempotent transitions (`already in target state`) return `data` + `message` instead of message-only payload.
   - list/detail/action responses share the same VM catalog item builder to reduce contract drift.
