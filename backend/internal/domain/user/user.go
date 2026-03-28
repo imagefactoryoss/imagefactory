@@ -268,6 +268,26 @@ func (u *User) ClearPasswordHash() {
 	u.version++
 }
 
+// EnsureLDAPCredentials normalizes credentials for LDAP-authenticated users.
+// Returns true when state changed and a persistence update is needed.
+func (u *User) EnsureLDAPCredentials() bool {
+	changed := false
+	if u.authMethod != AuthMethodLDAP {
+		u.authMethod = AuthMethodLDAP
+		changed = true
+	}
+	if u.passwordHash != "" || u.mustChangePassword {
+		u.passwordHash = ""
+		u.mustChangePassword = false
+		changed = true
+	}
+	if changed {
+		u.updatedAt = time.Now().UTC()
+		u.version++
+	}
+	return changed
+}
+
 // IsEmailVerified returns true if the user's email is verified
 func (u *User) IsEmailVerified() bool {
 	return u.emailVerified

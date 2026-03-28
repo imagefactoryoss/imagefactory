@@ -103,8 +103,18 @@ func (s *LDAPService) LDAPLogin(ctx context.Context, req LoginRequest) (*AuthRes
 			// Don't fail login if update fails
 		}
 		// Ensure LDAP users never persist local password credentials.
-		localUser.SetAuthMethod(AuthMethodLDAP)
-		localUser.ClearPasswordHash()
+		if localUser.EnsureLDAPCredentials() {
+			if updateErr := s.repository.Update(ctx, localUser); updateErr != nil {
+				s.logger.Warn("Failed to normalize LDAP user credentials",
+					zap.String("email", req.Email),
+					zap.Error(updateErr))
+				// Re-fetch the user to recover from optimistic lock races.
+				refreshed, refreshErr := s.repository.FindByEmail(ctx, req.Email)
+				if refreshErr == nil {
+					localUser = refreshed
+				}
+			}
+		}
 	}
 
 	// Check if account is active
@@ -120,6 +130,19 @@ func (s *LDAPService) LDAPLogin(ctx context.Context, req LoginRequest) (*AuthRes
 	// Record successful login
 	localUser.RecordLogin()
 	if err := s.repository.Update(ctx, localUser); err != nil {
+		// Retry once with a fresh copy when optimistic lock/version conflict occurs.
+		if strings.Contains(strings.ToLower(err.Error()), "version conflict") {
+			refreshed, refreshErr := s.repository.FindByEmail(ctx, req.Email)
+			if refreshErr == nil && refreshed != nil {
+				refreshed.RecordLogin()
+				if retryErr := s.repository.Update(ctx, refreshed); retryErr == nil {
+					localUser = refreshed
+					err = nil
+				} else {
+					err = retryErr
+				}
+			}
+		}
 		s.logger.Error("Failed to update user after successful login",
 			zap.String("user_id", localUser.ID().String()),
 			zap.Error(err))
