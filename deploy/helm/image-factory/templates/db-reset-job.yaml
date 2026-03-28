@@ -145,4 +145,7 @@ spec:
                 name: {{ include "image-factory.fullname" . }}-config
             - secretRef:
                 name: {{ include "image-factory.fullname" . }}-secrets
+          env:
+            - name: IF_BOOTSTRAP_SEED_ROBOT_SRE_POLICY
+              value: {{ and .Values.bootstrap.seedRobotSREPolicyDefaults .Values.ollama.enabled | quote }}
 {{- end }}

@@ -1,8 +1,8 @@
 nameOverride: ""
 fullnameOverride: ""
 
-imagePullSecrets: []
-# Set imagePullSecrets in an override file if your registry requires authentication.
+imagePullSecrets:
+  - name: gitlab-registry
 
 commonLabels: {}
 
@@ -54,10 +54,26 @@ ingress:
 
 app:
   environment: production
-  jwtSecret: "__SET_BEFORE_DEPLOYMENT__"
-  # Required in production. Set a long random secret before deployment.
+  jwtSecret: "change-me-to-a-long-random-secret"
   # Optional. Leave empty to auto-generate on first install and preserve on upgrades.
   encryptionKey: ""
+
+auth:
+  ldap:
+    enabled: true
+    providerName: "Active Directory"
+    providerType: "active_directory"
+    server: "image-factory-glauth"
+    port: 3893
+    baseDN: "dc=imgfactory,dc=com"
+    userSearchBase: "ou=people,dc=imgfactory,dc=com"
+    groupSearchBase: "dc=imgfactory,dc=com"
+    bindDN: "cn=ldap_search,ou=svcaccts,dc=imgfactory,dc=com"
+    bindPassword: "search_password"
+    useTLS: false
+    startTLS: false
+    allowedDomains:
+      - "imgfactory.com"
 
 build:
   tektonEnabled: true
@@ -80,8 +96,8 @@ database:
 backend:
   enabled: true
   image:
-    repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend
-    tag: v0.1.0-e7dc4ea
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-backend
+    tag: v0.1.0-6c42ac0-hz20260302104749
     pullPolicy: IfNotPresent
   replicaCount: 1
   service:
@@ -95,8 +111,8 @@ frontend:
   enabled: true
   apiBaseUrl: ""
   image:
-    repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-frontend
-    tag: v0.1.0-e7dc4ea
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-frontend
+    tag: v0.1.0-6c42ac0
     pullPolicy: IfNotPresent
   replicaCount: 1
   service:
@@ -109,8 +125,8 @@ frontend:
 docs:
   enabled: true
   image:
-    repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-docs
-    tag: v0.1.0-e7dc4ea
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-docs
+    tag: v0.1.0-6c42ac0
     pullPolicy: IfNotPresent
   replicaCount: 1
   service:
@@ -130,6 +146,7 @@ bootstrap:
   hookWeight: "5"
   backoffLimit: 3
   seedDemoData: false
+  seedRobotSREPolicyDefaults: false
 
 dbReset:
   enabled: false
@@ -147,8 +164,8 @@ workers:
     replicaCount: 1
     port: 8084
     image:
-      repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-dispatcher
-      tag: v0.1.0-e7dc4ea
+      repository: registry.gitlab.com/s4cna/image-factory/image-factory-dispatcher
+      tag: v0.1.0-21057fe
       pullPolicy: IfNotPresent
     resources: {}
   notification:
@@ -156,8 +173,8 @@ workers:
     replicaCount: 1
     port: 8083
     image:
-      repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-notification-worker
-      tag: v0.1.0-e7dc4ea
+      repository: registry.gitlab.com/s4cna/image-factory/image-factory-notification-worker
+      tag: v0.1.0-21057fe
       pullPolicy: IfNotPresent
     resources: {}
   email:
@@ -165,8 +182,8 @@ workers:
     replicaCount: 1
     port: 8081
     image:
-      repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-email-worker
-      tag: v0.1.0-e7dc4ea
+      repository: registry.gitlab.com/s4cna/image-factory/image-factory-email-worker
+      tag: v0.1.0-21057fe
       pullPolicy: IfNotPresent
     resources: {}
   internalRegistryGc:
@@ -174,28 +191,16 @@ workers:
     replicaCount: 1
     port: 8085
     image:
-      repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-internal-registry-gc-worker
-      tag: v0.1.0-e7dc4ea
+      repository: registry.gitlab.com/s4cna/image-factory/image-factory-internal-registry-gc-worker
+      tag: v0.1.0-21057fe
       pullPolicy: IfNotPresent
     resources: {}
-
-externalTenantService:
-  enabled: true
-  replicaCount: 1
-  port: 8082
-  apiKey: "__SET_BEFORE_DEPLOYMENT__"
-  # Required when externalTenantService is enabled. Set before deployment.
-  image:
-    repository: registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend
-    tag: v0.1.0-e7dc4ea
-    pullPolicy: IfNotPresent
-  resources: {}
 
 postgres:
   enabled: true
   image:
-    repository: postgres
-    tag: "17-alpine"
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-postgres
+    tag: "18-alpine"
     pullPolicy: IfNotPresent
   storage:
     type: "hostPath" # one of: emptyDir, pvc, hostPath
@@ -204,8 +209,7 @@ postgres:
       type: "DirectoryOrCreate"
   database: image_factory
   username: postgres
-  password: "__SET_BEFORE_DEPLOYMENT__"
-  # Set before deployment when bundled Postgres is enabled.
+  password: postgres
   persistence:
     enabled: true
     size: 20Gi
@@ -215,8 +219,8 @@ postgres:
 redis:
   enabled: true
   image:
-    repository: redis
-    tag: "7-alpine"
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-redis
+    tag: "8-alpine"
     pullPolicy: IfNotPresent
   storage:
     type: "hostPath" # one of: emptyDir, pvc, hostPath
@@ -232,7 +236,7 @@ redis:
 nats:
   enabled: true
   image:
-    repository: nats
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-nats
     tag: "2.10-alpine"
     pullPolicy: IfNotPresent
   storage:
@@ -249,13 +253,11 @@ nats:
 minio:
   enabled: true
   image:
-    repository: minio/minio
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-minio
     tag: latest
     pullPolicy: IfNotPresent
-  rootUser: "__SET_BEFORE_DEPLOYMENT__"
-  # Set before deployment when bundled MinIO is enabled.
-  rootPassword: "__SET_BEFORE_DEPLOYMENT__"
-  # Set before deployment when bundled MinIO is enabled.
+  rootUser: minioadmin
+  rootPassword: minioadmin
   storage:
     type: "hostPath" # one of: emptyDir, pvc, hostPath
     hostPath:
@@ -270,7 +272,7 @@ minio:
 registry:
   enabled: true
   image:
-    repository: registry
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-registry
     tag: "2"
     pullPolicy: IfNotPresent
   storage:
@@ -287,7 +289,7 @@ registry:
 mailpit:
   enabled: true
   image:
-    repository: axllent/mailpit
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-mailpit
     tag: latest
     pullPolicy: IfNotPresent
   resources: {}
@@ -295,7 +297,7 @@ mailpit:
 glauth:
   enabled: true
   image:
-    repository: glauth/glauth
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-glauth
     tag: latest
     pullPolicy: IfNotPresent
   service:
@@ -317,7 +319,7 @@ glauth:
 
     [backend]
       datastore = "config"
-      baseDN = "dc=imagefactory,dc=local"
+      baseDN = "dc=imgfactory,dc=com"
 
     [[groups]]
       name = "svcaccts"
@@ -340,9 +342,9 @@ glauth:
       primarygroup = 5501
       givenname = "LDAP"
       sn = "Search Service"
-      mail = "ldap-search@imagefactory.local"
+      mail = "ldap-search@imgfactory.com"
       disabled = false
-      pass = "__SET_BEFORE_DEPLOYMENT__"
+      pass = "search_password"
       [[users.capabilities]]
         action = "search"
         object = "*"
@@ -354,9 +356,9 @@ glauth:
       primarygroup = 5502
       givenname = "Image"
       sn = "Factory Admin"
-      mail = "admin@imagefactory.local"
+      mail = "admin@imgfactory.com"
       disabled = false
-      pass = "__SET_BEFORE_DEPLOYMENT__"
+      pass = "password"
 
     [[users]]
       name = "alice.johnson"
@@ -365,9 +367,9 @@ glauth:
       primarygroup = 5502
       givenname = "Alice"
       sn = "Johnson"
-      mail = "alice.johnson@imagefactory.local"
+      mail = "alice.johnson@imgfactory.com"
       disabled = false
-      pass = "__SET_BEFORE_DEPLOYMENT__"
+      pass = "password"
 
     [[users]]
       name = "carol.davis"
@@ -376,9 +378,9 @@ glauth:
       primarygroup = 5502
       givenname = "Carol"
       sn = "Davis"
-      mail = "carol.davis@imagefactory.local"
+      mail = "carol.davis@imgfactory.com"
       disabled = false
-      pass = "__SET_BEFORE_DEPLOYMENT__"
+      pass = "password"
 
     [[users]]
       name = "emily.chen"
@@ -387,9 +389,76 @@ glauth:
       primarygroup = 5502
       givenname = "Emily"
       sn = "Chen"
-      mail = "emily.chen@imagefactory.local"
+      mail = "emily.chen@imgfactory.com"
       disabled = false
-      pass = "__SET_BEFORE_DEPLOYMENT__"
+      pass = "password"
+
+ollama:
+  enabled: false
+  image:
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-ollama
+    tag: "llama3.2-3b"
+    pullPolicy: IfNotPresent
+  service:
+    port: 11434
+  storage:
+    mode: "baked" # one of: baked, emptyDir, pvc, hostPath
+    mountPath: "/root/.ollama"
+    hostPath:
+      path: "/var/lib/image-factory/ollama"
+      type: "DirectoryOrCreate"
+  persistence:
+    enabled: false
+    size: 20Gi
+    storageClass: ""
+  model:
+    name: "llama3.2:3b"
+    preloadExpected: true
+  resources: {}
+
+sre:
+  logDetector:
+    enabled: false
+    intervalSeconds: 120
+    timeoutSeconds: 15
+    lookbackMinutes: 5
+    maxMatches: 5
+    lokiBaseUrl: ""
+
+loki:
+  enabled: false
+  image:
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-loki
+    tag: "3.0.0"
+    pullPolicy: IfNotPresent
+  podSecurityContext:
+    fsGroup: 10001
+  securityContext: {}
+  service:
+    port: 3100
+  storage:
+    mode: "pvc" # one of: emptyDir, pvc, hostPath
+    hostPath:
+      path: "/var/lib/image-factory/loki"
+      type: "DirectoryOrCreate"
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  retention:
+    period: "168h"
+  resources: {}
+
+alloy:
+  enabled: false
+  image:
+    repository: registry.gitlab.com/s4cna/image-factory/image-factory-alloy
+    tag: "v1.6.1"
+    pullPolicy: IfNotPresent
+  clusterName: "external-cluster"
+  loki:
+    pushUrl: ""
+  resources: {}
 
 networkPolicy:
   enabled: false

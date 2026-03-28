@@ -6,7 +6,7 @@ import { useCapabilitySurfacesStore } from '@/store/capabilitySurfaces'
 import { useOperationCapabilitiesStore } from '@/store/operationCapabilities'
 import { useTenantStore } from '@/store/tenant'
 import { useThemeStore } from '@/store/theme'
-import { useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 
 // Layout components
@@ -18,75 +18,91 @@ import PermissionProtectedRoute from '@/components/layout/PermissionProtectedRou
 import ProtectedRoute from '@/components/layout/ProtectedRoute'
 import ReviewerLayout from '@/components/layout/ReviewerLayout'
 
-// Pages
-import AcceptInvitationPage from '@/pages/auth/AcceptInvitationPage'
-import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
-import ForcePasswordChangePage from '@/pages/auth/ForcePasswordChangePage'
-import LandingPage from '@/pages/auth/LandingPage'
-import LoginPage from '@/pages/auth/LoginPage'
-import ResetPasswordPage from '@/pages/auth/ResetPasswordPage'
-import BuildDetailPage from '@/pages/builds/BuildDetailPage'
-import BuildsPage from '@/pages/builds/BuildsPage'
-import CreateBuildPage from '@/pages/builds/CreateBuildPage'
-import DashboardPage from '@/pages/DashboardPage'
-import CapabilityAccessPage from '@/pages/help/CapabilityAccessPage'
-import CreateImagePage from '@/pages/images/CreateImagePage'
-import ImageDetailPage from '@/pages/images/ImageDetailPage'
-import ImagesPage from '@/pages/images/ImagesPage'
-import OnDemandScansPage from '@/pages/images/OnDemandScansPage'
-import VMImagesPage from '@/pages/images/VMImagesPage'
-import ReleasedArtifactsPage from '@/pages/quarantine/ReleasedArtifactsPage'
-import QuarantineRequestDetailPage from '@/pages/quarantine/QuarantineRequestDetailPage'
-import QuarantineRequestsPage from '@/pages/quarantine/QuarantineRequestsPage.tsx'
-import InvitationsPage from '@/pages/members/InvitationsPage'
-import MembersPage from '@/pages/members/MembersPage'
-import NoTenantAccessPage from '@/pages/NoTenantAccessPage'
-import NotFoundPage from '@/pages/NotFoundPage'
-import NotificationsPage from '@/pages/NotificationsPage'
-import ProfilePage from '@/pages/ProfilePage'
-import { CreateProjectPage, EditProjectPage, ProjectDetailPage, ProjectsPage } from '@/pages/projects'
-import ProjectBuildsPage from '@/pages/projects/ProjectBuildsPage'
-import SettingsPage from '@/pages/SettingsPage'
-import AuthManagementPage from '@/pages/settings/AuthManagementPage'
-import TenantDetailPage from '@/pages/tenants/TenantDetailPage'
-import TenantsPage from '@/pages/tenants/TenantsPage'
-
-// Admin Pages
-import AdminBuildAnalyticsPage from '@/pages/admin/AdminBuildAnalyticsPage'
-import AdminBuildNodesPage from '@/pages/admin/AdminBuildNodesPage'
-import AdminBuildPoliciesPage from '@/pages/admin/AdminBuildPoliciesPage'
-import AdminBuildsPage from '@/pages/admin/AdminBuildsPage'
-import AdminDashboardPage from '@/pages/admin/AdminDashboardPage'
-import AdminInfrastructureProviderDetailPage from '@/pages/admin/AdminInfrastructureProviderDetailPage'
-import AdminInfrastructureProvidersPage from '@/pages/admin/AdminInfrastructureProvidersPage'
-import AdminPackerTargetProfilesPage from '@/pages/admin/AdminPackerTargetProfilesPage'
-import AdminNotificationDefaultsPage from '@/pages/admin/AdminNotificationDefaultsPage'
-import AuditLogsPage from '@/pages/admin/AuditLogsPage'
-import ExternalServicesPage from '@/pages/admin/ExternalServicesPage'
-import AuthProvidersPage from '@/pages/admin/AuthProvidersPage'
-import InitialSetupPage from '@/pages/admin/InitialSetupPage'
-import OperationalCapabilitiesPage from '@/pages/admin/OperationalCapabilitiesPage'
-import SRESmartBotApprovalsPage from '@/pages/admin/SRESmartBotApprovalsPage'
-import SRESmartBotDetectorRulesPage from '@/pages/admin/SRESmartBotDetectorRulesPage'
-import SRESmartBotIncidentsPage from '@/pages/admin/SRESmartBotIncidentsPage'
-import SRESmartBotSettingsPage from '@/pages/admin/SRESmartBotSettingsPage'
-import PermissionDefinitionsPage from '@/pages/admin/PermissionDefinitionsPage'
-import PermissionManagementPage from '@/pages/admin/PermissionManagementPage'
-import QuarantineReviewWorkbenchPage from '@/pages/admin/QuarantineReviewWorkbenchPage'
-import RoleManagementPage from '@/pages/admin/RoleManagementPage'
-import SystemConfigurationPage from '@/pages/admin/SystemConfigurationPage'
-import TenantDetailsPage from '@/pages/admin/TenantDetailsPage'
-import TenantManagementPage from '@/pages/admin/TenantManagementPage'
-import ToolManagementPage from '@/pages/admin/ToolManagementPage'
-import UserInvitationsPage from '@/pages/admin/UserInvitationsPage'
-import UserManagementPage from '@/pages/admin/UserManagementPage'
-import ReviewerDashboardPage from '@/pages/reviewer/ReviewerDashboardPage'
-import ReviewerEprApprovalsPage from '@/pages/reviewer/ReviewerEprApprovalsPage'
-import ReviewerRequestsPage from '@/pages/reviewer/ReviewerRequestsPage'
 
 // Hooks
 import { useDashboardPath, useHasTenantAccess, useIsSecurityReviewer, useIsSystemAdmin } from '@/hooks/useAccess'
 // import useBuildWebSocket from '@/hooks/useBuildWebSocket' // TODO: Implement /api/builds/events in Phase 6.2.9
+
+const AcceptInvitationPage = lazy(() => import('@/pages/auth/AcceptInvitationPage'))
+const ForcePasswordChangePage = lazy(() => import('@/pages/auth/ForcePasswordChangePage'))
+const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'))
+const LandingPage = lazy(() => import('@/pages/auth/LandingPage'))
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
+const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPasswordPage'))
+const BuildDetailPage = lazy(() => import('@/pages/builds/BuildDetailPage'))
+const BuildsPage = lazy(() => import('@/pages/builds/BuildsPage'))
+const CreateBuildPage = lazy(() => import('@/pages/builds/CreateBuildPage'))
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
+const CapabilityAccessPage = lazy(() => import('@/pages/help/CapabilityAccessPage'))
+const ProductInfoPage = lazy(() => import('@/pages/help/ProductInfoPage'))
+const CreateImagePage = lazy(() => import('@/pages/images/CreateImagePage'))
+const ImageDetailPage = lazy(() => import('@/pages/images/ImageDetailPage'))
+const ImagesPage = lazy(() => import('@/pages/images/ImagesPage'))
+const OnDemandScansPage = lazy(() => import('@/pages/images/OnDemandScansPage'))
+const VMImagesPage = lazy(() => import('@/pages/images/VMImagesPage'))
+const InvitationsPage = lazy(() => import('@/pages/members/InvitationsPage'))
+const MembersPage = lazy(() => import('@/pages/members/MembersPage'))
+const NoTenantAccessPage = lazy(() => import('@/pages/NoTenantAccessPage'))
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
+const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'))
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
+const CreateProjectPage = lazy(() => import('@/pages/projects/CreateProjectPage'))
+const EditProjectPage = lazy(() => import('@/pages/projects/EditProjectPage'))
+const ProjectDetailPage = lazy(() => import('@/pages/projects/ProjectDetailPage'))
+const ProjectsPage = lazy(() => import('@/pages/projects/ProjectsPage'))
+const ProjectBuildsPage = lazy(() => import('@/pages/projects/ProjectBuildsPage'))
+const QuarantineRequestDetailPage = lazy(() => import('@/pages/quarantine/QuarantineRequestDetailPage'))
+const QuarantineRequestsPage = lazy(() => import('@/pages/quarantine/QuarantineRequestsPage'))
+const ReleasedArtifactsPage = lazy(() => import('@/pages/quarantine/ReleasedArtifactsPage'))
+const AuthManagementPage = lazy(() => import('@/pages/settings/AuthManagementPage'))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const TenantDetailPage = lazy(() => import('@/pages/tenants/TenantDetailPage'))
+const TenantsPage = lazy(() => import('@/pages/tenants/TenantsPage'))
+
+const AdminBuildAnalyticsPage = lazy(() => import('@/pages/admin/AdminBuildAnalyticsPage'))
+const AdminBuildNodesPage = lazy(() => import('@/pages/admin/AdminBuildNodesPage'))
+const AdminBuildPoliciesPage = lazy(() => import('@/pages/admin/AdminBuildPoliciesPage'))
+const AdminBuildsPage = lazy(() => import('@/pages/admin/AdminBuildsPage'))
+const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'))
+const AdminNotificationDefaultsPage = lazy(() => import('@/pages/admin/AdminNotificationDefaultsPage'))
+const AdminInfrastructureProviderDetailPage = lazy(() => import('@/pages/admin/AdminInfrastructureProviderDetailPage'))
+const AdminInfrastructureProvidersPage = lazy(() => import('@/pages/admin/AdminInfrastructureProvidersPage'))
+const AdminPackerTargetProfilesPage = lazy(() => import('@/pages/admin/AdminPackerTargetProfilesPage'))
+const AuditLogsPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
+const AuthProvidersPage = lazy(() => import('@/pages/admin/AuthProvidersPage'))
+const ExternalServicesPage = lazy(() => import('@/pages/admin/ExternalServicesPage'))
+const InitialSetupPage = lazy(() => import('@/pages/admin/InitialSetupPage'))
+const OperationalCapabilitiesPage = lazy(() => import('@/pages/admin/OperationalCapabilitiesPage'))
+const PermissionDefinitionsPage = lazy(() => import('@/pages/admin/PermissionDefinitionsPage'))
+const PermissionManagementPage = lazy(() => import('@/pages/admin/PermissionManagementPage'))
+const QuarantineReviewWorkbenchPage = lazy(() => import('@/pages/admin/QuarantineReviewWorkbenchPage'))
+const RoleManagementPage = lazy(() => import('@/pages/admin/RoleManagementPage'))
+const SRESmartBotActiveDetectorRulesSettingsPage = lazy(() => import('@/pages/admin/SRESmartBotActiveDetectorRulesSettingsPage'))
+const SRESmartBotApprovalsPage = lazy(() => import('@/pages/admin/SRESmartBotApprovalsPage'))
+const SRESmartBotDetectorRulesPage = lazy(() => import('@/pages/admin/SRESmartBotDetectorRulesPage'))
+const SRESmartBotIncidentsPage = lazy(() => import('@/pages/admin/SRESmartBotIncidentsPage'))
+const SRESmartBotIncidentTimelinePage = lazy(() => import('@/pages/admin/SRESmartBotIncidentTimelinePage'))
+const SRESmartBotOperatorRulesSettingsPage = lazy(() => import('@/pages/admin/SRESmartBotOperatorRulesSettingsPage'))
+const SRESmartBotSettingsPage = lazy(() => import('@/pages/admin/SRESmartBotSettingsPage'))
+const SystemConfigurationPage = lazy(() => import('@/pages/admin/SystemConfigurationPage'))
+const TenantDetailsPage = lazy(() => import('@/pages/admin/TenantDetailsPage'))
+const TenantManagementPage = lazy(() => import('@/pages/admin/TenantManagementPage'))
+const ToolManagementPage = lazy(() => import('@/pages/admin/ToolManagementPage'))
+const UserInvitationsPage = lazy(() => import('@/pages/admin/UserInvitationsPage'))
+const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage'))
+
+const ReviewerDashboardPage = lazy(() => import('@/pages/reviewer/ReviewerDashboardPage'))
+const ReviewerEprApprovalsPage = lazy(() => import('@/pages/reviewer/ReviewerEprApprovalsPage'))
+const ReviewerRequestsPage = lazy(() => import('@/pages/reviewer/ReviewerRequestsPage'))
+
+const RouteLoadingFallback = () => (
+    <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-900">
+        <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-300">Loading page...</p>
+        </div>
+    </div>
+)
 
 // Root redirect component that waits for auth to be ready
 function RootRedirect() {
@@ -264,7 +280,8 @@ function AppRoutes() {
                     </div>
                 </div>
             ) : (
-                <Routes>
+                <Suspense fallback={<RouteLoadingFallback />}>
+                    <Routes>
                     {/* Root route - uses RootRedirect component for better reactivity */}
                     <Route path="/" element={<RootRedirect />} />
 
@@ -347,9 +364,12 @@ function AppRoutes() {
                                             <Route path="access/permission-definitions" element={<PermissionDefinitionsPage />} />
                                             <Route path="access/operational-capabilities" element={<OperationalCapabilitiesPage />} />
                                             <Route path="operations/sre-smart-bot" element={<SRESmartBotIncidentsPage />} />
+                                            <Route path="operations/sre-smart-bot/incidents/:incidentId/timeline" element={<SRESmartBotIncidentTimelinePage />} />
                                             <Route path="operations/sre-smart-bot/approvals" element={<SRESmartBotApprovalsPage />} />
                                             <Route path="operations/sre-smart-bot/detector-rules" element={<SRESmartBotDetectorRulesPage />} />
                                             <Route path="operations/sre-smart-bot/settings" element={<SRESmartBotSettingsPage />} />
+                                            <Route path="operations/sre-smart-bot/settings/operator-rules" element={<SRESmartBotOperatorRulesSettingsPage />} />
+                                            <Route path="operations/sre-smart-bot/settings/detector-rules" element={<SRESmartBotActiveDetectorRulesSettingsPage />} />
                                             <Route path="tenants" element={<TenantManagementPage />} />
                                             <Route path="tenants/:id" element={<TenantDetailsPage />} />
                                             <Route path="system-config" element={<SystemConfigurationPage />} />
@@ -382,6 +402,7 @@ function AppRoutes() {
                                             <Route path="quarantine/requests/:requestId" element={<QuarantineRequestDetailPage scope="admin" />} />
                                             <Route path="quarantine/review" element={<QuarantineReviewWorkbenchPage mode="requests" />} />
                                             <Route path="images" element={<ImagesPage />} />
+                                            <Route path="help/product-info" element={<ProductInfoPage />} />
                                         </Routes>
                                     </AdminLayout>
                                 ) : (
@@ -613,6 +634,7 @@ function AppRoutes() {
                                                 <Route path="/profile" element={<ProfilePage />} />
                                                 <Route path="/notifications" element={<NotificationsPage />} />
                                                 <Route path="/help/capabilities" element={<CapabilityAccessPage />} />
+                                                <Route path="/help/product-info" element={<ProductInfoPage />} />
 
                                                 {/* Settings */}
                                                 <Route path="/settings" element={<SettingsPage />} />
@@ -634,7 +656,8 @@ function AppRoutes() {
                             </ProtectedRoute>
                         }
                     />
-                </Routes >
+                    </Routes >
+                </Suspense>
             )}
         </div >
     )

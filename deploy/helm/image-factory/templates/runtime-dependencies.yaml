@@ -37,6 +37,10 @@ spec:
         {{- include "image-factory.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: postgres
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: postgres
           image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
@@ -143,6 +147,10 @@ spec:
         {{- include "image-factory.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: redis
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: redis
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
@@ -235,6 +243,10 @@ spec:
         {{- include "image-factory.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: nats
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: nats
           image: "{{ .Values.nats.image.repository }}:{{ .Values.nats.image.tag }}"
@@ -334,6 +346,10 @@ spec:
         {{- include "image-factory.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: minio
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: minio
           image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
@@ -444,6 +460,10 @@ spec:
         {{- include "image-factory.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: registry
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: registry
           image: "{{ .Values.registry.image.repository }}:{{ .Values.registry.image.tag }}"
@@ -503,6 +523,383 @@ spec:
       targetPort: http
 {{- end }}
 
+{{- if .Values.ollama.enabled }}
+---
+{{- if and (eq .Values.ollama.storage.mode "pvc") .Values.ollama.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "image-factory.fullname" . }}-ollama
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.ollama.persistence.size }}
+  {{- if .Values.ollama.persistence.storageClass }}
+  storageClassName: {{ .Values.ollama.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-ollama
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "image-factory.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ollama
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ollama
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: ollama
+          image: "{{ .Values.ollama.image.repository }}:{{ .Values.ollama.image.tag }}"
+          imagePullPolicy: {{ .Values.ollama.image.pullPolicy }}
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:{{ .Values.ollama.service.port }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.ollama.service.port }}
+          {{- if ne .Values.ollama.storage.mode "baked" }}
+          volumeMounts:
+            - name: ollama-data
+              mountPath: {{ .Values.ollama.storage.mountPath | quote }}
+          {{- end }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.ollama.resources | nindent 12 }}
+      {{- if ne .Values.ollama.storage.mode "baked" }}
+      volumes:
+        - name: ollama-data
+          {{- if eq .Values.ollama.storage.mode "hostPath" }}
+          hostPath:
+            path: {{ .Values.ollama.storage.hostPath.path | quote }}
+            type: {{ .Values.ollama.storage.hostPath.type | quote }}
+          {{- else if and (eq .Values.ollama.storage.mode "pvc") .Values.ollama.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "image-factory.fullname" . }}-ollama
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-ollama
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  selector:
+    {{- include "image-factory.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+  ports:
+    - name: http
+      port: {{ .Values.ollama.service.port }}
+      targetPort: http
+{{- end }}
+
+{{- if .Values.loki.enabled }}
+---
+{{- if and (eq .Values.loki.storage.mode "pvc") .Values.loki.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "image-factory.fullname" . }}-loki
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: loki
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.loki.persistence.size }}
+  {{- if .Values.loki.persistence.storageClass }}
+  storageClassName: {{ .Values.loki.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "image-factory.fullname" . }}-loki
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: loki
+data:
+  config.yaml: |
+    auth_enabled: false
+
+    server:
+      http_listen_port: {{ .Values.loki.service.port }}
+
+    common:
+      path_prefix: /var/loki
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+      storage:
+        filesystem:
+          chunks_directory: /var/loki/chunks
+          rules_directory: /var/loki/rules
+
+    schema_config:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    limits_config:
+      retention_period: {{ .Values.loki.retention.period | quote }}
+
+    compactor:
+      working_directory: /var/loki/compactor
+      compaction_interval: 10m
+      retention_enabled: true
+      delete_request_store: filesystem
+
+    ruler:
+      storage:
+        type: local
+        local:
+          directory: /var/loki/rules
+      rule_path: /var/loki/rules-temp
+      alertmanager_url: http://localhost:9093
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-loki
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: loki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "image-factory.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: loki
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: loki
+    spec:
+      {{- with .Values.loki.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: loki
+          image: "{{ .Values.loki.image.repository }}:{{ .Values.loki.image.tag }}"
+          imagePullPolicy: {{ .Values.loki.image.pullPolicy }}
+          {{- with .Values.loki.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args:
+            - "-config.file=/etc/loki/config.yaml"
+          ports:
+            - name: http
+              containerPort: {{ .Values.loki.service.port }}
+          volumeMounts:
+            - name: loki-config
+              mountPath: /etc/loki
+            - name: loki-data
+              mountPath: /var/loki
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.loki.resources | nindent 12 }}
+      volumes:
+        - name: loki-config
+          configMap:
+            name: {{ include "image-factory.fullname" . }}-loki
+        - name: loki-data
+          {{- if eq .Values.loki.storage.mode "hostPath" }}
+          hostPath:
+            path: {{ .Values.loki.storage.hostPath.path | quote }}
+            type: {{ .Values.loki.storage.hostPath.type | quote }}
+          {{- else if and (eq .Values.loki.storage.mode "pvc") .Values.loki.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "image-factory.fullname" . }}-loki
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-loki
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: loki
+spec:
+  selector:
+    {{- include "image-factory.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: loki
+  ports:
+    - name: http
+      port: {{ .Values.loki.service.port }}
+      targetPort: http
+{{- end }}
+
+{{- if .Values.alloy.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "image-factory.fullname" . }}-alloy
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alloy
+data:
+  config.alloy: |
+    logging {
+      level  = "info"
+      format = "logfmt"
+    }
+
+    local.file_match "pods" {
+      path_targets = [
+        {
+          __path__     = "/var/log/pods/*/*/*.log",
+          cluster      = {{ .Values.alloy.clusterName | quote }},
+          job          = "kubernetes-pods",
+          source       = "kubernetes",
+          namespace    = "unknown",
+        },
+      ]
+    }
+
+    loki.source.file "pods" {
+      targets    = local.file_match.pods.targets
+      forward_to = [loki.process.pods.receiver]
+      tail_from_end = true
+    }
+
+    loki.process "pods" {
+      forward_to = [loki.write.default.receiver]
+
+      stage.static_labels {
+        values = {
+          cluster = {{ .Values.alloy.clusterName | quote }},
+          source  = "kubernetes",
+        }
+      }
+    }
+
+    loki.write "default" {
+      endpoint {
+        url = {{ (default (printf "http://%s-loki:%d/loki/api/v1/push" (include "image-factory.fullname" .) (.Values.loki.service.port | int)) .Values.alloy.loki.pushUrl) | quote }}
+      }
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "image-factory.fullname" . }}-alloy
+  labels:
+    {{- include "image-factory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alloy
+spec:
+  selector:
+    matchLabels:
+      {{- include "image-factory.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: alloy
+  template:
+    metadata:
+      labels:
+        {{- include "image-factory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: alloy
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: alloy
+          image: "{{ .Values.alloy.image.repository }}:{{ .Values.alloy.image.tag }}"
+          imagePullPolicy: {{ .Values.alloy.image.pullPolicy }}
+          args:
+            - "run"
+            - "/etc/alloy/config.alloy"
+            - "--storage.path=/var/lib/alloy/data"
+          volumeMounts:
+            - name: alloy-config
+              mountPath: /etc/alloy
+            - name: alloy-data
+              mountPath: /var/lib/alloy/data
+            - name: varlogpods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: varlogcontainers
+              mountPath: /var/log/containers
+              readOnly: true
+          resources:
+            {{- toYaml .Values.alloy.resources | nindent 12 }}
+      volumes:
+        - name: alloy-config
+          configMap:
+            name: {{ include "image-factory.fullname" . }}-alloy
+        - name: alloy-data
+          emptyDir: {}
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
+            type: DirectoryOrCreate
+        - name: varlogcontainers
+          hostPath:
+            path: /var/log/containers
+            type: DirectoryOrCreate
+{{- end }}
+
 {{- if .Values.mailpit.enabled }}
 ---
 apiVersion: apps/v1
@@ -524,6 +921,10 @@ spec:
         {{- include "image-factory.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mailpit
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: mailpit
           image: "{{ .Values.mailpit.image.repository }}:{{ .Values.mailpit.image.tag }}"

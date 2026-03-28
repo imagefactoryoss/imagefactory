@@ -373,6 +373,9 @@ func SetupRoutes(
 	infrastructureProviderHandler := platform.infrastructureProviderHand
 	packerTargetProfileRepo := postgres.NewPackerTargetProfileRepository(sqlxDB, logger)
 	packerTargetProfileService := packertarget.NewService(packerTargetProfileRepo)
+	if buildService != nil {
+		buildService.SetPackerTargetProfileLookup(packerTargetProfileService)
+	}
 	packerTargetProfileHandler := NewPackerTargetProfileHandler(packerTargetProfileService, logger)
 	tenantHandler.SetNotificationService(notificationService)
 	tenantHandler.SetInfrastructureService(infrastructureService)
@@ -537,16 +540,25 @@ func SetupRoutes(
 	buildNotificationDeliveryRepo := postgres.NewBuildNotificationDeliveryRepository(sqlxDB, logger)
 	sreSmartBotActionService := appsresmartbot.NewActionService(sreSmartBotRepo, infrastructureService, systemConfigService, buildNotificationDeliveryRepo, notificationService, logger)
 	sreSmartBotDemoService := appsresmartbot.NewDemoService(appsresmartbot.NewService(sreSmartBotRepo, nil, logger), sreSmartBotRepo, logger)
+	sreSmartBotRemediationPackService := appsresmartbot.NewRemediationPackService(systemConfigService)
 	sreSmartBotDetectorSuggestionService := appsresmartbot.NewDetectorRuleSuggestionService(sreSmartBotRepo, systemConfigService, logger)
 	sreSmartBotWorkspaceService := appsresmartbot.NewWorkspaceService(sreSmartBotRepo, systemConfigService)
 	sreLogDetectorBaseURL := strings.TrimSpace(os.Getenv("IF_SRE_LOG_DETECTOR_LOKI_BASE_URL"))
 	sreLogDetectorTimeout := time.Duration(getIntEnv("IF_SRE_LOG_DETECTOR_TIMEOUT_SECONDS", 15)) * time.Second
 	sreSmartBotLokiClient := logdetector.NewLokiClient(sreLogDetectorBaseURL, &http.Client{Timeout: sreLogDetectorTimeout})
-	sreSmartBotMCPService := appsresmartbot.NewMCPService(sreSmartBotRepo, systemConfigService, processStatusProvider, appSignalsRepo, releaseComplianceMetrics, sreSmartBotLokiClient, sqlxDB)
+	var consumerLagProvider interface {
+		ConsumerLagSnapshots(ctx context.Context) ([]messaging.NATSConsumerLagSnapshot, error)
+	}
+	if provider, ok := eventBus.(interface {
+		ConsumerLagSnapshots(ctx context.Context) ([]messaging.NATSConsumerLagSnapshot, error)
+	}); ok {
+		consumerLagProvider = provider
+	}
+	sreSmartBotMCPService := appsresmartbot.NewMCPService(sreSmartBotRepo, systemConfigService, processStatusProvider, appSignalsRepo, releaseComplianceMetrics, sreSmartBotLokiClient, consumerLagProvider, sqlxDB)
 	sreSmartBotAgentService := appsresmartbot.NewAgentService(sreSmartBotWorkspaceService, sreSmartBotMCPService)
 	sreSmartBotProbeService := appsresmartbot.NewAgentRuntimeProbeService()
 	sreSmartBotInterpretationService := appsresmartbot.NewInterpretationService(sreSmartBotAgentService, sreSmartBotWorkspaceService)
-	sreSmartBotHandler := NewSRESmartBotHandler(sreSmartBotRepo, sreSmartBotActionService, sreSmartBotDemoService, sreSmartBotDetectorSuggestionService, sreSmartBotWorkspaceService, sreSmartBotMCPService, sreSmartBotAgentService, sreSmartBotProbeService, sreSmartBotInterpretationService, logger)
+	sreSmartBotHandler := NewSRESmartBotHandler(sreSmartBotRepo, sreSmartBotActionService, sreSmartBotDemoService, sreSmartBotRemediationPackService, sreSmartBotDetectorSuggestionService, sreSmartBotWorkspaceService, sreSmartBotMCPService, sreSmartBotAgentService, sreSmartBotProbeService, sreSmartBotInterpretationService, logger)
 	configureImageCatalogSubscriber(
 		sqlxDB,
 		systemConfigService,
@@ -569,6 +581,7 @@ func SetupRoutes(
 	etaService := build.NewETAService(buildHistoryRepo, logger)
 	analyticsHandler := NewAnalyticsHandler(etaService, buildHistoryRepo, logger)
 	configHandler := NewConfigHandler(buildRepo, sqlxDB, logger)
+	configHandler.SetPackerTargetProfileLookup(packerTargetProfileService)
 
 	ssoWiring := initializeSSOWiring(bootstrapService, systemConfigService, auditService, logger)
 	ssoHandler := ssoWiring.ssoHandler

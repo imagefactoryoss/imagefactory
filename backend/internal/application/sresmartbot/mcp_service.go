@@ -15,6 +15,7 @@ import (
 	domainsresmartbot "github.com/srikarm/image-factory/internal/domain/sresmartbot"
 	"github.com/srikarm/image-factory/internal/domain/systemconfig"
 	"github.com/srikarm/image-factory/internal/infrastructure/logdetector"
+	"github.com/srikarm/image-factory/internal/infrastructure/messaging"
 	"github.com/srikarm/image-factory/internal/infrastructure/releasecompliance"
 )
 
@@ -58,7 +59,10 @@ type MCPService struct {
 	appSignalRepo       domainappsignals.Repository
 	releaseCompliance   *releasecompliance.Metrics
 	logQueryClient      *logdetector.LokiClient
-	db                  *sqlx.DB
+	consumerLagProvider interface {
+		ConsumerLagSnapshots(ctx context.Context) ([]messaging.NATSConsumerLagSnapshot, error)
+	}
+	db *sqlx.DB
 }
 
 func NewMCPService(
@@ -68,6 +72,9 @@ func NewMCPService(
 	appSignalRepo domainappsignals.Repository,
 	releaseCompliance *releasecompliance.Metrics,
 	logQueryClient *logdetector.LokiClient,
+	consumerLagProvider interface {
+		ConsumerLagSnapshots(ctx context.Context) ([]messaging.NATSConsumerLagSnapshot, error)
+	},
 	db *sqlx.DB,
 ) *MCPService {
 	return &MCPService{
@@ -77,6 +84,7 @@ func NewMCPService(
 		appSignalRepo:       appSignalRepo,
 		releaseCompliance:   releaseCompliance,
 		logQueryClient:      logQueryClient,
+		consumerLagProvider: consumerLagProvider,
 		db:                  db,
 	}
 }
@@ -159,6 +167,8 @@ func (s *MCPService) InvokeTool(ctx context.Context, tenantID *uuid.UUID, req MC
 		payload, err = s.invokeAsyncBacklogSignals()
 	case "messaging_transport.recent":
 		payload, err = s.invokeMessagingTransport()
+	case "messaging_consumers.recent":
+		payload, err = s.invokeMessagingConsumers(ctx)
 	case "logs.recent":
 		payload, err = s.invokeRecentLogs(ctx, req.IncidentID)
 	case "cluster_overview.get":
@@ -217,6 +227,7 @@ func supportedToolCatalog() map[string][]toolSpec {
 			{Name: "http_signals.history", DisplayName: "HTTP Signal History", Description: "Return recent app-level HTTP signal windows for trend-aware investigation.", IncidentRequired: false},
 			{Name: "async_backlog.recent", DisplayName: "Async Backlog", Description: "Return the latest build queue, email queue, and outbox backlog pressure captured by SRE Smart Bot.", IncidentRequired: false},
 			{Name: "messaging_transport.recent", DisplayName: "Messaging Transport", Description: "Return current NATS transport health, reconnect activity, and recent disconnect state.", IncidentRequired: false},
+			{Name: "messaging_consumers.recent", DisplayName: "Messaging Consumers", Description: "Return current NATS consumer lag and pending-ack pressure across visible JetStream consumers.", IncidentRequired: false},
 			{Name: "logs.recent", DisplayName: "Recent Logs", Description: "Run a bounded Loki query using incident-derived search terms and return recent matching log lines.", IncidentRequired: true},
 		},
 		"kubernetes": {
@@ -423,6 +434,48 @@ func (s *MCPService) invokeMessagingTransport() (map[string]any, error) {
 		"reconnect_threshold": metricInt64(status.Metrics, "nats_reconnect_threshold"),
 		"reconnects":          metricInt64(status.Metrics, "nats_transport_reconnects"),
 		"disconnects":         metricInt64(status.Metrics, "nats_transport_disconnects"),
+	}, nil
+}
+
+func (s *MCPService) invokeMessagingConsumers(ctx context.Context) (map[string]any, error) {
+	if s.consumerLagProvider == nil {
+		return nil, fmt.Errorf("messaging_consumers.recent is unavailable because a consumer lag provider is not configured")
+	}
+	snapshots, err := s.consumerLagProvider.ConsumerLagSnapshots(ctx)
+	if err != nil {
+		return nil, err
+	}
+	laggingCount := 0
+	maxPending := uint64(0)
+	consumers := make([]map[string]any, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		if snapshot.PendingCount > 0 || snapshot.AckPendingCount > 0 {
+			laggingCount++
+		}
+		if snapshot.PendingCount > maxPending {
+			maxPending = snapshot.PendingCount
+		}
+		consumers = append(consumers, map[string]any{
+			"stream":                 snapshot.Stream,
+			"consumer":               snapshot.Consumer,
+			"pending_count":          snapshot.PendingCount,
+			"ack_pending_count":      snapshot.AckPendingCount,
+			"waiting_count":          snapshot.WaitingCount,
+			"redelivered_count":      snapshot.RedeliveredCount,
+			"delivered_consumer_seq": snapshot.DeliveredConsumerSeq,
+			"delivered_stream_seq":   snapshot.DeliveredStreamSeq,
+			"ack_floor_consumer_seq": snapshot.AckFloorConsumerSeq,
+			"ack_floor_stream_seq":   snapshot.AckFloorStreamSeq,
+			"push_bound":             snapshot.PushBound,
+			"last_active":            snapshot.LastActive,
+		})
+	}
+	return map[string]any{
+		"provider":          "nats",
+		"count":             len(snapshots),
+		"lagging_count":     laggingCount,
+		"max_pending_count": maxPending,
+		"consumers":         consumers,
 	}, nil
 }
 
