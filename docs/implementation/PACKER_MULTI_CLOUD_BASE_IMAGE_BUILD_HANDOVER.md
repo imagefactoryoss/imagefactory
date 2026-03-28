@@ -66,7 +66,7 @@ Branch: `feature/packer-builds`
   - VM catalog reason modal now applies the same 500-character limit with inline count feedback.
 - PR8 lifecycle transition-mode contract clarity completed:
   - VM catalog responses now include `lifecycle_transition_mode`.
-  - lifecycle transitions currently report `metadata_only` to explicitly signal metadata-state transitions (provider-native lifecycle actions pending).
+  - lifecycle transitions now report runtime mode depth (`metadata_only` / `provider_native` / `hybrid`) based on execution behavior.
 - PR8 lifecycle audit mode-depth completed:
   - lifecycle history metadata now includes per-transition `transition_mode`.
   - VM catalog lifecycle history UI now renders each transition's mode for clearer audit context.
@@ -89,10 +89,10 @@ Branch: `feature/packer-builds`
   - VM catalog UI now includes transition-mode filter dropdown for list narrowing.
 - PR8 provider-lifecycle execution seam foundation completed:
   - lifecycle transitions now pass through a backend lifecycle executor interface before metadata update.
-  - default executor remains metadata-only and returns `metadata_only` transition mode (provider-native action wiring remains the next step).
+  - executor now supports provider-native transitions across AWS, VMware, Azure, and GCP when execution mode allows.
 - PR8 provider-lifecycle execution-mode policy gate completed:
   - added `IF_VM_LIFECYCLE_EXECUTION_MODE` with `metadata_only` (default), `prefer_provider_native`, and `require_provider_native`.
-  - `require_provider_native` now returns `501` for lifecycle actions until provider-native executors are shipped.
+  - `require_provider_native` now returns `501` for unsupported provider/state paths and missing provider execution metadata.
 - PR8 provider-native lifecycle initial execution completed:
   - AWS `delete` lifecycle action now supports provider-native execution via EC2 `DeregisterImage` when execution mode allows.
   - successful AWS native delete transitions now persist `provider_native`; invalid/missing AWS image metadata now returns `400`.
@@ -292,4 +292,4 @@ Frontend:
 
 ## Known Gap For Next PR
 
-- implement provider-side lifecycle actions (actual provider deprecate/delete integrations) behind policy gates; current lifecycle transitions remain metadata-only state management.
+- provider-native lifecycle actions are now implemented across AWS, VMware, Azure, and GCP; next gap is end-to-end provider API validation coverage in staging and production-like environments.

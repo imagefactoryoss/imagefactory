@@ -14,7 +14,7 @@ Owners: Backend + Platform/Ops + Frontend
 - PR6 (tenant VM image catalog read path): completed on `feature/packer-builds`.
 - PR7 backend scheduler slice (scheduled trigger execution + metadata): completed on `feature/packer-builds`.
 - PR7 follow-up (scheduled outcome notification hooks): completed on `feature/packer-builds`.
-- PR7 UX/management follow-up + PR8 remain pending.
+- PR7 UX/management follow-up + PR8 lifecycle rollout: completed on `feature/packer-builds`.
 
 ## 1) Objective
 
@@ -843,7 +843,7 @@ Progress update (2026-03-27):
   - frontend reason modal constrains input to 500 characters and shows inline character count.
 - lifecycle transition mode is now explicit in VM catalog responses:
   - API exposes `lifecycle_transition_mode` for VM catalog list/detail/action responses.
-  - current implementation emits `metadata_only`, clarifying lifecycle transitions are metadata state management until provider-native actions are integrated.
+  - transition mode now reflects runtime execution path (`metadata_only` / `provider_native` / `hybrid`) based on execution mode and provider support.
 - lifecycle history audit depth now includes transition mode:
   - lifecycle history entries include `transition_mode` for each transition event.
   - VM catalog lifecycle history view surfaces each entry's transition mode for operator traceability.
@@ -865,10 +865,10 @@ Progress update (2026-03-27):
   - frontend filter bar includes transition mode selector for rapid metadata-only/provider-native segmentation.
 - lifecycle transition execution now has an extensible backend seam:
   - lifecycle handler invokes a lifecycle executor interface before persisting metadata transition fields.
-  - default executor currently returns `metadata_only` (provider-native operations still pending), enabling incremental provider implementation without handler contract churn.
+  - executor now supports provider-native lifecycle execution across AWS, VMware, Azure, and GCP when execution mode enables it.
 - lifecycle execution mode policy gate now exists for rollout safety:
   - `IF_VM_LIFECYCLE_EXECUTION_MODE` supports `metadata_only` (default), `prefer_provider_native`, and `require_provider_native`.
-  - `require_provider_native` enforces fail-closed behavior (`501`) until provider-native transition executors are implemented.
+  - `require_provider_native` enforces fail-closed behavior (`501`) for unsupported provider/state paths and missing provider execution metadata.
 - provider-native lifecycle execution now has initial AWS implementation:
   - AWS `delete` transitions invoke EC2 `DeregisterImage` when provider-native mode is enabled.
   - AWS `deprecate` transitions invoke EC2 `EnableImageDeprecation` with configurable deprecation window.

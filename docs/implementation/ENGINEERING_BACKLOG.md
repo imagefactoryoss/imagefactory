@@ -101,7 +101,7 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - VM catalog reason modal now mirrors the 500-character limit with inline counter feedback.
   - PR8 lifecycle transition-mode contract clarity completed on `feature/packer-builds`:
     - VM catalog API now returns `lifecycle_transition_mode` for list/detail/action responses.
-    - current mode is explicit `metadata_only` to indicate provider-native deprecate/delete is not yet wired.
+    - transition mode now reflects runtime execution path (`metadata_only` / `provider_native` / `hybrid`) based on execution mode and provider support.
   - PR8 lifecycle audit mode-depth completed on `feature/packer-builds`:
     - lifecycle history entries now persist `transition_mode` for each recorded transition.
     - VM catalog lifecycle history UI now renders per-entry transition mode for audit clarity.
@@ -122,10 +122,10 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - VM catalog filter bar now includes transition-mode selector (`All`, `metadata_only`, `provider_native`, `hybrid`).
   - PR8 provider-lifecycle execution seam foundation completed on `feature/packer-builds`:
     - VM lifecycle transitions now route through a lifecycle executor interface before metadata persistence.
-    - default executor remains metadata-only (no provider-native action), but transition mode is now sourced from executor result for future provider integrations.
+    - executor now supports provider-native lifecycle execution across AWS, VMware, Azure, and GCP when execution mode enables it.
   - PR8 provider-lifecycle execution-mode policy gate completed on `feature/packer-builds`:
     - added `IF_VM_LIFECYCLE_EXECUTION_MODE` gate (`metadata_only`, `prefer_provider_native`, `require_provider_native`).
-    - `require_provider_native` now fails closed with `501` until provider-native transition implementations are added.
+    - `require_provider_native` now fails closed with `501` for unsupported provider/state paths and missing provider execution metadata.
   - PR8 provider-native lifecycle action initial implementation completed on `feature/packer-builds`:
     - AWS `delete` lifecycle transitions now execute provider-native `DeregisterImage` via EC2 when execution mode enables provider-native execution.
     - transition mode persists as `provider_native` on successful AWS native delete path; missing/invalid AWS image metadata now returns `400`.
