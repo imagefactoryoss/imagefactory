@@ -19,8 +19,11 @@ data:
   {{- $emailTag := .Values.workers.email.image.tag }}
   {{- $internalRegistryGCRepo := .Values.workers.internalRegistryGc.image.repository }}
   {{- $internalRegistryGCTag := .Values.workers.internalRegistryGc.image.tag }}
-  {{- $externalTenantRepo := .Values.externalTenantService.image.repository }}
-  {{- $externalTenantTag := .Values.externalTenantService.image.tag }}
+  {{- $ollamaBaseURL := ternary (printf "http://%s-ollama:%d" (include "image-factory.fullname" .) (.Values.ollama.service.port | int)) "http://127.0.0.1:11434" .Values.ollama.enabled }}
+  {{- $lokiBaseURL := .Values.sre.logDetector.lokiBaseUrl }}
+  {{- if .Values.loki.enabled }}
+    {{- $lokiBaseURL = printf "http://%s-loki:%d" (include "image-factory.fullname" .) (.Values.loki.service.port | int) }}
+  {{- end }}
   {{- $dispatcherURL := printf "http://%s-dispatcher" (include "image-factory.fullname" .) }}
   {{- $emailWorkerURL := printf "http://%s-email-worker" (include "image-factory.fullname" .) }}
   {{- $notificationWorkerURL := printf "http://%s-notification-worker" (include "image-factory.fullname" .) }}
@@ -29,6 +32,18 @@ data:
   IF_SERVER_ENVIRONMENT: {{ .Values.app.environment | quote }}
   IF_SERVER_HOST: "0.0.0.0"
   IF_SERVER_PORT: "8080"
+  IF_AUTH_LDAP_ENABLED: {{ .Values.auth.ldap.enabled | quote }}
+  IF_AUTH_LDAP_PROVIDER_NAME: {{ .Values.auth.ldap.providerName | quote }}
+  IF_AUTH_LDAP_PROVIDER_TYPE: {{ .Values.auth.ldap.providerType | quote }}
+  IF_AUTH_LDAP_SERVER: {{ .Values.auth.ldap.server | quote }}
+  IF_AUTH_LDAP_PORT: {{ .Values.auth.ldap.port | quote }}
+  IF_AUTH_LDAP_BASE_DN: {{ .Values.auth.ldap.baseDN | quote }}
+  IF_AUTH_LDAP_USER_SEARCH_BASE: {{ .Values.auth.ldap.userSearchBase | quote }}
+  IF_AUTH_LDAP_GROUP_SEARCH_BASE: {{ .Values.auth.ldap.groupSearchBase | quote }}
+  IF_AUTH_LDAP_BIND_DN: {{ .Values.auth.ldap.bindDN | quote }}
+  IF_AUTH_LDAP_USE_TLS: {{ .Values.auth.ldap.useTLS | quote }}
+  IF_AUTH_LDAP_START_TLS: {{ .Values.auth.ldap.startTLS | quote }}
+  IF_AUTH_LDAP_ALLOWED_DOMAINS: {{ join "," .Values.auth.ldap.allowedDomains | quote }}
   IF_DATABASE_HOST: {{ $dbHost | quote }}
   IF_DATABASE_PORT: {{ .Values.database.port | quote }}
   IF_DATABASE_NAME: {{ $dbName | quote }}
@@ -43,7 +58,6 @@ data:
   IF_MESSAGING_ENABLE_NATS: "true"
   IF_SMTP_HOST: {{ printf "%s-mailpit" (include "image-factory.fullname" .) | quote }}
   IF_SMTP_PORT: "1025"
-  EXTERNAL_TENANT_SERVICE_URL: {{ printf "http://%s-external-tenant-service:%d" (include "image-factory.fullname" .) (.Values.externalTenantService.port | int) | quote }}
   IF_BUILD_REGISTRY_URL: {{ printf "%s-registry:5000" (include "image-factory.fullname" .) | quote }}
   IF_INTERNAL_TEMP_SCAN_REGISTRY: {{ printf "%s-registry:5000" (include "image-factory.fullname" .) | quote }}
   IF_INTERNAL_TEMP_SCAN_REPOSITORY: "quarantine-temp"
@@ -70,8 +84,6 @@ data:
   IF_EMAIL_WORKER_IMAGE_TAG: {{ $emailTag | quote }}
   IF_INTERNAL_REGISTRY_GC_WORKER_IMAGE_REPOSITORY: {{ $internalRegistryGCRepo | quote }}
   IF_INTERNAL_REGISTRY_GC_WORKER_IMAGE_TAG: {{ $internalRegistryGCTag | quote }}
-  IF_EXTERNAL_TENANT_SERVICE_IMAGE_REPOSITORY: {{ $externalTenantRepo | quote }}
-  IF_EXTERNAL_TENANT_SERVICE_IMAGE_TAG: {{ $externalTenantTag | quote }}
   IF_DISPATCHER_URL: {{ $dispatcherURL | quote }}
   IF_DISPATCHER_PORT: {{ .Values.workers.dispatcher.port | quote }}
   IF_EMAIL_WORKER_URL: {{ $emailWorkerURL | quote }}
@@ -80,6 +92,14 @@ data:
   IF_NOTIFICATION_WORKER_PORT: {{ .Values.workers.notification.port | quote }}
   IF_BUILD_TEKTON_ENABLED: {{ .Values.build.tektonEnabled | quote }}
   IF_BUILD_TEKTON_KUBECONFIG: {{ .Values.build.tektonKubeconfig | quote }}
+  IF_SRE_LOG_DETECTOR_ENABLED: {{ .Values.sre.logDetector.enabled | quote }}
+  IF_SRE_LOG_DETECTOR_INTERVAL_SECONDS: {{ .Values.sre.logDetector.intervalSeconds | quote }}
+  IF_SRE_LOG_DETECTOR_TIMEOUT_SECONDS: {{ .Values.sre.logDetector.timeoutSeconds | quote }}
+  IF_SRE_LOG_DETECTOR_LOOKBACK_MINUTES: {{ .Values.sre.logDetector.lookbackMinutes | quote }}
+  IF_SRE_LOG_DETECTOR_MAX_MATCHES: {{ .Values.sre.logDetector.maxMatches | quote }}
+  IF_SRE_LOG_DETECTOR_LOKI_BASE_URL: {{ $lokiBaseURL | quote }}
+  IF_SRE_AGENT_RUNTIME_BASE_URL: {{ $ollamaBaseURL | quote }}
+  IF_SRE_AGENT_RUNTIME_MODEL: {{ .Values.ollama.model.name | quote }}
 ---
 apiVersion: v1
 kind: ConfigMap
