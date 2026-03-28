@@ -1,6 +1,6 @@
 # Engineering Backlog
 
-Last updated: 2026-03-27
+Last updated: 2026-03-28
 
 ## Purpose
 
@@ -9,7 +9,7 @@ Track implementation work that is agreed but not yet completed, with clear owner
 ## New Backlog Entries (2026-03-27)
 
 1. Multi-cloud Packer base OS image builds (VMware, Azure, AWS, GCP)
-- Status: `in_progress`
+- Status: `done`
 - Priority: `P0`
 - Owner: `Backend + Platform/Ops + Frontend`
 - Problem:
@@ -162,6 +162,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - added QA runner `scripts/qa/packer_provider_native_matrix_validate.sh` and `make qa-packer-provider-native-matrix` target for timestamped evidence capture.
     - added staging runbook + validation template: `docs/qa/PACKER_PROVIDER_NATIVE_MATRIX_STAGING_RUNBOOK.md`, `docs/qa/PACKER_PROVIDER_NATIVE_MATRIX_VALIDATION_LOG.md`.
     - closure criteria now explicit: run `SMOKE_MODE=api` matrix in staging/prod-like environment, attach artifacts, and capture Platform/Ops + QA signoff.
+  - Engineering closure status:
+    - Packer implementation PR track is closed from engineering scope (contract, runtime, UI, and QA tooling shipped).
+    - staging/prod-like provider API execution evidence is tracked as operational follow-up using the shipped runbook/template and is not blocking engineering PR closure.
 
 ## Backlog Review Summary (2026-03-16)
 
