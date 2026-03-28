@@ -97,6 +97,9 @@ Branch: `feature/packer-builds`
   - added `IF_VM_LIFECYCLE_EXECUTION_MODE` with `metadata_only` (default), `prefer_provider_native`, and `require_provider_native`.
   - `require_provider_native` now returns `501` for unsupported provider/state paths and missing provider execution metadata.
   - added per-provider provider-native rollout toggles (default enabled): `IF_VM_LIFECYCLE_PROVIDER_AWS_ENABLED`, `IF_VM_LIFECYCLE_PROVIDER_VMWARE_ENABLED`, `IF_VM_LIFECYCLE_PROVIDER_AZURE_ENABLED`, `IF_VM_LIFECYCLE_PROVIDER_GCP_ENABLED`.
+- PR8 provider-native lifecycle smoke tooling completed:
+  - executable smoke runner: `scripts/packer-lifecycle-provider-native-smoke.sh`.
+  - operational runbook: `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_SMOKE_RUNBOOK.md`.
 - PR8 provider-native lifecycle initial execution completed:
   - AWS `delete` lifecycle action now supports provider-native execution via EC2 `DeregisterImage` when execution mode allows.
   - successful AWS native delete transitions now persist `provider_native`; invalid/missing AWS image metadata now returns `400`.

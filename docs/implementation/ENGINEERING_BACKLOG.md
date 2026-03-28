@@ -149,6 +149,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 provider-native lifecycle audit-depth expansion completed on `feature/packer-builds`:
     - lifecycle metadata/history now persists provider execution audit fields (`provider_action`, `provider_identifier`, `provider_outcome`) for provider-native transitions.
     - VM catalog payloads now expose latest provider execution audit fields for faster operator diagnostics.
+  - PR8 provider-native lifecycle smoke tooling completed on `feature/packer-builds`:
+    - added provider-native smoke runner script `scripts/packer-lifecycle-provider-native-smoke.sh` with destructive-guard and provider-native assertions.
+    - added operator runbook `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_SMOKE_RUNBOOK.md` for env setup, execution order, and rollback guidance.
 
 ## Backlog Review Summary (2026-03-16)
 

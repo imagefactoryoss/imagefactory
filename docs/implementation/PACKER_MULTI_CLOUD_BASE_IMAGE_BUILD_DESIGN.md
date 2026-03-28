@@ -895,6 +895,9 @@ Progress update (2026-03-27):
   - GCP `deprecate` / `released` transitions execute provider-native Compute API `deprecate` actions (`DEPRECATED` / `ACTIVE` state transitions).
   - GCP identifier resolution supports provider metadata plus execution artifact fallback (`projects/.../global/images/...` and full Compute API URL forms).
   - GCP lifecycle execution is configured via `IF_VM_LIFECYCLE_GCP_BEARER_TOKEN` and optional `IF_VM_LIFECYCLE_GCP_BASE_URL`.
+- provider-native lifecycle smoke tooling now exists:
+  - scripted validation entrypoint: `scripts/packer-lifecycle-provider-native-smoke.sh`.
+  - operator runbook: `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_SMOKE_RUNBOOK.md`.
 
 ### 16.10 Cross-cutting quality gates for every PR
 
