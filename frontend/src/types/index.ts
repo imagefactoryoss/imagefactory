@@ -986,6 +986,10 @@ export interface SREAgentIncidentSnapshotResponse {
     suggested_action?: SREAgentSuggestedActionResponse
     operator_handoff_note: string
     policy_guardrails?: string[]
+    evidence_signals_expected?: string[]
+    evidence_signals_observed?: string[]
+    evidence_coverage_percent: number
+    evidence_health_note: string
     human_confirmation_required: boolean
 }
 

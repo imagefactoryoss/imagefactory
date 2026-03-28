@@ -398,6 +398,15 @@ func TestBuildIncidentSnapshotFromDraft_ComposesDeterministicViews(t *testing.T)
 	if len(snapshot.PolicyGuardrails) == 0 {
 		t.Fatal("expected snapshot policy guardrails")
 	}
+	if snapshot.EvidenceCoveragePercent <= 0 {
+		t.Fatalf("expected positive evidence coverage, got %d", snapshot.EvidenceCoveragePercent)
+	}
+	if len(snapshot.EvidenceSignalsExpected) == 0 {
+		t.Fatal("expected evidence expected signals")
+	}
+	if len(snapshot.EvidenceSignalsObserved) == 0 {
+		t.Fatal("expected evidence observed signals")
+	}
 }
 
 func TestBuildIncidentSnapshotFromDraft_RemainsApprovalBound(t *testing.T) {
@@ -431,5 +440,28 @@ func TestBuildIncidentSnapshotFromDraft_RemainsApprovalBound(t *testing.T) {
 	guardrails := strings.ToLower(strings.Join(snapshot.PolicyGuardrails, " "))
 	if !strings.Contains(guardrails, "advisory") || !strings.Contains(guardrails, "approval") {
 		t.Fatalf("expected guardrails to include advisory+approval language, got %q", strings.Join(snapshot.PolicyGuardrails, " | "))
+	}
+}
+
+func TestBuildSnapshotEvidenceHealth_CoverageBands(t *testing.T) {
+	draft := &AgentDraftResponse{
+		ToolRuns: []MCPToolInvocationResult{
+			{ToolName: "findings.list"},
+			{ToolName: "evidence.list"},
+			{ToolName: "http_signals.recent"},
+			{ToolName: "async_backlog.recent"},
+			{ToolName: "messaging_transport.recent"},
+			{ToolName: "logs.recent"},
+		},
+	}
+	expected, observed, coverage, note := buildSnapshotEvidenceHealth(draft)
+	if len(expected) == 0 || len(observed) == 0 {
+		t.Fatal("expected non-empty expected/observed signals")
+	}
+	if coverage != 100 {
+		t.Fatalf("expected full evidence coverage, got %d", coverage)
+	}
+	if !strings.Contains(strings.ToLower(note), "strong") {
+		t.Fatalf("expected strong coverage note, got %q", note)
 	}
 }

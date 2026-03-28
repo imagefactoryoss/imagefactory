@@ -1557,9 +1557,12 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                     <div><span className="font-semibold">Probable cause:</span> {agentSnapshot.triage?.probable_cause || 'n/a'}</div>
                                                                     <div className="mt-1"><span className="font-semibold">Severity:</span> {agentSnapshot.severity?.score ?? 'n/a'} ({agentSnapshot.severity?.level || 'n/a'})</div>
                                                                     <div className="mt-1"><span className="font-semibold">Action:</span> {agentSnapshot.suggested_action?.action_key || 'n/a'}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Evidence coverage:</span> {agentSnapshot.evidence_coverage_percent ?? 0}%</div>
                                                                 </div>
                                                                 <div className="mt-2 rounded-md border border-emerald-200 bg-white/80 px-2.5 py-2 text-xs dark:border-emerald-900/40 dark:bg-emerald-950/30">
                                                                     <div><span className="font-semibold">Operator handoff:</span> {agentSnapshot.operator_handoff_note || 'n/a'}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Evidence health:</span> {agentSnapshot.evidence_health_note || 'n/a'}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Signals observed:</span> {(agentSnapshot.evidence_signals_observed || []).join(', ') || 'n/a'}</div>
                                                                     {(agentSnapshot.policy_guardrails || []).length > 0 ? (
                                                                         <div className="mt-1 space-y-1">
                                                                             {(agentSnapshot.policy_guardrails || []).map((guardrail, idx) => (
@@ -2119,9 +2122,12 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                         <div><span className="font-semibold">Probable cause:</span> {agentSnapshot.triage?.probable_cause || 'n/a'}</div>
                                                                         <div className="mt-1"><span className="font-semibold">Severity:</span> {agentSnapshot.severity?.score ?? 'n/a'} ({agentSnapshot.severity?.level || 'n/a'})</div>
                                                                         <div className="mt-1"><span className="font-semibold">Action:</span> {agentSnapshot.suggested_action?.action_key || 'n/a'}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Evidence coverage:</span> {agentSnapshot.evidence_coverage_percent ?? 0}%</div>
                                                                     </div>
                                                                     <div className="mt-3 rounded-lg border border-emerald-200 bg-white/80 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
                                                                         <div><span className="font-semibold">Operator handoff:</span> {agentSnapshot.operator_handoff_note || 'n/a'}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Evidence health:</span> {agentSnapshot.evidence_health_note || 'n/a'}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Signals observed:</span> {(agentSnapshot.evidence_signals_observed || []).join(', ') || 'n/a'}</div>
                                                                         {(agentSnapshot.policy_guardrails || []).length > 0 ? (
                                                                             <div className="mt-2 space-y-1 text-xs">
                                                                                 {(agentSnapshot.policy_guardrails || []).map((guardrail, idx) => (
