@@ -87,7 +87,7 @@ That objective is now materially achieved:
 
 ## Recommended Next Steps
 
-0. Execute `AIOps Assistant v1` PR track in order (`AIOPS-02` through `AIOPS-06`)
+0. Execute `AIOps Assistant v1` PR track in order (`AIOPS-04` through `AIOPS-06`)
 - backlog tracker: `docs/implementation/ENGINEERING_BACKLOG.md` (`AIOps Assistant v1 PR Track`)
 - keep each slice deterministic and approval-safe, with one validation artifact per slice.
 
@@ -169,7 +169,6 @@ Known test-harness noise:
 ### Current boundary
 
 - The AI layer is still deterministic and embedded.
-- No external model calls are happening yet.
 - The first agent workflow now exists via:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/draft`
 - A deterministic triage workflow now exists via:
@@ -178,6 +177,11 @@ Known test-harness noise:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/severity`
 - An optional local-model interpretation layer now exists via:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/interpretation`
+- The interpretation endpoint now includes bounded small-LLM outputs:
+  - `timeline_summary`
+  - `change_detection_15m`
+  - `operator_handoff_note`
+  - plus `evidence_hash`, `cache_hit`, and `fallback_reason` metadata
 - That draft flow:
   - gathers a bounded set of read-only MCP tool results
   - ranks a few likely hypotheses
@@ -185,6 +189,8 @@ Known test-harness noise:
   - does not create or execute actions
 - The interpretation flow:
   - stays downstream of the deterministic draft
+  - now caches local-model output by `incident + evidence hash` to reduce repeated inference cost
+  - now returns grounded deterministic fallback summaries when local runtime is unavailable
   - currently supports `provider=ollama`
   - uses `agent_runtime.base_url` plus the configured local model name
   - does not add any action authority
