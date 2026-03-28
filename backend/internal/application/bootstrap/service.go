@@ -80,7 +80,7 @@ func (s *Service) IsSetupRequired(ctx context.Context) (bool, error) {
 // EnsureInitialized initializes first-run bootstrap state and local admin password exactly once.
 func (s *Service) EnsureInitialized(ctx context.Context, adminEmail string) (*State, string, error) {
 	if adminEmail == "" {
-		adminEmail = "admin@imagefactory.local"
+		adminEmail = "admin@imgfactory.com"
 	}
 
 	state, err := s.GetState(ctx)
@@ -190,7 +190,7 @@ func (s *Service) MarkSetupComplete(ctx context.Context) error {
 // This is intended for first-run recovery when the generated password was lost.
 func (s *Service) ReissueInitialAdminPassword(ctx context.Context, adminEmail string) (string, error) {
 	if adminEmail == "" {
-		adminEmail = "admin@imagefactory.local"
+		adminEmail = "admin@imgfactory.com"
 	}
 
 	state, err := s.GetState(ctx)
