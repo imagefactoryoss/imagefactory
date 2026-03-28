@@ -450,13 +450,17 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - AI workspace and operator control center now render advisory-only suggested-action cards with clear non-executable labeling.
 
 6. `AIOPS-06` Evaluation harness (replay + safety)
-- Status: `planned`
+- Status: `done`
 - Scope:
   - replay suite with fixed incidents and expected triage/summary outcomes.
   - evaluate correctness, hallucination guard, and policy compliance.
 - Validation:
   - publish reproducible QA runner + artifact log under `docs/qa/artifacts`.
   - fail build/PR checks when hallucination/policy assertions regress.
+- Completion note:
+  - added deterministic replay harness test `TestAIOpsEvaluationHarness_ReplaySuite` to verify triage/severity/suggested-action correctness across fixed incident fixtures.
+  - added interpretation safety gate to reject unsafe generated summary content (approval-bypass/auto-execute phrasing) and fallback to deterministic grounded output.
+  - added reproducible QA runner `scripts/qa/sre_smartbot_aiops_eval_validate.sh` and Make target `qa-sre-smartbot-aiops-eval` with artifact logs under `docs/qa/artifacts`.
 
 0. Deployment guardrails: strict Helm configuration (no silent fallbacks) + Supabase pooler stability
 - Status: `done`
