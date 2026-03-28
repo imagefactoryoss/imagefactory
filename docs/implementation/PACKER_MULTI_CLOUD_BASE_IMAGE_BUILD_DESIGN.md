@@ -872,6 +872,7 @@ Progress update (2026-03-27):
 - lifecycle execution mode policy gate now exists for rollout safety:
   - `IF_VM_LIFECYCLE_EXECUTION_MODE` supports `metadata_only` (default), `prefer_provider_native`, and `require_provider_native`.
   - `require_provider_native` enforces fail-closed behavior (`501`) for unsupported provider/state paths and missing provider execution metadata.
+  - per-provider rollout toggles now exist (default enabled): `IF_VM_LIFECYCLE_PROVIDER_AWS_ENABLED`, `IF_VM_LIFECYCLE_PROVIDER_VMWARE_ENABLED`, `IF_VM_LIFECYCLE_PROVIDER_AZURE_ENABLED`, `IF_VM_LIFECYCLE_PROVIDER_GCP_ENABLED`.
 - provider-native lifecycle execution now has initial AWS implementation:
   - AWS `delete` transitions invoke EC2 `DeregisterImage` when provider-native mode is enabled.
   - AWS `deprecate` transitions invoke EC2 `EnableImageDeprecation` with configurable deprecation window.

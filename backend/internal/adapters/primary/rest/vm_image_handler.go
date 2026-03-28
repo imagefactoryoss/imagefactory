@@ -121,7 +121,7 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "metadata_only", ProviderOutcome: "metadata_only"}, nil
 	}
 
-	if provider == "aws" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
+	if provider == "aws" && resolveVMLifecycleProviderNativeEnabled(provider) && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
 		ref, err := selectAWSLifecycleImageReference(req.ProviderArtifactIdentifiers, req.ArtifactValues, strings.TrimSpace(os.Getenv("IF_VM_LIFECYCLE_AWS_REGION")))
 		if err != nil {
 			return vmLifecycleTransitionResult{}, err
@@ -179,7 +179,7 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderOutcome: "success"}, nil
 	}
 
-	if provider == "vmware" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
+	if provider == "vmware" && resolveVMLifecycleProviderNativeEnabled(provider) && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
 		identifier, err := selectVMwareLifecycleIdentifier(req.ProviderArtifactIdentifiers, req.ArtifactValues)
 		if err != nil {
 			return vmLifecycleTransitionResult{}, err
@@ -212,7 +212,7 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderOutcome: "success"}, nil
 	}
 
-	if provider == "azure" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
+	if provider == "azure" && resolveVMLifecycleProviderNativeEnabled(provider) && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
 		identifier, err := selectAzureLifecycleIdentifier(req.ProviderArtifactIdentifiers, req.ArtifactValues)
 		if err != nil {
 			return vmLifecycleTransitionResult{}, err
@@ -245,7 +245,7 @@ func (e vmDispatchLifecycleExecutor) ExecuteTransition(ctx context.Context, req 
 		return vmLifecycleTransitionResult{TransitionMode: "provider_native", ProviderOutcome: "success"}, nil
 	}
 
-	if provider == "gcp" && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
+	if provider == "gcp" && resolveVMLifecycleProviderNativeEnabled(provider) && (req.TargetState == "deleted" || req.TargetState == "deprecated" || req.TargetState == "released") {
 		identifier, err := selectGCPLifecycleIdentifier(req.ProviderArtifactIdentifiers, req.ArtifactValues)
 		if err != nil {
 			return vmLifecycleTransitionResult{}, err
@@ -793,6 +793,32 @@ func resolveVMLifecycleExecutionMode(logger *zap.Logger) vmLifecycleExecutionMod
 		}
 		return vmLifecycleExecutionModeMetadataOnly
 	}
+}
+
+func resolveVMLifecycleProviderNativeEnabled(provider string) bool {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	var envName string
+	switch provider {
+	case "aws":
+		envName = "IF_VM_LIFECYCLE_PROVIDER_AWS_ENABLED"
+	case "vmware":
+		envName = "IF_VM_LIFECYCLE_PROVIDER_VMWARE_ENABLED"
+	case "azure":
+		envName = "IF_VM_LIFECYCLE_PROVIDER_AZURE_ENABLED"
+	case "gcp":
+		envName = "IF_VM_LIFECYCLE_PROVIDER_GCP_ENABLED"
+	default:
+		return true
+	}
+	raw := strings.TrimSpace(os.Getenv(envName))
+	if raw == "" {
+		return true
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		return true
+	}
+	return parsed
 }
 
 type vmImageCatalogItem struct {
