@@ -47,6 +47,18 @@ func (s *DemoService) ListScenarios() []DemoScenarioDescriptor {
 			Summary:                "Shows configuration drift with release-focused evidence so the AI layer can build a hypothesis and investigation plan from MCP tool output.",
 			RecommendedWalkthrough: "Open the incident, inspect release evidence, run release MCP tools, and show the deterministic draft investigation plan.",
 		},
+		{
+			ID:                     "async_backlog_without_transport",
+			Name:                   "Async Backlog Without Transport Instability",
+			Summary:                "Creates localized dispatcher backlog pressure while transport remains stable so operators can distinguish worker congestion from message-bus instability.",
+			RecommendedWalkthrough: "Open the incident, confirm the summary tab shows isolated backlog pressure, then generate the deterministic draft to show worker-throughput wording.",
+		},
+		{
+			ID:                     "async_backlog_with_transport",
+			Name:                   "Async Backlog With Transport Correlation",
+			Summary:                "Creates messaging outbox backlog pressure with reconnect and disconnect evidence so operators can demo transport-driven async pressure.",
+			RecommendedWalkthrough: "Open the incident, review backlog plus transport summaries, then generate the draft to show transport-related causality and bounded messaging review guidance.",
+		},
 	}
 }
 
@@ -216,6 +228,164 @@ func (s *DemoService) GenerateIncident(ctx context.Context, tenantID *uuid.UUID,
 			ApprovalRequired: false,
 			ResultPayload: map[string]interface{}{
 				"reason": "Share the drift summary with administrators before manual reconciliation.",
+			},
+		}, now); err != nil {
+			return nil, err
+		}
+	case "async_backlog_without_transport":
+		if err := s.signals.RecordObservation(ctx, SignalObservation{
+			TenantID:       tenantID,
+			CorrelationKey: correlationKey,
+			Domain:         "golden_signals",
+			IncidentType:   "dispatcher_backlog_pressure",
+			DisplayName:    "Dispatcher backlog pressure without transport instability",
+			Summary:        "Dispatcher backlog is elevated above threshold while messaging transport remains stable, which points to worker throughput pressure rather than bus instability.",
+			Source:         "demo.generator",
+			Severity:       domainsresmartbot.IncidentSeverityWarning,
+			Confidence:     domainsresmartbot.IncidentConfidenceHigh,
+			OccurredAt:     now,
+			Metadata: map[string]interface{}{
+				"demo":                       true,
+				"scenario_id":                scenarioID,
+				"queue_kind":                 "build_queue",
+				"subsystem":                  "dispatcher",
+				"transport_correlation_hint": "messaging_transport:stable",
+			},
+			FindingTitle:   "Dispatcher backlog exceeded its configured threshold",
+			FindingMessage: "Dispatcher backlog remains elevated without matching reconnect or disconnect pressure on the message bus.",
+			SignalType:     "dispatcher_backlog_pressure",
+			SignalKey:      "dispatcher.build_queue",
+			RawPayload: map[string]interface{}{
+				"count":                   16,
+				"threshold":               8,
+				"threshold_delta":         8,
+				"threshold_ratio_percent": 200,
+				"trend":                   "rising",
+				"recent_observations": map[string]interface{}{
+					"previous": 11,
+					"current":  16,
+				},
+				"correlation_hints": map[string]interface{}{
+					"messaging_transport": "stable",
+				},
+			},
+		}); err != nil {
+			return nil, err
+		}
+		if err := s.signals.AddEvidence(ctx, correlationKey, "dispatcher_backlog_snapshot", "Synthetic dispatcher backlog snapshot showing localized worker congestion without transport instability.", map[string]interface{}{
+			"count":                   16,
+			"threshold":               8,
+			"threshold_delta":         8,
+			"threshold_ratio_percent": 200,
+			"trend":                   "rising",
+			"queue_kind":              "build_queue",
+			"subsystem":               "dispatcher",
+			"operator_status":         "Dispatcher backlog is growing without current messaging transport instability.",
+			"latest_summary":          "Dispatcher queue depth rose from 11 to 16 while reconnect and disconnect counts stayed at zero.",
+			"recent_observations": map[string]interface{}{
+				"previous": 11,
+				"current":  16,
+			},
+			"correlation_hints": map[string]interface{}{
+				"messaging_transport": "stable",
+			},
+		}, now); err != nil {
+			return nil, err
+		}
+		if err := s.signals.EnsureActionAttempt(ctx, correlationKey, ActionAttemptSpec{
+			ActionKey:        "review_dispatcher_backlog_pressure",
+			ActionClass:      "recommendation",
+			TargetKind:       "worker_domain",
+			TargetRef:        "dispatcher",
+			Status:           "proposed",
+			ActorType:        "system",
+			ApprovalRequired: false,
+			ResultPayload: map[string]interface{}{
+				"reason": "Review dispatcher worker throughput and downstream processing before making transport changes.",
+			},
+		}, now); err != nil {
+			return nil, err
+		}
+	case "async_backlog_with_transport":
+		if err := s.signals.RecordObservation(ctx, SignalObservation{
+			TenantID:       tenantID,
+			CorrelationKey: correlationKey,
+			Domain:         "golden_signals",
+			IncidentType:   "messaging_outbox_backlog_pressure",
+			DisplayName:    "Messaging outbox backlog correlated with transport instability",
+			Summary:        "Messaging outbox backlog is above threshold and recent reconnect pressure suggests the message bus is contributing to delayed delivery.",
+			Source:         "demo.generator",
+			Severity:       domainsresmartbot.IncidentSeverityWarning,
+			Confidence:     domainsresmartbot.IncidentConfidenceHigh,
+			OccurredAt:     now,
+			Metadata: map[string]interface{}{
+				"demo":                       true,
+				"scenario_id":                scenarioID,
+				"queue_kind":                 "messaging_outbox",
+				"subsystem":                  "messaging",
+				"transport_correlation_hint": "messaging_transport:nats_transport_degraded",
+			},
+			FindingTitle:   "Messaging outbox backlog exceeded threshold alongside reconnect pressure",
+			FindingMessage: "Outbox pending count is growing while the message bus is reconnecting repeatedly.",
+			SignalType:     "messaging_outbox_backlog_pressure",
+			SignalKey:      "messaging.outbox",
+			RawPayload: map[string]interface{}{
+				"count":                   21,
+				"threshold":               9,
+				"threshold_delta":         12,
+				"threshold_ratio_percent": 233,
+				"trend":                   "rising",
+				"recent_observations": map[string]interface{}{
+					"previous": 13,
+					"current":  21,
+				},
+				"correlation_hints": map[string]interface{}{
+					"messaging_transport": "reconnect_pressure",
+				},
+			},
+		}); err != nil {
+			return nil, err
+		}
+		if err := s.signals.AddEvidence(ctx, correlationKey, "messaging_outbox_backlog_snapshot", "Synthetic outbox backlog snapshot correlated with reconnect pressure on NATS.", map[string]interface{}{
+			"count":                   21,
+			"threshold":               9,
+			"threshold_delta":         12,
+			"threshold_ratio_percent": 233,
+			"trend":                   "rising",
+			"queue_kind":              "messaging_outbox",
+			"subsystem":               "messaging",
+			"operator_status":         "Messaging outbox backlog is growing while messaging transport is unstable.",
+			"latest_summary":          "Outbox pending count rose from 13 to 21 after repeated reconnect and disconnect events on NATS.",
+			"recent_observations": map[string]interface{}{
+				"previous": 13,
+				"current":  21,
+			},
+			"correlation_hints": map[string]interface{}{
+				"messaging_transport": "reconnect_pressure",
+			},
+		}, now); err != nil {
+			return nil, err
+		}
+		if err := s.signals.AddEvidence(ctx, correlationKey, "nats_transport_status", "Synthetic transport snapshot showing reconnect pressure during outbox backlog growth.", map[string]interface{}{
+			"status":              "degraded",
+			"reconnects":          6,
+			"disconnects":         2,
+			"reconnect_threshold": 3,
+			"operator_status":     "Transport instability is likely contributing to outbox backlog pressure.",
+			"latest_summary":      "Reconnect spikes occurred before the outbox crossed its threshold.",
+		}, now); err != nil {
+			return nil, err
+		}
+		if err := s.signals.EnsureActionAttempt(ctx, correlationKey, ActionAttemptSpec{
+			ActionKey:        "review_messaging_transport_health",
+			ActionClass:      "recommendation",
+			TargetKind:       "message_bus",
+			TargetRef:        "nats",
+			Status:           "proposed",
+			ActorType:        "system",
+			ApprovalRequired: false,
+			ResultPayload: map[string]interface{}{
+				"reason": "Validate message-bus reconnect pressure before changing worker capacity or draining the backlog manually.",
 			},
 		}, now); err != nil {
 			return nil, err

@@ -1296,6 +1296,19 @@ func main() {
 			ReconnectThreshold: int64(getIntEnv("IF_NATS_TRANSPORT_RECONNECT_THRESHOLD", 3)),
 		},
 	)
+	appsresmartbot.StartNATSConsumerLagSignalRunner(
+		logger,
+		processHealthStore,
+		natsBus,
+		sreSmartBotService,
+		appsresmartbot.NATSConsumerLagRunnerConfig{
+			Enabled:                  getBoolEnv("IF_NATS_CONSUMER_LAG_SIGNAL_RUNNER_ENABLED", true),
+			Interval:                 time.Duration(getIntEnv("IF_NATS_CONSUMER_LAG_SIGNAL_INTERVAL_SECONDS", 60)) * time.Second,
+			PendingMessagesThreshold: int64(getIntEnv("IF_NATS_CONSUMER_LAG_PENDING_THRESHOLD", 25)),
+			AckPendingThreshold:      int64(getIntEnv("IF_NATS_CONSUMER_ACK_PENDING_THRESHOLD", 10)),
+			StalledDuration:          time.Duration(getIntEnv("IF_NATS_CONSUMER_STALLED_SECONDS", 300)) * time.Second,
+		},
+	)
 	appsresmartbot.StartLogDetectorRunner(
 		logger,
 		processHealthStore,
