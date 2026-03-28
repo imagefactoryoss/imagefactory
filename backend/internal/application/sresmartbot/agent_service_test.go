@@ -139,3 +139,74 @@ func TestBuildTriageFromDraft_FallsBackWhenHypothesesMissing(t *testing.T) {
 		t.Fatal("expected fallback evidence refs")
 	}
 }
+
+func TestBuildSeverityFromDraft_CorrelatesSignals(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		Summary:    "Degradation detected across transport and HTTP windows.",
+		Hypotheses: []AgentDraftHypothesis{
+			{Title: "Service health is degrading through one or more golden signals", Confidence: "high"},
+		},
+		ToolRuns: []MCPToolInvocationResult{
+			{
+				ToolName:   "logs.recent",
+				ServerName: "Observability",
+				Payload: map[string]any{
+					"match_count": int64(9),
+				},
+			},
+			{
+				ToolName:   "http_signals.recent",
+				ServerName: "Observability",
+				Payload: map[string]any{
+					"error_rate_percent": int64(7),
+					"average_latency_ms": int64(1200),
+				},
+			},
+			{
+				ToolName:   "messaging_transport.recent",
+				ServerName: "Observability",
+				Payload: map[string]any{
+					"reconnects":          int64(5),
+					"disconnects":         int64(1),
+					"reconnect_threshold": int64(3),
+				},
+			},
+		},
+	}
+
+	severity := buildSeverityFromDraft(draft)
+	if severity == nil {
+		t.Fatal("expected severity response")
+	}
+	if severity.Score < 80 {
+		t.Fatalf("expected score >= 80, got %d", severity.Score)
+	}
+	if severity.Level != "critical" {
+		t.Fatalf("expected critical level, got %q", severity.Level)
+	}
+	if len(severity.Factors) == 0 {
+		t.Fatal("expected correlated severity factors")
+	}
+}
+
+func TestBuildSeverityFromDraft_UsesFallbackForSparseEvidence(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+		Summary:    "Initial signal observed.",
+	}
+
+	severity := buildSeverityFromDraft(draft)
+	if severity == nil {
+		t.Fatal("expected severity response")
+	}
+	if severity.Score != 25 {
+		t.Fatalf("expected baseline score 25, got %d", severity.Score)
+	}
+	if severity.Level != "low" {
+		t.Fatalf("expected low level, got %q", severity.Level)
+	}
+	if len(severity.Factors) != 0 {
+		t.Fatalf("expected no factors for sparse evidence, got %d", len(severity.Factors))
+	}
+}

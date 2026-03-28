@@ -51,6 +51,23 @@ type AgentTriageResponse struct {
 	HumanConfirmation bool                    `json:"human_confirmation_required"`
 }
 
+type AgentSeverityFactor struct {
+	Key          string `json:"key"`
+	Label        string `json:"label"`
+	Contribution int64  `json:"contribution"`
+	Reason       string `json:"reason"`
+}
+
+type AgentSeverityResponse struct {
+	IncidentID        uuid.UUID             `json:"incident_id"`
+	Mode              string                `json:"mode"`
+	Score             int64                 `json:"score"`
+	Level             string                `json:"level"`
+	Summary           string                `json:"summary"`
+	Factors           []AgentSeverityFactor `json:"factors"`
+	HumanConfirmation bool                  `json:"human_confirmation_required"`
+}
+
 type AgentService struct {
 	workspaceService *WorkspaceService
 	mcpService       *MCPService
@@ -127,6 +144,14 @@ func (s *AgentService) BuildTriage(ctx context.Context, tenantID *uuid.UUID, inc
 	return buildTriageFromDraft(draft), nil
 }
 
+func (s *AgentService) BuildSeverity(ctx context.Context, tenantID *uuid.UUID, incidentID uuid.UUID) (*AgentSeverityResponse, error) {
+	draft, err := s.BuildDraft(ctx, tenantID, incidentID)
+	if err != nil {
+		return nil, err
+	}
+	return buildSeverityFromDraft(draft), nil
+}
+
 func buildTriageFromDraft(draft *AgentDraftResponse) *AgentTriageResponse {
 	if draft == nil {
 		return nil
@@ -162,6 +187,124 @@ func buildTriageFromDraft(draft *AgentDraftResponse) *AgentTriageResponse {
 		NextChecks:        buildTriageNextChecks(draft),
 		RecommendedAction: deriveTriageRecommendedAction(draft),
 		EvidenceRefs:      evidenceRefs,
+		HumanConfirmation: draft.HumanConfirmation,
+	}
+}
+
+func buildSeverityFromDraft(draft *AgentDraftResponse) *AgentSeverityResponse {
+	if draft == nil {
+		return nil
+	}
+	score := int64(25)
+	factors := make([]AgentSeverityFactor, 0, 6)
+	addFactor := func(key, label string, contribution int64, reason string) {
+		if contribution <= 0 {
+			return
+		}
+		factors = append(factors, AgentSeverityFactor{
+			Key:          key,
+			Label:        label,
+			Contribution: contribution,
+			Reason:       reason,
+		})
+		score += contribution
+	}
+
+	if len(draft.Hypotheses) > 0 {
+		top := draft.Hypotheses[0]
+		switch strings.ToLower(strings.TrimSpace(top.Confidence)) {
+		case "high":
+			addFactor("top_hypothesis_confidence", "Top Hypothesis Confidence", 15, "The strongest grounded hypothesis is high confidence.")
+		case "medium":
+			addFactor("top_hypothesis_confidence", "Top Hypothesis Confidence", 8, "The strongest grounded hypothesis is medium confidence.")
+		}
+	}
+
+	for _, run := range draft.ToolRuns {
+		switch run.ToolName {
+		case "logs.recent":
+			matches := metricFromPayload(run.Payload, "match_count")
+			if matches > 0 {
+				contribution := matches * 2
+				if contribution > 20 {
+					contribution = 20
+				}
+				addFactor("logs_recent", "Log Pressure", contribution, fmt.Sprintf("Recent logs returned %d matching error signatures.", matches))
+			}
+		case "http_signals.recent":
+			errRate := metricFromPayload(run.Payload, "error_rate_percent")
+			latency := metricFromPayload(run.Payload, "average_latency_ms")
+			contribution := int64(0)
+			if errRate >= 5 {
+				contribution += 12
+			} else if errRate > 0 {
+				contribution += 6
+			}
+			if latency >= 1000 {
+				contribution += 8
+			} else if latency >= 400 {
+				contribution += 4
+			}
+			addFactor("http_signals_recent", "HTTP Signal Degradation", contribution, fmt.Sprintf("Recent HTTP window shows %d%% server-error rate and %dms average latency.", errRate, latency))
+		case "async_backlog.recent":
+			buildQueue := metricFromPayload(run.Payload, "build_queue_depth")
+			emailQueue := metricFromPayload(run.Payload, "email_queue_depth")
+			outboxPending := metricFromPayload(run.Payload, "messaging_outbox_pending")
+			total := buildQueue + emailQueue + outboxPending
+			contribution := int64(0)
+			if total >= 50 {
+				contribution = 12
+			} else if total >= 15 {
+				contribution = 7
+			} else if total > 0 {
+				contribution = 3
+			}
+			addFactor("async_backlog_recent", "Async Backlog Pressure", contribution, fmt.Sprintf("Backlog snapshot totals build=%d, email=%d, outbox=%d.", buildQueue, emailQueue, outboxPending))
+		case "messaging_transport.recent":
+			reconnects := metricFromPayload(run.Payload, "reconnects")
+			disconnects := metricFromPayload(run.Payload, "disconnects")
+			threshold := metricFromPayload(run.Payload, "reconnect_threshold")
+			contribution := int64(0)
+			if disconnects > 0 {
+				contribution += 10
+			}
+			if threshold > 0 && reconnects >= threshold {
+				contribution += 8
+			} else if reconnects > 0 {
+				contribution += 4
+			}
+			addFactor("messaging_transport_recent", "Messaging Transport Instability", contribution, fmt.Sprintf("Transport shows reconnects=%d, disconnects=%d, threshold=%d.", reconnects, disconnects, threshold))
+		}
+	}
+
+	if score > 100 {
+		score = 100
+	}
+	level := "low"
+	switch {
+	case score >= 80:
+		level = "critical"
+	case score >= 60:
+		level = "high"
+	case score >= 35:
+		level = "medium"
+	}
+
+	sort.SliceStable(factors, func(i, j int) bool {
+		return factors[i].Contribution > factors[j].Contribution
+	})
+	if len(factors) > 4 {
+		factors = factors[:4]
+	}
+
+	summary := fmt.Sprintf("Severity score is %d (%s) based on correlated logs, HTTP signals, async backlog, and transport evidence.", score, level)
+	return &AgentSeverityResponse{
+		IncidentID:        draft.IncidentID,
+		Mode:              "deterministic_severity_correlation",
+		Score:             score,
+		Level:             level,
+		Summary:           summary,
+		Factors:           factors,
 		HumanConfirmation: draft.HumanConfirmation,
 	}
 }
