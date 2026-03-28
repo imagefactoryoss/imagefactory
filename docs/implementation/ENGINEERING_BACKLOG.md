@@ -530,6 +530,18 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - `AgentSeverityFactor` now includes `weight_percent` and `operator_rationale` fields populated deterministically from contribution and incident severity level.
   - incident severity and scorecard cards now render contribution, weight percentage, and operator rationale for each why-severe factor.
 
+12. `AIOPS-12` Runbook-grounded next-check mapping
+- Status: `done`
+- Scope:
+  - add deterministic triage mapping for each next check with runbook source/section and supporting evidence signal.
+  - surface mapping in triage and snapshot cards so operators can follow check-to-runbook-evidence flow.
+- Validation:
+  - backend tests enforce populated runbook/evidence mapping for triage and snapshot outputs.
+  - full SRE regression + AIOPS eval harness remain green.
+- Completion note:
+  - `AgentTriageResponse` now includes `next_check_refs[]` with `check`, `runbook_source`, `runbook_section`, `evidence_signals[]`, and `evidence_note`.
+  - incidents AI cards now render runbook-grounded check mappings in both desktop and mobile layouts.
+
 0. Deployment guardrails: strict Helm configuration (no silent fallbacks) + Supabase pooler stability
 - Status: `done`
 - Priority: `P0`

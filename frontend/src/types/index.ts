@@ -938,9 +938,18 @@ export interface SREAgentTriageResponse {
     probable_cause: string
     confidence: string
     next_checks: string[]
+    next_check_refs?: SREAgentTriageCheckRef[]
     recommended_action: string
     evidence_refs?: SREAgentDraftEvidenceRef[]
     human_confirmation_required: boolean
+}
+
+export interface SREAgentTriageCheckRef {
+    check: string
+    runbook_source: string
+    runbook_section: string
+    evidence_signals?: string[]
+    evidence_note: string
 }
 
 export interface SREAgentSeverityFactor {
