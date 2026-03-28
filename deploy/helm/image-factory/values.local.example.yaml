@@ -2,6 +2,6 @@ app:
   # Generate with: openssl rand -base64 32 | tr -d '\n'
   encryptionKey: "REPLACE_WITH_BASE64_32_BYTE_KEY"
 
-# Optional: keep this only if your cluster pulls from a private registry.
+# Optional: keep this only if your cluster pulls private GitLab images.
 imagePullSecrets:
-  - name: registry-credentials
+  - name: gitlab-registry

@@ -106,12 +106,6 @@ Validate strict component configuration and ban silent fallback behavior.
   {{- $_ := required "docs.image.pullPolicy is required when docs.enabled=true" .Values.docs.image.pullPolicy -}}
 {{- end -}}
 
-{{- if and .Values.backend.enabled .Values.externalTenantService.enabled -}}
-  {{- $_ := required "externalTenantService.image.repository is required when externalTenantService.enabled=true" .Values.externalTenantService.image.repository -}}
-  {{- $_ := required "externalTenantService.image.tag is required when externalTenantService.enabled=true" .Values.externalTenantService.image.tag -}}
-  {{- $_ := required "externalTenantService.image.pullPolicy is required when externalTenantService.enabled=true" .Values.externalTenantService.image.pullPolicy -}}
-{{- end -}}
-
 {{- if and .Values.backend.enabled .Values.workers.dispatcher.enabled -}}
   {{- $_ := required "workers.dispatcher.image.repository is required when workers.dispatcher.enabled=true" .Values.workers.dispatcher.image.repository -}}
   {{- $_ := required "workers.dispatcher.image.tag is required when workers.dispatcher.enabled=true" .Values.workers.dispatcher.image.tag -}}
@@ -213,6 +207,55 @@ Validate strict component configuration and ban silent fallback behavior.
   {{- end -}}
   {{- if eq $storageType "hostPath" -}}
     {{- $_ := required "registry.storage.hostPath.path is required when registry.storage.type=hostPath" .Values.registry.storage.hostPath.path -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if .Values.ollama.enabled -}}
+  {{- $_ := required "ollama.image.repository is required when ollama.enabled=true" .Values.ollama.image.repository -}}
+  {{- $_ := required "ollama.image.tag is required when ollama.enabled=true" .Values.ollama.image.tag -}}
+  {{- $_ := required "ollama.image.pullPolicy is required when ollama.enabled=true" .Values.ollama.image.pullPolicy -}}
+  {{- $storageMode := required "ollama.storage.mode is required when ollama.enabled=true" .Values.ollama.storage.mode -}}
+  {{- if and (ne $storageMode "baked") (ne $storageMode "emptyDir") (ne $storageMode "pvc") (ne $storageMode "hostPath") -}}
+    {{- fail (printf "invalid ollama.storage.mode=%q (allowed: baked, emptyDir, pvc, hostPath)" $storageMode) -}}
+  {{- end -}}
+  {{- if eq $storageMode "pvc" -}}
+    {{- if not .Values.ollama.persistence.enabled -}}
+      {{- fail "ollama.storage.mode=pvc requires ollama.persistence.enabled=true" -}}
+    {{- end -}}
+    {{- $_ := required "ollama.persistence.size is required when ollama.storage.mode=pvc" .Values.ollama.persistence.size -}}
+  {{- end -}}
+  {{- if eq $storageMode "hostPath" -}}
+    {{- $_ := required "ollama.storage.hostPath.path is required when ollama.storage.mode=hostPath" .Values.ollama.storage.hostPath.path -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if .Values.loki.enabled -}}
+  {{- $_ := required "loki.image.repository is required when loki.enabled=true" .Values.loki.image.repository -}}
+  {{- $_ := required "loki.image.tag is required when loki.enabled=true" .Values.loki.image.tag -}}
+  {{- $_ := required "loki.image.pullPolicy is required when loki.enabled=true" .Values.loki.image.pullPolicy -}}
+  {{- $storageMode := required "loki.storage.mode is required when loki.enabled=true" .Values.loki.storage.mode -}}
+  {{- if and (ne $storageMode "emptyDir") (ne $storageMode "pvc") (ne $storageMode "hostPath") -}}
+    {{- fail (printf "invalid loki.storage.mode=%q (allowed: emptyDir, pvc, hostPath)" $storageMode) -}}
+  {{- end -}}
+  {{- if eq $storageMode "pvc" -}}
+    {{- if not .Values.loki.persistence.enabled -}}
+      {{- fail "loki.storage.mode=pvc requires loki.persistence.enabled=true" -}}
+    {{- end -}}
+    {{- $_ := required "loki.persistence.size is required when loki.storage.mode=pvc" .Values.loki.persistence.size -}}
+  {{- end -}}
+  {{- if eq $storageMode "hostPath" -}}
+    {{- $_ := required "loki.storage.hostPath.path is required when loki.storage.mode=hostPath" .Values.loki.storage.hostPath.path -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if .Values.alloy.enabled -}}
+  {{- $_ := required "alloy.image.repository is required when alloy.enabled=true" .Values.alloy.image.repository -}}
+  {{- $_ := required "alloy.image.tag is required when alloy.enabled=true" .Values.alloy.image.tag -}}
+  {{- $_ := required "alloy.image.pullPolicy is required when alloy.enabled=true" .Values.alloy.image.pullPolicy -}}
+  {{- $_ := required "alloy.clusterName is required when alloy.enabled=true" .Values.alloy.clusterName -}}
+  {{- $pushURL := .Values.alloy.loki.pushUrl -}}
+  {{- if and (not .Values.loki.enabled) (eq (trim $pushURL) "") -}}
+    {{- fail "alloy.enabled=true requires loki.enabled=true or alloy.loki.pushUrl to be set" -}}
   {{- end -}}
 {{- end -}}
 {{- end -}}

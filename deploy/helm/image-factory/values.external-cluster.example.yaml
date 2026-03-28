@@ -1,6 +1,3 @@
-# Example: external-cluster deployment profile for OSS installs.
-# Use this as a starting point and replace placeholders before production use.
-
 ingress:
   enabled: true
 
@@ -14,10 +11,6 @@ database:
   sslMode: "require"
 
 postgres:
-  enabled: false
-
-# Keep external tenant lookup service disabled for manual onboarding flows.
-externalTenantService:
   enabled: false
 
 redis:
@@ -52,7 +45,6 @@ registry:
     enabled: true
     size: 50Gi
 
-# Optional SRE log path. Enable only when Loki/Alloy support is configured for your chart build.
 loki:
   enabled: true
   storage:
