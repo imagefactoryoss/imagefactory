@@ -389,6 +389,60 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - teach the draft/interpretation layer to compare recent logs with recent golden-signal windows explicitly.
 - Source: `docs/implementation/ROBOT_SRE_OPS_PERSONA_REQUIREMENTS_AND_DESIGN.md`
 
+### AIOps Assistant v1 PR Track
+
+1. `AIOPS-01` Deterministic Incident Triage Copilot
+- Status: `done`
+- Scope:
+  - `GET /api/v1/admin/sre/incidents/{id}/agent/triage`
+  - outputs probable cause, confidence, next 3 checks, and safe recommended action.
+  - preserves deterministic/approval-safe action authority.
+
+2. `AIOPS-02` Signal Correlation Severity Layer + UI cards
+- Status: `planned`
+- Scope:
+  - correlate `logs + http_signals + async_backlog + messaging_transport` into one severity score contract.
+  - add operator-facing "Why This Is Severe" cards in incident summary/AI workspace.
+- Validation:
+  - deterministic score tests for stable, mixed-cause, and transport-driven pressure cases.
+  - frontend card rendering tests for low/medium/high/critical severity explanations.
+
+3. `AIOPS-03` Small-LLM usefulness pack (bounded)
+- Status: `planned`
+- Scope:
+  - local-model outputs only for timeline summary, 15-minute change detection, and operator handoff note.
+  - cache by incident/evidence hash to reduce repeated inference and keep responses stable.
+- Validation:
+  - deterministic cache hit/miss tests.
+  - interpretation endpoints return grounded fallback when model unavailable.
+
+4. `AIOPS-04` Runbook grounding + citation contract
+- Status: `planned`
+- Scope:
+  - build retrieval index over approved runbooks/docs.
+  - require agent outputs to cite runbook sections and current incident evidence references.
+- Validation:
+  - responses without citations fail validation gate.
+  - retrieval contract tests enforce runbook-only source allowlist.
+
+5. `AIOPS-05` Approval-safe suggested action reasoning
+- Status: `planned`
+- Scope:
+  - AI suggestion envelope includes action, justification, and blast-radius category.
+  - execution continues to require existing deterministic approval gates.
+- Validation:
+  - policy tests prove suggestions never bypass approval workflow.
+  - UI clearly labels advisory suggestion vs executable action.
+
+6. `AIOPS-06` Evaluation harness (replay + safety)
+- Status: `planned`
+- Scope:
+  - replay suite with fixed incidents and expected triage/summary outcomes.
+  - evaluate correctness, hallucination guard, and policy compliance.
+- Validation:
+  - publish reproducible QA runner + artifact log under `docs/qa/artifacts`.
+  - fail build/PR checks when hallucination/policy assertions regress.
+
 0. Deployment guardrails: strict Helm configuration (no silent fallbacks) + Supabase pooler stability
 - Status: `done`
 - Priority: `P0`
