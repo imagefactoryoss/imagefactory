@@ -506,6 +506,18 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - `AgentIncidentSnapshotResponse` now includes `operator_handoff_note` and `policy_guardrails[]`.
   - AI snapshot cards now render explicit handoff guidance and advisory/approval guardrails.
 
+10. `AIOPS-10` Snapshot evidence health signals
+- Status: `done`
+- Scope:
+  - add deterministic evidence-health fields to snapshot (`expected`, `observed`, `coverage_percent`, `health_note`).
+  - surface evidence-health visibility in AI snapshot cards so operators can gauge confidence quickly.
+- Validation:
+  - backend tests cover coverage and note banding.
+  - full SRE regression + AIOPS eval harness remain green.
+- Completion note:
+  - `AgentIncidentSnapshotResponse` now includes evidence coverage and observed-signal metadata.
+  - AI snapshot cards now show evidence coverage percent + evidence health summary.
+
 0. Deployment guardrails: strict Helm configuration (no silent fallbacks) + Supabase pooler stability
 - Status: `done`
 - Priority: `P0`

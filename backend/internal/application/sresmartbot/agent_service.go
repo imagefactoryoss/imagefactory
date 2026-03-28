@@ -99,16 +99,20 @@ type AgentIncidentScorecardResponse struct {
 }
 
 type AgentIncidentSnapshotResponse struct {
-	IncidentID        uuid.UUID                       `json:"incident_id"`
-	Mode              string                          `json:"mode"`
-	Summary           string                          `json:"summary"`
-	Triage            *AgentTriageResponse            `json:"triage,omitempty"`
-	Severity          *AgentSeverityResponse          `json:"severity,omitempty"`
-	Scorecard         *AgentIncidentScorecardResponse `json:"scorecard,omitempty"`
-	SuggestedAction   *AgentSuggestedActionResponse   `json:"suggested_action,omitempty"`
-	OperatorHandoff   string                          `json:"operator_handoff_note"`
-	PolicyGuardrails  []string                        `json:"policy_guardrails,omitempty"`
-	HumanConfirmation bool                            `json:"human_confirmation_required"`
+	IncidentID              uuid.UUID                       `json:"incident_id"`
+	Mode                    string                          `json:"mode"`
+	Summary                 string                          `json:"summary"`
+	Triage                  *AgentTriageResponse            `json:"triage,omitempty"`
+	Severity                *AgentSeverityResponse          `json:"severity,omitempty"`
+	Scorecard               *AgentIncidentScorecardResponse `json:"scorecard,omitempty"`
+	SuggestedAction         *AgentSuggestedActionResponse   `json:"suggested_action,omitempty"`
+	OperatorHandoff         string                          `json:"operator_handoff_note"`
+	PolicyGuardrails        []string                        `json:"policy_guardrails,omitempty"`
+	EvidenceSignalsExpected []string                        `json:"evidence_signals_expected,omitempty"`
+	EvidenceSignalsObserved []string                        `json:"evidence_signals_observed,omitempty"`
+	EvidenceCoveragePercent int64                           `json:"evidence_coverage_percent"`
+	EvidenceHealthNote      string                          `json:"evidence_health_note"`
+	HumanConfirmation       bool                            `json:"human_confirmation_required"`
 }
 
 type AgentService struct {
@@ -493,6 +497,7 @@ func buildIncidentSnapshotFromDraft(draft *AgentDraftResponse) *AgentIncidentSna
 		return nil
 	}
 	operatorHandoff := buildSnapshotOperatorHandoff(triage, scorecard, suggested)
+	expectedSignals, observedSignals, evidenceCoveragePercent, evidenceHealthNote := buildSnapshotEvidenceHealth(draft)
 	policyGuardrails := []string{
 		"AI output is advisory-only and cannot execute actions directly.",
 		"Execution must go through deterministic action + approval workflow.",
@@ -502,16 +507,20 @@ func buildIncidentSnapshotFromDraft(draft *AgentDraftResponse) *AgentIncidentSna
 		policyGuardrails = append(policyGuardrails, "Human confirmation is required before operator-facing messages are sent.")
 	}
 	return &AgentIncidentSnapshotResponse{
-		IncidentID:        draft.IncidentID,
-		Mode:              "deterministic_incident_snapshot",
-		Summary:           severity.Summary,
-		Triage:            triage,
-		Severity:          severity,
-		Scorecard:         scorecard,
-		SuggestedAction:   suggested,
-		OperatorHandoff:   operatorHandoff,
-		PolicyGuardrails:  policyGuardrails,
-		HumanConfirmation: draft.HumanConfirmation,
+		IncidentID:              draft.IncidentID,
+		Mode:                    "deterministic_incident_snapshot",
+		Summary:                 severity.Summary,
+		Triage:                  triage,
+		Severity:                severity,
+		Scorecard:               scorecard,
+		SuggestedAction:         suggested,
+		OperatorHandoff:         operatorHandoff,
+		PolicyGuardrails:        policyGuardrails,
+		EvidenceSignalsExpected: expectedSignals,
+		EvidenceSignalsObserved: observedSignals,
+		EvidenceCoveragePercent: evidenceCoveragePercent,
+		EvidenceHealthNote:      evidenceHealthNote,
+		HumanConfirmation:       draft.HumanConfirmation,
 	}
 }
 
@@ -537,6 +546,46 @@ func buildSnapshotOperatorHandoff(
 		strings.TrimSpace(suggested.ActionKey),
 		strings.TrimSpace(suggested.BlastRadius),
 	)
+}
+
+func buildSnapshotEvidenceHealth(draft *AgentDraftResponse) ([]string, []string, int64, string) {
+	expected := []string{
+		"findings.list",
+		"evidence.list",
+		"http_signals.recent",
+		"async_backlog.recent",
+		"messaging_transport.recent",
+		"logs.recent",
+	}
+	if draft == nil {
+		return expected, nil, 0, "No deterministic draft evidence available yet."
+	}
+	seen := make(map[string]struct{}, len(draft.ToolRuns))
+	for _, run := range draft.ToolRuns {
+		name := strings.TrimSpace(run.ToolName)
+		if name == "" {
+			continue
+		}
+		seen[name] = struct{}{}
+	}
+	observed := make([]string, 0, len(expected))
+	for _, signal := range expected {
+		if _, ok := seen[signal]; ok {
+			observed = append(observed, signal)
+		}
+	}
+	coverage := int64(0)
+	if len(expected) > 0 {
+		coverage = int64((len(observed) * 100) / len(expected))
+	}
+	healthNote := "Evidence coverage is partial; use bounded checks before escalation."
+	switch {
+	case coverage >= 80:
+		healthNote = "Evidence coverage is strong for deterministic operator guidance."
+	case coverage >= 50:
+		healthNote = "Evidence coverage is moderate; confirm missing signals if risk increases."
+	}
+	return expected, observed, coverage, healthNote
 }
 
 func selectDraftTools(workspace *IncidentWorkspace, tools []MCPToolDescriptor) []MCPToolDescriptor {
