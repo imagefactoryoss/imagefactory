@@ -188,6 +188,12 @@ func TestBuildSeverityFromDraft_CorrelatesSignals(t *testing.T) {
 	if len(severity.Factors) == 0 {
 		t.Fatal("expected correlated severity factors")
 	}
+	if severity.Factors[0].WeightPercent <= 0 {
+		t.Fatalf("expected factor weight percent, got %d", severity.Factors[0].WeightPercent)
+	}
+	if strings.TrimSpace(severity.Factors[0].OperatorRationale) == "" {
+		t.Fatal("expected operator rationale for top factor")
+	}
 }
 
 func TestBuildSeverityFromDraft_UsesFallbackForSparseEvidence(t *testing.T) {
@@ -208,6 +214,52 @@ func TestBuildSeverityFromDraft_UsesFallbackForSparseEvidence(t *testing.T) {
 	}
 	if len(severity.Factors) != 0 {
 		t.Fatalf("expected no factors for sparse evidence, got %d", len(severity.Factors))
+	}
+}
+
+func TestBuildSeverityFromDraft_AddsDeterministicWeightsAndRationales(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.New(),
+		Summary:    "Multiple correlated degradations detected.",
+		Hypotheses: []AgentDraftHypothesis{
+			{Title: "Service health is degrading through one or more golden signals", Confidence: "high"},
+		},
+		ToolRuns: []MCPToolInvocationResult{
+			{
+				ToolName:   "logs.recent",
+				ServerName: "Observability",
+				Payload: map[string]any{
+					"match_count": int64(10),
+				},
+			},
+			{
+				ToolName:   "http_signals.recent",
+				ServerName: "Observability",
+				Payload: map[string]any{
+					"error_rate_percent": int64(8),
+					"average_latency_ms": int64(1400),
+				},
+			},
+		},
+	}
+
+	severity := buildSeverityFromDraft(draft)
+	if severity == nil {
+		t.Fatal("expected severity response")
+	}
+	if len(severity.Factors) < 2 {
+		t.Fatalf("expected at least two factors, got %d", len(severity.Factors))
+	}
+	for _, factor := range severity.Factors {
+		if factor.WeightPercent <= 0 {
+			t.Fatalf("expected positive weight percent for factor %q", factor.Key)
+		}
+		if factor.WeightPercent > 100 {
+			t.Fatalf("weight percent should not exceed 100 for factor %q", factor.Key)
+		}
+		if !strings.Contains(strings.ToLower(factor.OperatorRationale), strings.ToLower(factor.Label)) {
+			t.Fatalf("expected operator rationale to mention factor label for %q, got %q", factor.Key, factor.OperatorRationale)
+		}
 	}
 }
 

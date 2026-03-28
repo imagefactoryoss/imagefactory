@@ -518,6 +518,18 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - `AgentIncidentSnapshotResponse` now includes evidence coverage and observed-signal metadata.
   - AI snapshot cards now show evidence coverage percent + evidence health summary.
 
+11. `AIOPS-11` Deterministic “Why Severe” weighting + operator rationale
+- Status: `done`
+- Scope:
+  - extend severity/scorecard factors with deterministic weight percentage and explicit operator rationale text.
+  - surface weight + rationale in incident AI cards for both desktop and mobile layouts.
+- Validation:
+  - backend tests enforce positive bounded factor weights and non-empty operator rationale fields.
+  - full SRE regression + AIOPS eval harness remain green.
+- Completion note:
+  - `AgentSeverityFactor` now includes `weight_percent` and `operator_rationale` fields populated deterministically from contribution and incident severity level.
+  - incident severity and scorecard cards now render contribution, weight percentage, and operator rationale for each why-severe factor.
+
 0. Deployment guardrails: strict Helm configuration (no silent fallbacks) + Supabase pooler stability
 - Status: `done`
 - Priority: `P0`
