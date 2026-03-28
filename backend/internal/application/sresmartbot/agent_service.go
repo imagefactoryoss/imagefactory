@@ -175,13 +175,7 @@ func (s *AgentService) BuildDraft(ctx context.Context, tenantID *uuid.UUID, inci
 
 	hypotheses := buildDraftHypotheses(workspace, toolRuns)
 	plan := buildDraftPlan(workspace, hypotheses, toolRuns)
-	summary := ""
-	if len(workspace.ExecutiveSummary) > 0 {
-		summary = workspace.ExecutiveSummary[0]
-	}
-	if summary == "" && workspace.Incident != nil {
-		summary = workspace.Incident.DisplayName
-	}
+	summary := buildDraftSummary(workspace)
 
 	return &AgentDraftResponse{
 		IncidentID:        incidentID,
@@ -454,7 +448,13 @@ func buildSuggestedActionFromDraft(draft *AgentDraftResponse) *AgentSuggestedAct
 		actionSummary = "Inspect transport reconnect/disconnect pressure and confirm bus stability."
 		blastRadius = "low"
 		justification = "Transport instability is present; runbooks recommend validating bus stability before throughput or restart actions."
-		evidenceRefs = evidenceRefsForSignals([]string{"messaging_transport.recent", "async_backlog.recent"}, draft.ToolRuns)
+		evidenceRefs = evidenceRefsForSignals([]string{"messaging_transport.recent", "async_backlog.recent", "messaging_consumers.recent"}, draft.ToolRuns)
+	case containsSignal(signals, "messaging_consumers.recent"):
+		actionKey = "review_nats_consumer_lag"
+		actionSummary = "Investigate lagging consumer groups and stalled progress."
+		blastRadius = "medium"
+		justification = "Consumer lag appears to be the primary bottleneck; targeted investigation is safer than broad scaling changes."
+		evidenceRefs = evidenceRefsForSignals([]string{"messaging_consumers.recent", "async_backlog.recent", "messaging_transport.recent"}, draft.ToolRuns)
 	case containsSignal(signals, "async_backlog.recent"):
 		actionKey = "review_async_worker_capacity"
 		actionSummary = "Validate async queue pressure and worker throughput limits."
@@ -637,7 +637,7 @@ func selectDraftTools(workspace *IncidentWorkspace, tools []MCPToolDescriptor) [
 	if workspace == nil || len(tools) == 0 {
 		return nil
 	}
-	preferred := []string{"incidents.get", "findings.list", "evidence.list", "runtime_health.get", "http_signals.recent", "http_signals.history", "async_backlog.recent", "messaging_transport.recent", "cluster_overview.get", "release_drift.summary", "logs.recent"}
+	preferred := []string{"incidents.get", "findings.list", "evidence.list", "runtime_health.get", "http_signals.recent", "http_signals.history", "async_backlog.recent", "messaging_consumers.recent", "messaging_transport.recent", "cluster_overview.get", "release_drift.summary", "logs.recent"}
 	index := map[string]MCPToolDescriptor{}
 	for _, tool := range tools {
 		index[tool.ToolName] = tool
@@ -660,6 +660,7 @@ func buildDraftHypotheses(workspace *IncidentWorkspace, toolRuns []MCPToolInvoca
 	}
 	incident := workspace.Incident
 	hypotheses := make([]AgentDraftHypothesis, 0, 3)
+	hypotheses = append(hypotheses, buildAsyncPressureHypotheses(workspace)...)
 	switch incident.Domain {
 	case "infrastructure":
 		hypotheses = append(hypotheses,
@@ -685,6 +686,7 @@ func buildDraftHypotheses(workspace *IncidentWorkspace, toolRuns []MCPToolInvoca
 					"http_signals.recent",
 					"http_signals.history",
 					"async_backlog.recent",
+					"messaging_consumers.recent",
 					"messaging_transport.recent",
 					"findings.list",
 				},
@@ -782,6 +784,18 @@ func buildDraftHypotheses(workspace *IncidentWorkspace, toolRuns []MCPToolInvoca
 			},
 		})
 	}
+	if hasToolRun(toolRuns, "messaging_consumers.recent") {
+		hypotheses = append(hypotheses, AgentDraftHypothesis{
+			Title:      "One NATS consumer may be lagging or stalled enough to explain downstream pressure",
+			Confidence: "medium",
+			Rationale:  "Consumer lag and pending-ack pressure can distinguish message-flow bottlenecks from transport instability or general worker saturation.",
+			SignalsUsed: []string{
+				"messaging_consumers.recent",
+				"messaging_transport.recent",
+				"async_backlog.recent",
+			},
+		})
+	}
 	if hasToolRun(toolRuns, "messaging_transport.recent") {
 		hypotheses = append(hypotheses, AgentDraftHypothesis{
 			Title:      "Messaging transport instability may be contributing to backlog growth or delayed event delivery",
@@ -857,22 +871,236 @@ func buildDraftPlan(workspace *IncidentWorkspace, hypotheses []AgentDraftHypothe
 			EvidenceRefs: evidenceRefsForSignals([]string{"http_signals.history"}, toolRuns),
 		})
 	}
+	if asyncStep := buildAsyncPressurePlanStep(workspace, toolRuns); asyncStep != nil {
+		steps = append(steps, *asyncStep)
+	}
 	if hasToolRun(toolRuns, "async_backlog.recent") {
 		steps = append(steps, AgentDraftPlanStep{
 			Title:        "Check whether backlog pressure is contributing to the symptom",
 			Description:  "Compare build queue, email queue, and messaging outbox pressure with recent HTTP trends and logs to decide whether async congestion is amplifying the incident.",
-			EvidenceRefs: evidenceRefsForSignals([]string{"async_backlog.recent", "messaging_transport.recent", "http_signals.history", "logs.recent"}, toolRuns),
+			EvidenceRefs: evidenceRefsForSignals([]string{"async_backlog.recent", "messaging_consumers.recent", "messaging_transport.recent", "http_signals.history", "logs.recent"}, toolRuns),
 		})
 	}
 	steps = append(steps, AgentDraftPlanStep{
 		Title:        "Escalate only after bounded review",
 		Description:  "If the evidence still supports intervention, move to an approval-bound action rather than extending the read-only investigation loop.",
-		EvidenceRefs: evidenceRefsForSignals([]string{"runtime_health.get", "cluster_overview.get", "release_drift.summary", "async_backlog.recent"}, toolRuns),
+		EvidenceRefs: evidenceRefsForSignals([]string{"runtime_health.get", "cluster_overview.get", "release_drift.summary", "async_backlog.recent", "messaging_consumers.recent"}, toolRuns),
 	})
 	if len(steps) > 6 {
 		steps = steps[:6]
 	}
 	return steps
+}
+
+func buildDraftSummary(workspace *IncidentWorkspace) string {
+	if workspace == nil {
+		return ""
+	}
+	if summary := asyncPressureSummaryLine(workspace); summary != "" {
+		return summary
+	}
+	if len(workspace.ExecutiveSummary) > 0 {
+		return workspace.ExecutiveSummary[0]
+	}
+	if workspace.Incident != nil {
+		return workspace.Incident.DisplayName
+	}
+	return ""
+}
+
+func buildAsyncPressureHypotheses(workspace *IncidentWorkspace) []AgentDraftHypothesis {
+	if workspace == nil || workspace.AsyncPressureSummary == nil {
+		return nil
+	}
+	backlog := workspace.AsyncPressureSummary.Backlog
+	consumer := workspace.AsyncPressureSummary.MessagingConsumer
+	transport := workspace.AsyncPressureSummary.MessagingTransport
+	transportUnstable := messagingTransportUnstable(transport)
+	hypotheses := make([]AgentDraftHypothesis, 0, 3)
+
+	switch {
+	case consumerPressureAboveThreshold(consumer) && transportUnstable:
+		hypotheses = append(hypotheses, AgentDraftHypothesis{
+			Title:      "Consumer lag is rising alongside transport instability",
+			Confidence: "high",
+			Rationale: fmt.Sprintf("%s is %d above threshold (%d vs %d) with trend %s while messaging transport shows reconnects=%d and disconnects=%d. This points to a mixed-cause incident where consumer progress is falling behind during transport instability.",
+				consumer.DisplayName,
+				consumer.ThresholdDelta,
+				consumer.Count,
+				consumer.Threshold,
+				consumer.Trend,
+				transport.Reconnects,
+				transport.Disconnects,
+			),
+			SignalsUsed: []string{"messaging_consumers.recent", "messaging_transport.recent", "async_backlog.recent", "evidence.list"},
+		})
+	case consumerPressureAboveThreshold(consumer):
+		hypotheses = append(hypotheses, AgentDraftHypothesis{
+			Title:      "A specific NATS consumer is the primary bottleneck",
+			Confidence: "high",
+			Rationale: fmt.Sprintf("%s is %d above threshold (%d vs %d) with trend %s while messaging transport remains stable, which points to localized consumer pressure rather than a bus connectivity problem.",
+				consumer.DisplayName,
+				consumer.ThresholdDelta,
+				consumer.Count,
+				consumer.Threshold,
+				consumer.Trend,
+			),
+			SignalsUsed: []string{"messaging_consumers.recent", "evidence.list"},
+		})
+	case backlogAboveThreshold(backlog) && transportUnstable:
+		hypotheses = append(hypotheses, AgentDraftHypothesis{
+			Title:      "Messaging transport instability is likely driving async backlog growth",
+			Confidence: "high",
+			Rationale: fmt.Sprintf("%s is %d above threshold (%d vs %d) with trend %s, while messaging transport shows reconnects=%d and disconnects=%d against threshold=%d.",
+				backlog.DisplayName,
+				backlog.ThresholdDelta,
+				backlog.Count,
+				backlog.Threshold,
+				backlog.Trend,
+				transport.Reconnects,
+				transport.Disconnects,
+				transport.ReconnectThreshold,
+			),
+			SignalsUsed: []string{"async_backlog.recent", "messaging_transport.recent", "evidence.list"},
+		})
+	case backlogAboveThreshold(backlog):
+		hypotheses = append(hypotheses, AgentDraftHypothesis{
+			Title:      "Worker throughput pressure is the more likely cause of backlog growth",
+			Confidence: "high",
+			Rationale: fmt.Sprintf("%s is %d above threshold with trend %s, while messaging transport remains stable enough that the evidence points more toward downstream processing congestion in %s.",
+				backlog.DisplayName,
+				backlog.ThresholdDelta,
+				backlog.Trend,
+				backlog.Subsystem,
+			),
+			SignalsUsed: []string{"async_backlog.recent", "evidence.list"},
+		})
+	case transportUnstable:
+		hypotheses = append(hypotheses, AgentDraftHypothesis{
+			Title:      "Messaging transport instability appeared before severe backlog growth",
+			Confidence: "high",
+			Rationale: fmt.Sprintf("Messaging transport is %s with reconnects=%d and disconnects=%d, while async backlog has not yet crossed a severe threshold. This looks like an early transport issue that may create downstream queue pressure if it persists.",
+				transport.Status,
+				transport.Reconnects,
+				transport.Disconnects,
+			),
+			SignalsUsed: []string{"messaging_transport.recent", "async_backlog.recent", "evidence.list"},
+		})
+	}
+
+	if backlog != nil {
+		hypotheses = append(hypotheses, AgentDraftHypothesis{
+			Title:       "Pressure is currently isolated to one async worker domain",
+			Confidence:  "medium",
+			Rationale:   fmt.Sprintf("The strongest normalized backlog signal is %s in the %s subsystem, which points to localized pressure rather than broad system-wide queue saturation.", backlog.DisplayName, backlog.Subsystem),
+			SignalsUsed: []string{"async_backlog.recent", "evidence.list"},
+		})
+	}
+	if consumer != nil {
+		hypotheses = append(hypotheses, AgentDraftHypothesis{
+			Title:       "Consumer pressure is localized to one durable path",
+			Confidence:  "medium",
+			Rationale:   fmt.Sprintf("The strongest normalized consumer signal is %s for %s, which gives the team a bounded message-flow investigation target instead of treating the whole bus as unhealthy.", consumer.DisplayName, consumer.TargetRef),
+			SignalsUsed: []string{"messaging_consumers.recent", "evidence.list"},
+		})
+	}
+
+	return hypotheses
+}
+
+func buildAsyncPressurePlanStep(workspace *IncidentWorkspace, toolRuns []MCPToolInvocationResult) *AgentDraftPlanStep {
+	if workspace == nil || workspace.AsyncPressureSummary == nil {
+		return nil
+	}
+	backlog := workspace.AsyncPressureSummary.Backlog
+	consumer := workspace.AsyncPressureSummary.MessagingConsumer
+	transport := workspace.AsyncPressureSummary.MessagingTransport
+
+	switch {
+	case consumerPressureAboveThreshold(consumer) && messagingTransportUnstable(transport):
+		return &AgentDraftPlanStep{
+			Title:        "Validate mixed consumer and transport pressure with bounded review",
+			Description:  fmt.Sprintf("Confirm whether %s is growing because the consumer is genuinely falling behind during reconnect or disconnect pressure. Prefer recommendation-only review paths such as review_nats_consumer_lag and review_messaging_transport_health before any disruptive action.", consumer.DisplayName),
+			EvidenceRefs: evidenceRefsForSignals([]string{"messaging_consumers.recent", "messaging_transport.recent", "async_backlog.recent", "evidence.list"}, toolRuns),
+		}
+	case consumerPressureAboveThreshold(consumer):
+		return &AgentDraftPlanStep{
+			Title:        "Validate localized consumer pressure with bounded review",
+			Description:  fmt.Sprintf("Confirm that %s remains above threshold while transport stays stable. Prefer recommendation-only investigation such as review_nats_consumer_lag or review_nats_consumer_progress before escalating to broader throughput changes.", consumer.DisplayName),
+			EvidenceRefs: evidenceRefsForSignals([]string{"messaging_consumers.recent", "evidence.list"}, toolRuns),
+		}
+	case backlogAboveThreshold(backlog) && messagingTransportUnstable(transport):
+		return &AgentDraftPlanStep{
+			Title:        "Validate transport-driven backlog pressure with bounded review",
+			Description:  fmt.Sprintf("Use the normalized workspace summary to confirm whether %s is rising because of reconnect or disconnect pressure before taking any worker-capacity action. If the evidence still points to transport, prefer the recommendation-only path review_messaging_transport_health.", backlog.DisplayName),
+			EvidenceRefs: evidenceRefsForSignals([]string{"async_backlog.recent", "messaging_transport.recent", "evidence.list"}, toolRuns),
+		}
+	case backlogAboveThreshold(backlog):
+		return &AgentDraftPlanStep{
+			Title:        "Validate localized worker pressure with bounded review",
+			Description:  fmt.Sprintf("Confirm that %s is staying above threshold without current transport instability. Prefer recommendation-only investigation such as review_async_worker_capacity or review_dispatcher_backlog_pressure before escalating to disruptive changes.", backlog.DisplayName),
+			EvidenceRefs: evidenceRefsForSignals([]string{"async_backlog.recent", "evidence.list"}, toolRuns),
+		}
+	case messagingTransportUnstable(transport):
+		return &AgentDraftPlanStep{
+			Title:        "Confirm transport instability before backlog escalates",
+			Description:  "Review reconnect and disconnect pressure first so the team can contain the messaging issue early. Prefer the recommendation-only transport review path rather than speculative capacity changes.",
+			EvidenceRefs: evidenceRefsForSignals([]string{"messaging_transport.recent", "evidence.list"}, toolRuns),
+		}
+	default:
+		return nil
+	}
+}
+
+func asyncPressureSummaryLine(workspace *IncidentWorkspace) string {
+	if workspace == nil || workspace.AsyncPressureSummary == nil {
+		return ""
+	}
+	backlog := workspace.AsyncPressureSummary.Backlog
+	consumer := workspace.AsyncPressureSummary.MessagingConsumer
+	transport := workspace.AsyncPressureSummary.MessagingTransport
+
+	switch {
+	case consumerPressureAboveThreshold(consumer) && messagingTransportUnstable(transport):
+		return fmt.Sprintf("%s is %d above threshold (%d vs %d) while messaging transport is unstable with reconnects=%d and disconnects=%d, so the current evidence points to mixed consumer-lag and transport pressure rather than an isolated worker bottleneck.", consumer.DisplayName, consumer.ThresholdDelta, consumer.Count, consumer.Threshold, transport.Reconnects, transport.Disconnects)
+	case consumerPressureAboveThreshold(consumer):
+		return fmt.Sprintf("%s is %d above threshold (%d vs %d) while messaging transport remains stable, which points to localized consumer pressure in %s rather than broad bus instability.", consumer.DisplayName, consumer.ThresholdDelta, consumer.Count, consumer.Threshold, consumer.TargetRef)
+	case backlogAboveThreshold(backlog) && messagingTransportUnstable(transport):
+		return fmt.Sprintf("%s is %d above threshold (%d vs %d) while messaging transport is unstable with reconnects=%d and disconnects=%d, so the current evidence points to transport-related async pressure rather than isolated worker congestion.", backlog.DisplayName, backlog.ThresholdDelta, backlog.Count, backlog.Threshold, transport.Reconnects, transport.Disconnects)
+	case backlogAboveThreshold(backlog):
+		return fmt.Sprintf("%s is %d above threshold (%d vs %d) while messaging transport remains stable, which points to throughput pressure in the %s path rather than bus connectivity.", backlog.DisplayName, backlog.ThresholdDelta, backlog.Count, backlog.Threshold, backlog.Subsystem)
+	case messagingTransportUnstable(transport):
+		return fmt.Sprintf("Messaging transport is unstable with reconnects=%d and disconnects=%d before severe backlog buildup, which suggests an early transport issue that may create downstream async pressure if it persists.", transport.Reconnects, transport.Disconnects)
+	case backlog != nil:
+		return fmt.Sprintf("Backlog pressure is currently isolated to %s in the %s subsystem, which suggests a localized worker bottleneck rather than broad transport instability.", backlog.DisplayName, backlog.Subsystem)
+	default:
+		return ""
+	}
+}
+
+func backlogAboveThreshold(backlog *AsyncBacklogWorkspaceSummary) bool {
+	return backlog != nil && backlog.Count > backlog.Threshold
+}
+
+func consumerPressureAboveThreshold(consumer *MessagingConsumerWorkspaceSummary) bool {
+	return consumer != nil && consumer.Count > consumer.Threshold
+}
+
+func messagingTransportUnstable(transport *MessagingTransportWorkspaceSummary) bool {
+	if transport == nil {
+		return false
+	}
+	status := strings.ToLower(strings.TrimSpace(transport.Status))
+	if status == "degraded" || status == "disconnected" || status == "reconnecting" {
+		return true
+	}
+	if transport.Disconnects > 0 {
+		return true
+	}
+	if transport.ReconnectThreshold > 0 && transport.Reconnects >= transport.ReconnectThreshold {
+		return true
+	}
+	return false
 }
 
 func hasToolRun(runs []MCPToolInvocationResult, toolName string) bool {
@@ -947,6 +1175,13 @@ func summarizeToolRun(run MCPToolInvocationResult) string {
 			metricFromPayload(run.Payload, "reconnects"),
 			metricFromPayload(run.Payload, "disconnects"),
 			metricFromPayload(run.Payload, "reconnect_threshold"),
+		)
+	}
+	if run.ToolName == "messaging_consumers.recent" {
+		return fmt.Sprintf("Consumer lag snapshot shows %d visible consumers, %d lagging, and max pending=%d.",
+			metricFromPayload(run.Payload, "count"),
+			metricFromPayload(run.Payload, "lagging_count"),
+			metricFromPayload(run.Payload, "max_pending_count"),
 		)
 	}
 	if count, ok := run.Payload["count"].(int); ok {
@@ -1099,7 +1334,10 @@ func deriveTriageRecommendedAction(draft *AgentDraftResponse) string {
 		topSignals = draft.Hypotheses[0].SignalsUsed
 	}
 	if containsSignal(topSignals, "messaging_transport.recent") {
-		return "Prefer recommendation-only review_messaging_transport_health first, then re-check backlog pressure before scaling workers."
+		return "Prefer recommendation-only review_messaging_transport_health first, then re-check backlog and consumer pressure before scaling workers."
+	}
+	if containsSignal(topSignals, "messaging_consumers.recent") {
+		return "Prefer recommendation-only review_nats_consumer_lag to isolate the lagging consumer before broader throughput changes."
 	}
 	if containsSignal(topSignals, "async_backlog.recent") {
 		return "Prefer recommendation-only review_async_worker_capacity or review_dispatcher_backlog_pressure before any disruptive intervention."

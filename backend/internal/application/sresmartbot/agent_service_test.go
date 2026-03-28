@@ -7,6 +7,109 @@ import (
 	"github.com/google/uuid"
 )
 
+func TestBuildDraftSummary_ExplainsTransportDrivenBacklog(t *testing.T) {
+	workspace := &IncidentWorkspace{
+		Incident: (&incidentFixture{
+			Domain:       "golden_signals",
+			IncidentType: "messaging_outbox_backlog_pressure",
+			DisplayName:  "Messaging outbox backlog",
+		}).toDomain(),
+		AsyncPressureSummary: &AsyncPressureWorkspaceSummary{
+			Backlog: &AsyncBacklogWorkspaceSummary{
+				DisplayName:    "Messaging outbox backlog",
+				Subsystem:      "messaging",
+				Count:          18,
+				Threshold:      10,
+				ThresholdDelta: 8,
+				Trend:          "rising",
+			},
+			MessagingTransport: &MessagingTransportWorkspaceSummary{
+				Status:             "degraded",
+				Reconnects:         5,
+				Disconnects:        2,
+				ReconnectThreshold: 3,
+			},
+		},
+	}
+
+	summary := buildDraftSummary(workspace)
+	expected := "Messaging outbox backlog is 8 above threshold (18 vs 10) while messaging transport is unstable with reconnects=5 and disconnects=2, so the current evidence points to transport-related async pressure rather than isolated worker congestion."
+	if summary != expected {
+		t.Fatalf("expected %q, got %q", expected, summary)
+	}
+}
+
+func TestBuildDraftHypotheses_DistinguishesWorkerPressureWithoutTransportInstability(t *testing.T) {
+	workspace := &IncidentWorkspace{
+		Incident: (&incidentFixture{
+			Domain:       "golden_signals",
+			IncidentType: "dispatcher_backlog_pressure",
+			DisplayName:  "Dispatcher backlog",
+		}).toDomain(),
+		AsyncPressureSummary: &AsyncPressureWorkspaceSummary{
+			Backlog: &AsyncBacklogWorkspaceSummary{
+				DisplayName:    "Dispatcher backlog",
+				Subsystem:      "dispatcher",
+				Count:          14,
+				Threshold:      8,
+				ThresholdDelta: 6,
+				Trend:          "rising",
+			},
+			MessagingTransport: &MessagingTransportWorkspaceSummary{
+				Status:             "stable",
+				Reconnects:         0,
+				Disconnects:        0,
+				ReconnectThreshold: 3,
+			},
+		},
+	}
+
+	hypotheses := buildDraftHypotheses(workspace, nil)
+	if len(hypotheses) == 0 {
+		t.Fatal("expected hypotheses to be generated")
+	}
+	if hypotheses[0].Title != "Worker throughput pressure is the more likely cause of backlog growth" {
+		t.Fatalf("expected worker-pressure hypothesis first, got %q", hypotheses[0].Title)
+	}
+	if hypotheses[0].Confidence != "high" {
+		t.Fatalf("expected high confidence, got %q", hypotheses[0].Confidence)
+	}
+}
+
+func TestBuildDraftPlan_UsesBoundedAsyncReviewLanguage(t *testing.T) {
+	workspace := &IncidentWorkspace{
+		Incident: (&incidentFixture{
+			Domain:       "golden_signals",
+			IncidentType: "dispatcher_backlog_pressure",
+			DisplayName:  "Dispatcher backlog",
+		}).toDomain(),
+		AsyncPressureSummary: &AsyncPressureWorkspaceSummary{
+			Backlog: &AsyncBacklogWorkspaceSummary{
+				DisplayName:    "Dispatcher backlog",
+				Subsystem:      "dispatcher",
+				Count:          14,
+				Threshold:      8,
+				ThresholdDelta: 6,
+				Trend:          "rising",
+			},
+		},
+	}
+
+	plan := buildDraftPlan(workspace, nil, nil)
+	found := false
+	for _, step := range plan {
+		if step.Title == "Validate localized worker pressure with bounded review" {
+			found = true
+			if step.Description == "" || !containsAll(step.Description, "review_async_worker_capacity", "review_dispatcher_backlog_pressure") {
+				t.Fatalf("expected bounded review wording in step description, got %q", step.Description)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected async bounded review step in plan")
+	}
+}
+
 func TestBuildDraftHypotheses_IncludesAsyncBacklogAndMessagingTransport(t *testing.T) {
 	workspace := &IncidentWorkspace{
 		Incident: (&incidentFixture{
@@ -71,27 +174,110 @@ func TestSummarizeToolRun_MessagingTransport(t *testing.T) {
 	}
 }
 
+func TestBuildDraftSummary_ExplainsConsumerLagWithoutTransportInstability(t *testing.T) {
+	workspace := &IncidentWorkspace{
+		Incident: (&incidentFixture{
+			Domain:       "golden_signals",
+			IncidentType: "nats_consumer_lag_pressure",
+			DisplayName:  "NATS consumer lag pressure",
+		}).toDomain(),
+		AsyncPressureSummary: &AsyncPressureWorkspaceSummary{
+			MessagingConsumer: &MessagingConsumerWorkspaceSummary{
+				DisplayName:    "NATS consumer lag pressure for build-events/dispatcher",
+				TargetRef:      "build-events/dispatcher",
+				Count:          42,
+				Threshold:      25,
+				ThresholdDelta: 17,
+				Trend:          "growing",
+			},
+			MessagingTransport: &MessagingTransportWorkspaceSummary{
+				Status:             "stable",
+				Reconnects:         0,
+				Disconnects:        0,
+				ReconnectThreshold: 3,
+			},
+		},
+	}
+
+	summary := buildDraftSummary(workspace)
+	expected := "NATS consumer lag pressure for build-events/dispatcher is 17 above threshold (42 vs 25) while messaging transport remains stable, which points to localized consumer pressure in build-events/dispatcher rather than broad bus instability."
+	if summary != expected {
+		t.Fatalf("expected %q, got %q", expected, summary)
+	}
+}
+
+func TestBuildDraftHypotheses_DistinguishesConsumerPressureFromTransport(t *testing.T) {
+	workspace := &IncidentWorkspace{
+		Incident: (&incidentFixture{
+			Domain:       "golden_signals",
+			IncidentType: "nats_consumer_lag_pressure",
+			DisplayName:  "NATS consumer lag pressure",
+		}).toDomain(),
+		AsyncPressureSummary: &AsyncPressureWorkspaceSummary{
+			MessagingConsumer: &MessagingConsumerWorkspaceSummary{
+				DisplayName:    "NATS consumer lag pressure for build-events/dispatcher",
+				TargetRef:      "build-events/dispatcher",
+				Count:          42,
+				Threshold:      25,
+				ThresholdDelta: 17,
+				Trend:          "growing",
+			},
+			MessagingTransport: &MessagingTransportWorkspaceSummary{
+				Status:             "stable",
+				Reconnects:         0,
+				Disconnects:        0,
+				ReconnectThreshold: 3,
+			},
+		},
+	}
+
+	hypotheses := buildDraftHypotheses(workspace, nil)
+	if len(hypotheses) == 0 {
+		t.Fatal("expected hypotheses to be generated")
+	}
+	if hypotheses[0].Title != "A specific NATS consumer is the primary bottleneck" {
+		t.Fatalf("expected consumer-pressure hypothesis first, got %q", hypotheses[0].Title)
+	}
+}
+
+func TestSummarizeToolRun_MessagingConsumers(t *testing.T) {
+	summary := summarizeToolRun(MCPToolInvocationResult{
+		ToolName:   "messaging_consumers.recent",
+		ServerName: "Observability",
+		Payload: map[string]any{
+			"count":             int64(6),
+			"lagging_count":     int64(2),
+			"max_pending_count": int64(42),
+		},
+	})
+
+	expected := "Consumer lag snapshot shows 6 visible consumers, 2 lagging, and max pending=42."
+	if summary != expected {
+		t.Fatalf("expected %q, got %q", expected, summary)
+	}
+}
+
 func TestBuildTriageFromDraft_UsesTopHypothesis(t *testing.T) {
-	incidentID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	incidentID := newUUID()
 	draft := &AgentDraftResponse{
 		IncidentID: incidentID,
 		Summary:    "Dispatcher backlog is growing with mixed pressure.",
 		Hypotheses: []AgentDraftHypothesis{
 			{
-				Title:      "Service health is degrading through one or more golden signals",
+				Title:      "A specific NATS consumer is the primary bottleneck",
 				Confidence: "high",
 				SignalsUsed: []string{
-					"messaging_transport.recent",
+					"messaging_consumers.recent",
 					"evidence.list",
 				},
 				EvidenceRefs: []AgentDraftEvidenceRef{
-					{ToolName: "messaging_transport.recent", ServerName: "Observability", Summary: "Messaging transport shows reconnects=4, disconnects=2, threshold=3."},
+					{ToolName: "messaging_consumers.recent", ServerName: "Observability", Summary: "Consumer lag snapshot shows 6 visible consumers, 2 lagging, and max pending=42."},
 				},
 			},
 		},
 		InvestigationPlan: []AgentDraftPlanStep{
-			{Title: "Check transport status", Description: "Confirm reconnect and disconnect pressure is still active."},
-			{Title: "Check backlog trend", Description: "Compare latest backlog depth against threshold."},
+			{Title: "Validate localized consumer pressure with bounded review", Description: "Confirm lag remains above threshold while transport stays stable."},
+			{Title: "Cross-check evidence", Description: "Compare findings.list and evidence.list output for drift."},
 		},
 		HumanConfirmation: true,
 	}
@@ -100,11 +286,14 @@ func TestBuildTriageFromDraft_UsesTopHypothesis(t *testing.T) {
 	if triage == nil {
 		t.Fatal("expected triage response")
 	}
-	if triage.ProbableCause != "Service health is degrading through one or more golden signals" {
+	if triage.ProbableCause != "A specific NATS consumer is the primary bottleneck" {
 		t.Fatalf("unexpected probable cause: %q", triage.ProbableCause)
 	}
 	if triage.Confidence != "high" {
 		t.Fatalf("expected high confidence, got %q", triage.Confidence)
+	}
+	if triage.Mode != "deterministic_triage" {
+		t.Fatalf("expected deterministic_triage mode, got %q", triage.Mode)
 	}
 	if len(triage.NextChecks) != 3 {
 		t.Fatalf("expected 3 next checks, got %d", len(triage.NextChecks))
@@ -115,13 +304,13 @@ func TestBuildTriageFromDraft_UsesTopHypothesis(t *testing.T) {
 	if strings.TrimSpace(triage.NextCheckRefs[0].RunbookSource) == "" || strings.TrimSpace(triage.NextCheckRefs[0].RunbookSection) == "" {
 		t.Fatal("expected runbook mapping for first triage check")
 	}
-	if !strings.Contains(triage.RecommendedAction, "review_messaging_transport_health") {
-		t.Fatalf("expected transport recommendation, got %q", triage.RecommendedAction)
+	if !containsAll(triage.RecommendedAction, "review_nats_consumer_lag") {
+		t.Fatalf("expected consumer-lag recommendation, got %q", triage.RecommendedAction)
 	}
 }
 
 func TestBuildTriageFromDraft_FallsBackWhenHypothesesMissing(t *testing.T) {
-	incidentID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	incidentID := newUUID()
 	draft := &AgentDraftResponse{
 		IncidentID: incidentID,
 		Summary:    "Evidence remains inconclusive.",
@@ -142,7 +331,10 @@ func TestBuildTriageFromDraft_FallsBackWhenHypothesesMissing(t *testing.T) {
 		t.Fatalf("expected medium confidence fallback, got %q", triage.Confidence)
 	}
 	if len(triage.EvidenceRefs) == 0 {
-		t.Fatal("expected fallback evidence refs")
+		t.Fatal("expected fallback evidence refs from findings/evidence tools")
+	}
+	if len(triage.NextChecks) != 3 {
+		t.Fatalf("expected padded next checks, got %d", len(triage.NextChecks))
 	}
 	if len(triage.NextCheckRefs) != len(triage.NextChecks) {
 		t.Fatalf("expected padded triage checks to include mapping refs, got %d refs for %d checks", len(triage.NextCheckRefs), len(triage.NextChecks))
@@ -172,7 +364,7 @@ func TestBuildTriageCheckRefs_MapsRunbookAndEvidence(t *testing.T) {
 	if len(refs) != len(checks) {
 		t.Fatalf("expected %d refs, got %d", len(checks), len(refs))
 	}
-	if !strings.Contains(refs[0].RunbookSource, "SRE_SMART_BOT_ASYNC_BACKLOG_TRANSPORT_PRESSURE_EPIC.md") {
+	if !containsAll(refs[0].RunbookSource, "SRE_SMART_BOT_ASYNC_BACKLOG_TRANSPORT_PRESSURE_EPIC.md") {
 		t.Fatalf("expected transport runbook mapping, got %q", refs[0].RunbookSource)
 	}
 	if strings.TrimSpace(refs[0].EvidenceNote) == "" {
@@ -185,7 +377,7 @@ func TestBuildTriageCheckRefs_MapsRunbookAndEvidence(t *testing.T) {
 
 func TestBuildSeverityFromDraft_CorrelatesSignals(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		IncidentID: newUUID(),
 		Summary:    "Degradation detected across transport and HTTP windows.",
 		Hypotheses: []AgentDraftHypothesis{
 			{Title: "Service health is degrading through one or more golden signals", Confidence: "high"},
@@ -241,7 +433,7 @@ func TestBuildSeverityFromDraft_CorrelatesSignals(t *testing.T) {
 
 func TestBuildSeverityFromDraft_UsesFallbackForSparseEvidence(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+		IncidentID: newUUID(),
 		Summary:    "Initial signal observed.",
 	}
 
@@ -262,7 +454,7 @@ func TestBuildSeverityFromDraft_UsesFallbackForSparseEvidence(t *testing.T) {
 
 func TestBuildSeverityFromDraft_AddsDeterministicWeightsAndRationales(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.New(),
+		IncidentID: newUUID(),
 		Summary:    "Multiple correlated degradations detected.",
 		Hypotheses: []AgentDraftHypothesis{
 			{Title: "Service health is degrading through one or more golden signals", Confidence: "high"},
@@ -308,7 +500,7 @@ func TestBuildSeverityFromDraft_AddsDeterministicWeightsAndRationales(t *testing
 
 func TestBuildSuggestedActionFromDraft_IsAdvisoryAndApprovalBound(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.MustParse("55555555-5555-5555-5555-555555555555"),
+		IncidentID: newUUID(),
 		Summary:    "Messaging transport and backlog pressure are rising.",
 		Hypotheses: []AgentDraftHypothesis{
 			{
@@ -342,15 +534,14 @@ func TestBuildSuggestedActionFromDraft_IsAdvisoryAndApprovalBound(t *testing.T) 
 	if !suggestion.ExecutionRequiresApproval {
 		t.Fatal("expected approval-required execution guard")
 	}
-	guard := strings.ToLower(suggestion.ExecutionGuardrail)
-	if !strings.Contains(guard, "advisory-only") || !strings.Contains(guard, "approval") {
+	if !containsAll(strings.ToLower(suggestion.ExecutionGuardrail), "advisory-only", "approval") {
 		t.Fatalf("expected guardrail text to enforce approval, got %q", suggestion.ExecutionGuardrail)
 	}
 }
 
 func TestBuildSuggestedActionFromDraft_CategorizesBlastRadius(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.MustParse("66666666-6666-6666-6666-666666666666"),
+		IncidentID: newUUID(),
 		Summary:    "Release drift detected with cross-service impact.",
 		Hypotheses: []AgentDraftHypothesis{
 			{
@@ -380,7 +571,7 @@ func TestBuildSuggestedActionFromDraft_CategorizesBlastRadius(t *testing.T) {
 
 func TestBuildIncidentScorecardFromDraft_ProjectsSeverityAndTriage(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.MustParse("77777777-7777-7777-7777-777777777777"),
+		IncidentID: newUUID(),
 		Summary:    "Transport instability and backlog pressure are worsening.",
 		Hypotheses: []AgentDraftHypothesis{
 			{
@@ -428,7 +619,7 @@ func TestBuildIncidentScorecardFromDraft_ProjectsSeverityAndTriage(t *testing.T)
 
 func TestBuildIncidentScorecardFromDraft_TrimsWhySevereCards(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.MustParse("88888888-8888-8888-8888-888888888888"),
+		IncidentID: newUUID(),
 		Summary:    "Correlated degradation across logs/http/backlog/transport.",
 		Hypotheses: []AgentDraftHypothesis{
 			{
@@ -455,7 +646,7 @@ func TestBuildIncidentScorecardFromDraft_TrimsWhySevereCards(t *testing.T) {
 
 func TestBuildIncidentSnapshotFromDraft_ComposesDeterministicViews(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.MustParse("99999999-9999-9999-9999-999999999999"),
+		IncidentID: newUUID(),
 		Summary:    "Transport and backlog pressure are correlated.",
 		Hypotheses: []AgentDraftHypothesis{
 			{
@@ -509,7 +700,7 @@ func TestBuildIncidentSnapshotFromDraft_ComposesDeterministicViews(t *testing.T)
 
 func TestBuildIncidentSnapshotFromDraft_RemainsApprovalBound(t *testing.T) {
 	draft := &AgentDraftResponse{
-		IncidentID: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		IncidentID: newUUID(),
 		Summary:    "Release drift detected.",
 		Hypotheses: []AgentDraftHypothesis{
 			{
@@ -532,11 +723,11 @@ func TestBuildIncidentSnapshotFromDraft_RemainsApprovalBound(t *testing.T) {
 	if !snapshot.Scorecard.ExecutionRequiresApproval || !snapshot.SuggestedAction.ExecutionRequiresApproval {
 		t.Fatal("expected incident snapshot actions to remain approval-bound")
 	}
-	if !strings.Contains(strings.ToLower(snapshot.OperatorHandoff), "approval-bound") {
+	if !containsAll(strings.ToLower(snapshot.OperatorHandoff), "approval-bound") {
 		t.Fatalf("expected operator handoff to preserve approval-bound language, got %q", snapshot.OperatorHandoff)
 	}
 	guardrails := strings.ToLower(strings.Join(snapshot.PolicyGuardrails, " "))
-	if !strings.Contains(guardrails, "advisory") || !strings.Contains(guardrails, "approval") {
+	if !containsAll(guardrails, "advisory", "approval") {
 		t.Fatalf("expected guardrails to include advisory+approval language, got %q", strings.Join(snapshot.PolicyGuardrails, " | "))
 	}
 }
@@ -559,7 +750,20 @@ func TestBuildSnapshotEvidenceHealth_CoverageBands(t *testing.T) {
 	if coverage != 100 {
 		t.Fatalf("expected full evidence coverage, got %d", coverage)
 	}
-	if !strings.Contains(strings.ToLower(note), "strong") {
+	if !containsAll(strings.ToLower(note), "strong") {
 		t.Fatalf("expected strong coverage note, got %q", note)
 	}
+}
+
+func containsAll(value string, parts ...string) bool {
+	for _, part := range parts {
+		if !strings.Contains(value, part) {
+			return false
+		}
+	}
+	return true
+}
+
+func newUUID() uuid.UUID {
+	return uuid.MustParse("11111111-1111-1111-1111-111111111111")
 }
