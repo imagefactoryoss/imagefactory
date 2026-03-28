@@ -219,6 +219,8 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - incident drawer now includes an executive summary section.
   - operators can now queue `email_incident_summary` directly from an incident, using the existing email queue and admin recipient lookup.
   - `review_provider_connectivity` is now executable and triggers an on-demand provider readiness refresh.
+  - focused SRE regression workflow now exists via `make qa-sre-smartbot-regression` (`scripts/qa/sre_smartbot_regression_validate.sh`) to capture backend + frontend evidence in one timestamped artifact.
+  - known frontend `act(...)` warning noise remains tracked as test-harness hardening follow-up; regression runner keeps pass/fail drift visible while warning cleanup continues.
 - Next step:
   - shift the next slice toward observability and intelligence plumbing: Loki ingestion, structured detectors, MCP integration, and agent-facing tool contracts.
   - continue improving evidence/action summaries so the operator story is readable without opening raw payloads.
