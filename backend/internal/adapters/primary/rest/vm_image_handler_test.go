@@ -81,6 +81,29 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		}
 	})
 
+	t.Run("metadata_only mode does not invoke provider-native client", func(t *testing.T) {
+		exec := vmDispatchLifecycleExecutor{
+			mode: vmLifecycleExecutionModeMetadataOnly,
+			awsClientFactory: func(ctx context.Context, region string) (vmAWSLifecycleClient, error) {
+				t.Fatal("aws client factory should not be called in metadata_only mode")
+				return nil, nil
+			},
+		}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "deleted",
+			ProviderArtifactIdentifiers: map[string][]string{
+				"aws": {"us-west-2:ami-0123456789abcdef0"},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "metadata_only" {
+			t.Fatalf("expected metadata_only transition mode, got %q", result.TransitionMode)
+		}
+	})
+
 	t.Run("require_provider_native fails closed for unsupported provider", func(t *testing.T) {
 		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
 		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
@@ -136,6 +159,17 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		}
 	})
 
+	t.Run("require_provider_native fails closed for unsupported state", func(t *testing.T) {
+		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModeRequireProviderNative}
+		_, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "archived",
+		})
+		if !errors.Is(err, errUnsupportedProviderLifecycleTransition) {
+			t.Fatalf("expected unsupported provider transition error, got %v", err)
+		}
+	})
+
 	t.Run("prefer_provider_native executes aws delete", func(t *testing.T) {
 		fake := &fakeVMAWSLifecycleClient{}
 		exec := vmDispatchLifecycleExecutor{
@@ -168,6 +202,20 @@ func TestVMDispatchLifecycleExecutor(t *testing.T) {
 		}
 		if fake.lastDisableDeprecateImageID != "" {
 			t.Fatalf("expected no disable-deprecate call for delete flow, got %q", fake.lastDisableDeprecateImageID)
+		}
+	})
+
+	t.Run("prefer_provider_native falls back to metadata_only for unsupported state", func(t *testing.T) {
+		exec := vmDispatchLifecycleExecutor{mode: vmLifecycleExecutionModePreferProviderNative}
+		result, err := exec.ExecuteTransition(context.Background(), vmLifecycleTransitionRequest{
+			TargetProvider: "aws",
+			TargetState:    "archived",
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if result.TransitionMode != "metadata_only" {
+			t.Fatalf("expected metadata_only fallback transition mode, got %q", result.TransitionMode)
 		}
 	})
 
