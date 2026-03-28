@@ -411,13 +411,17 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - AI workspace/operator control center now render correlated severity score + factor cards.
 
 3. `AIOPS-03` Small-LLM usefulness pack (bounded)
-- Status: `planned`
+- Status: `done`
 - Scope:
   - local-model outputs only for timeline summary, 15-minute change detection, and operator handoff note.
   - cache by incident/evidence hash to reduce repeated inference and keep responses stable.
 - Validation:
   - deterministic cache hit/miss tests.
   - interpretation endpoints return grounded fallback when model unavailable.
+- Completion note:
+  - `GET /api/v1/admin/sre/incidents/{id}/agent/interpretation` now returns bounded small-LLM fields: `timeline_summary`, `change_detection_15m`, and `operator_handoff_note`.
+  - added in-memory cache keyed by `incident_id + evidence_hash + runtime provider/model` to stabilize repeated interpretation calls.
+  - interpretation now returns deterministic grounded fallback summaries when local model runtime is unavailable instead of failing request flow.
 
 4. `AIOPS-04` Runbook grounding + citation contract
 - Status: `planned`

@@ -965,6 +965,13 @@ export interface SREAgentInterpretationResponse {
     provider: string
     model: string
     generated: boolean
+    cache_hit?: boolean
+    evidence_hash?: string
+    summary_mode?: string
+    timeline_summary?: string
+    change_detection_15m?: string
+    operator_handoff_note?: string
+    fallback_reason?: string
     operator_summary?: string
     likely_root_cause?: string
     watchouts?: string[]
