@@ -1,6 +1,6 @@
 import Drawer from '@/components/ui/Drawer'
 import { adminService } from '@/services/adminService'
-import type { SREActionAttempt, SREAgentDraftResponse, SREAgentIncidentScorecardResponse, SREAgentInterpretationResponse, SREAgentSeverityResponse, SREAgentSuggestedActionResponse, SREAgentTriageResponse, SREApproval, SREDemoScenario, SREEvidence, SREFinding, SREIncident, SREIncidentWorkspaceResponse, SREMCPToolDescriptor, SREMCPToolInvocationResponse, SRERemediationPack, SRERemediationPackRun, SRESmartBotChannelProvider, SRESmartBotPolicyConfig } from '@/types'
+import type { SREActionAttempt, SREAgentDraftResponse, SREAgentIncidentScorecardResponse, SREAgentIncidentSnapshotResponse, SREAgentInterpretationResponse, SREAgentSeverityResponse, SREAgentSuggestedActionResponse, SREAgentTriageResponse, SREApproval, SREDemoScenario, SREEvidence, SREFinding, SREIncident, SREIncidentWorkspaceResponse, SREMCPToolDescriptor, SREMCPToolInvocationResponse, SRERemediationPack, SRERemediationPackRun, SRESmartBotChannelProvider, SRESmartBotPolicyConfig } from '@/types'
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -79,7 +79,9 @@ const SRESmartBotIncidentsPage: React.FC = () => {
     const [agentTriage, setAgentTriage] = useState<SREAgentTriageResponse | null>(null)
     const [agentSeverity, setAgentSeverity] = useState<SREAgentSeverityResponse | null>(null)
     const [agentScorecard, setAgentScorecard] = useState<SREAgentIncidentScorecardResponse | null>(null)
+    const [agentSnapshot, setAgentSnapshot] = useState<SREAgentIncidentSnapshotResponse | null>(null)
     const [agentSuggestedAction, setAgentSuggestedAction] = useState<SREAgentSuggestedActionResponse | null>(null)
+    const [generatingAgentSnapshot, setGeneratingAgentSnapshot] = useState(false)
     const [generatingAgentScorecard, setGeneratingAgentScorecard] = useState(false)
     const [generatingAgentSeverity, setGeneratingAgentSeverity] = useState(false)
     const [generatingAgentSuggestedAction, setGeneratingAgentSuggestedAction] = useState(false)
@@ -214,6 +216,7 @@ const SRESmartBotIncidentsPage: React.FC = () => {
         setAgentTriage(null)
         setAgentSeverity(null)
         setAgentScorecard(null)
+        setAgentSnapshot(null)
         setAgentSuggestedAction(null)
         setAgentInterpretation(null)
         setApprovalComments({})
@@ -269,6 +272,7 @@ const SRESmartBotIncidentsPage: React.FC = () => {
         setAgentTriage(null)
         setAgentSeverity(null)
         setAgentScorecard(null)
+        setAgentSnapshot(null)
         setAgentSuggestedAction(null)
         setAgentInterpretation(null)
         setApprovalComments({})
@@ -461,6 +465,24 @@ const SRESmartBotIncidentsPage: React.FC = () => {
             toast.error(err instanceof Error ? err.message : 'Failed to generate incident scorecard')
         } finally {
             setGeneratingAgentScorecard(false)
+        }
+    }
+
+    const handleGenerateAgentSnapshot = async () => {
+        if (!selectedIncident) return
+        try {
+            setGeneratingAgentSnapshot(true)
+            const response = await adminService.getSREIncidentAgentSnapshot(selectedIncident.id)
+            setAgentSnapshot(response)
+            if (response.triage) setAgentTriage(response.triage)
+            if (response.severity) setAgentSeverity(response.severity)
+            if (response.scorecard) setAgentScorecard(response.scorecard)
+            if (response.suggested_action) setAgentSuggestedAction(response.suggested_action)
+            toast.success('AI snapshot generated')
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to generate AI snapshot')
+        } finally {
+            setGeneratingAgentSnapshot(false)
         }
     }
 
@@ -1446,6 +1468,14 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                         <div className="mt-4 flex flex-wrap gap-2">
                                             <button
                                                 type="button"
+                                                onClick={() => void handleGenerateAgentSnapshot()}
+                                                disabled={generatingAgentSnapshot}
+                                                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
+                                            >
+                                                {generatingAgentSnapshot ? 'Generating...' : 'Generate AI Snapshot'}
+                                            </button>
+                                            <button
+                                                type="button"
                                                 onClick={() => void handleGenerateAgentSeverity()}
                                                 disabled={generatingAgentSeverity}
                                                 className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/50"
@@ -1514,11 +1544,22 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                             </Link>
                                         </div>
 
-                                        {agentDraft || agentInterpretation || agentSuggestedAction || agentScorecard ? (
+                                        {agentDraft || agentInterpretation || agentSuggestedAction || agentScorecard || agentSnapshot ? (
                                             <div className="mt-4 grid gap-4 xl:grid-cols-2">
                                                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
                                                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Bot Guidance</div>
                                                     <div className="mt-3 space-y-3">
+                                                        {agentSnapshot ? (
+                                                            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+                                                                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">AI Snapshot</div>
+                                                                <div className="mt-2">{agentSnapshot.summary}</div>
+                                                                <div className="mt-2 rounded-md border border-emerald-200 bg-white/80 px-2.5 py-2 text-xs dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                                                                    <div><span className="font-semibold">Probable cause:</span> {agentSnapshot.triage?.probable_cause || 'n/a'}</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Severity:</span> {agentSnapshot.severity?.score ?? 'n/a'} ({agentSnapshot.severity?.level || 'n/a'})</div>
+                                                                    <div className="mt-1"><span className="font-semibold">Action:</span> {agentSnapshot.suggested_action?.action_key || 'n/a'}</div>
+                                                                </div>
+                                                            </div>
+                                                        ) : null}
                                                         {agentScorecard ? (
                                                             <div className={`rounded-lg border px-3 py-3 text-sm ${agentSeverityTone(agentScorecard.severity_level)}`}>
                                                                 <div className="text-xs font-semibold uppercase tracking-[0.16em]">Incident Scorecard</div>
@@ -2003,6 +2044,14 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                             <div className="flex flex-wrap gap-2">
                                                                 <button
                                                                     type="button"
+                                                                    onClick={() => void handleGenerateAgentSnapshot()}
+                                                                    disabled={generatingAgentSnapshot}
+                                                                    className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
+                                                                >
+                                                                    {generatingAgentSnapshot ? 'Generating...' : 'Generate AI Snapshot'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
                                                                     onClick={() => void handleGenerateAgentSeverity()}
                                                                     disabled={generatingAgentSeverity}
                                                                     className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/50"
@@ -2052,6 +2101,19 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                             </div>
                                                         </div>
                                                         <div className="mt-4 space-y-4">
+                                                            {agentSnapshot ? (
+                                                                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                                                                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">AI Snapshot</div>
+                                                                    <div className="mt-2 text-sm text-emerald-900 dark:text-emerald-100">{agentSnapshot.summary}</div>
+                                                                    <div className="mt-3 rounded-lg border border-emerald-200 bg-white/80 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+                                                                        <div><span className="font-semibold">Probable cause:</span> {agentSnapshot.triage?.probable_cause || 'n/a'}</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Severity:</span> {agentSnapshot.severity?.score ?? 'n/a'} ({agentSnapshot.severity?.level || 'n/a'})</div>
+                                                                        <div className="mt-1"><span className="font-semibold">Action:</span> {agentSnapshot.suggested_action?.action_key || 'n/a'}</div>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <EmptyState title="No AI snapshot yet" description="Generate AI Snapshot to build triage, severity, scorecard, and suggested action in one deterministic call." />
+                                                            )}
                                                             {agentScorecard ? (
                                                                 <div className={`rounded-xl border px-4 py-3 ${agentSeverityTone(agentScorecard.severity_level)}`}>
                                                                     <div className="text-xs font-semibold uppercase tracking-[0.16em]">Incident Scorecard</div>

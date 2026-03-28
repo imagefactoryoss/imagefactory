@@ -14,6 +14,7 @@ import {
     ReleaseGovernancePolicyConfig,
     SREAgentDraftResponse,
     SREAgentIncidentScorecardResponse,
+    SREAgentIncidentSnapshotResponse,
     SREAgentInterpretationResponse,
     SREAgentSeverityResponse,
     SREAgentSuggestedActionResponse,
@@ -355,6 +356,17 @@ export const adminService = {
     async getSREIncidentAgentScorecard(id: string): Promise<SREAgentIncidentScorecardResponse> {
         try {
             const response = await api.get(`/admin/sre/incidents/${id}/agent/scorecard`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentAgentSnapshot(id: string): Promise<SREAgentIncidentSnapshotResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/agent/snapshot`, {
                 headers: getTenantHeader(),
             })
             return response.data

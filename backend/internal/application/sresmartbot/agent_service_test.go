@@ -357,3 +357,66 @@ func TestBuildIncidentScorecardFromDraft_TrimsWhySevereCards(t *testing.T) {
 		t.Fatalf("expected why-severe cards to be trimmed to 3, got %d", len(scorecard.WhySevereCards))
 	}
 }
+
+func TestBuildIncidentSnapshotFromDraft_ComposesDeterministicViews(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.MustParse("99999999-9999-9999-9999-999999999999"),
+		Summary:    "Transport and backlog pressure are correlated.",
+		Hypotheses: []AgentDraftHypothesis{
+			{
+				Title:      "Messaging transport instability may be contributing to backlog growth",
+				Confidence: "high",
+				SignalsUsed: []string{
+					"messaging_transport.recent",
+					"async_backlog.recent",
+				},
+			},
+		},
+		ToolRuns: []MCPToolInvocationResult{
+			{ToolName: "messaging_transport.recent", ServerName: "Observability", Payload: map[string]any{"reconnects": int64(6), "disconnects": int64(2), "reconnect_threshold": int64(3)}},
+			{ToolName: "async_backlog.recent", ServerName: "Observability", Payload: map[string]any{"build_queue_depth": int64(10), "email_queue_depth": int64(4), "messaging_outbox_pending": int64(8)}},
+		},
+		HumanConfirmation: true,
+	}
+
+	snapshot := buildIncidentSnapshotFromDraft(draft)
+	if snapshot == nil {
+		t.Fatal("expected incident snapshot response")
+	}
+	if snapshot.Mode != "deterministic_incident_snapshot" {
+		t.Fatalf("unexpected mode: %q", snapshot.Mode)
+	}
+	if snapshot.Triage == nil || snapshot.Severity == nil || snapshot.Scorecard == nil || snapshot.SuggestedAction == nil {
+		t.Fatal("expected snapshot to include triage, severity, scorecard, and suggested action")
+	}
+	if snapshot.Scorecard.ActionKey != snapshot.SuggestedAction.ActionKey {
+		t.Fatalf("expected scorecard/suggested-action keys to align, got %q and %q", snapshot.Scorecard.ActionKey, snapshot.SuggestedAction.ActionKey)
+	}
+}
+
+func TestBuildIncidentSnapshotFromDraft_RemainsApprovalBound(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		Summary:    "Release drift detected.",
+		Hypotheses: []AgentDraftHypothesis{
+			{
+				Title:      "Release drift or partial rollout is the primary cause",
+				Confidence: "high",
+				SignalsUsed: []string{
+					"release_drift.summary",
+				},
+			},
+		},
+		ToolRuns: []MCPToolInvocationResult{
+			{ToolName: "release_drift.summary", ServerName: "Release", Payload: map[string]any{"active_drift_count": int64(3)}},
+		},
+	}
+
+	snapshot := buildIncidentSnapshotFromDraft(draft)
+	if snapshot == nil || snapshot.Scorecard == nil || snapshot.SuggestedAction == nil {
+		t.Fatal("expected snapshot scorecard and suggested action")
+	}
+	if !snapshot.Scorecard.ExecutionRequiresApproval || !snapshot.SuggestedAction.ExecutionRequiresApproval {
+		t.Fatal("expected incident snapshot actions to remain approval-bound")
+	}
+}
