@@ -310,10 +310,10 @@ Frontend:
 - `npm run build`
 - `npm test -- --run src/components/projects/__tests__/ProjectNotificationTriggerMatrix.test.tsx`
 
-## Known Gap For Next PR
+## Post-PR Operational Follow-up
 
-- provider-native lifecycle actions are implemented across AWS, VMware, Azure, and GCP; next gap is executing the matrix runbook against staging/prod-like environments and attaching evidence artifacts for each provider.
-- closure criteria for marking Packer track done:
-  - execute `SMOKE_MODE=api ... make qa-packer-provider-native-matrix` in staging/prod-like env.
-  - collect and attach runner artifacts under `docs/qa/artifacts/`.
+- Packer engineering PR scope is complete and closed.
+- Remaining external validation is operational execution in staging/prod-like environments:
+  - run `SMOKE_MODE=api ... make qa-packer-provider-native-matrix` with real provider credentials and disposable execution IDs.
+  - attach runner artifacts under `docs/qa/artifacts/`.
   - complete `docs/qa/PACKER_PROVIDER_NATIVE_MATRIX_VALIDATION_LOG.md` with Platform/Ops + QA signoff.
