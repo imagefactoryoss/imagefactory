@@ -29,6 +29,7 @@ type AgentInterpretationResponse struct {
 	OperatorSummary      string              `json:"operator_summary,omitempty"`
 	LikelyRootCause      string              `json:"likely_root_cause,omitempty"`
 	Watchouts            []string            `json:"watchouts,omitempty"`
+	Citations            []AgentCitation     `json:"citations,omitempty"`
 	OperatorMessageDraft string              `json:"operator_message_draft,omitempty"`
 	RawResponse          string              `json:"raw_response,omitempty"`
 }
@@ -58,6 +59,7 @@ type boundedSummaryOutcome struct {
 	OperatorHandoffNote string
 	LikelyRootCause     string
 	Watchouts           []string
+	Citations           []AgentCitation
 	RawResponse         string
 	Generated           bool
 	CacheHit            bool
@@ -70,6 +72,7 @@ type InterpretationService struct {
 	agentService     *AgentService
 	workspaceService *WorkspaceService
 	generate         func(ctx context.Context, baseURL string, model string, prompt string) (string, error)
+	runbookIndex     *runbookGroundingIndex
 	mu               sync.RWMutex
 	cache            map[string]cachedInterpretation
 }
@@ -82,7 +85,8 @@ func NewInterpretationService(agentService *AgentService, workspaceService *Work
 			client := llm.NewOllamaClient(baseURL, nil)
 			return client.Generate(ctx, model, prompt)
 		},
-		cache: make(map[string]cachedInterpretation),
+		runbookIndex: newRunbookGroundingIndex(),
+		cache:        make(map[string]cachedInterpretation),
 	}
 }
 
@@ -116,7 +120,11 @@ func (s *InterpretationService) BuildInterpretation(ctx context.Context, tenantI
 	resp.FallbackReason = outcome.FallbackReason
 	resp.LikelyRootCause = outcome.LikelyRootCause
 	resp.Watchouts = outcome.Watchouts
+	resp.Citations = outcome.Citations
 	resp.RawResponse = outcome.RawResponse
+	if err := validateCitationContract(resp.Citations); err != nil {
+		return nil, err
+	}
 
 	// Backward compatibility for existing UI consumers.
 	resp.OperatorSummary = outcome.TimelineSummary
@@ -149,6 +157,7 @@ func (s *InterpretationService) buildBoundedSummaries(ctx context.Context, draft
 	outcome := fallbackBoundedSummaries(draft)
 	outcome.EvidenceHash = evidenceHashForDraft(draft)
 	outcome.SummaryMode = "grounded_fallback"
+	outcome.Citations = s.buildGroundedCitations(draft)
 
 	if !runtimeEligibleForLocalModel(runtime) || strings.TrimSpace(outcome.EvidenceHash) == "" {
 		outcome.FallbackReason = "local runtime unavailable; returned deterministic grounded fallback"
@@ -351,6 +360,21 @@ func fallbackBoundedSummaries(draft *AgentDraftResponse) boundedSummaryOutcome {
 		Watchouts:           fallbackWatchouts(draft),
 		Generated:           false,
 	}
+}
+
+func (s *InterpretationService) buildGroundedCitations(draft *AgentDraftResponse) []AgentCitation {
+	runbookCitations := make([]AgentCitation, 0, 2)
+	if s != nil && s.runbookIndex != nil {
+		runbookCitations = append(runbookCitations, s.runbookIndex.FindRelevantCitations(draft, 2)...)
+	} else {
+		runbookCitations = append(runbookCitations, fallbackRunbookCitation())
+	}
+	evidenceCitations := buildEvidenceCitations(draft, 2)
+
+	citations := make([]AgentCitation, 0, len(runbookCitations)+len(evidenceCitations))
+	citations = append(citations, runbookCitations...)
+	citations = append(citations, evidenceCitations...)
+	return citations
 }
 
 func fallbackTimelineSummary(draft *AgentDraftResponse) string {

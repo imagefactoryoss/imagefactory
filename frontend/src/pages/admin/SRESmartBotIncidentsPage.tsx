@@ -1521,6 +1521,20 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                 <div className="mt-2">{agentInterpretation.change_detection_15m}</div>
                                                             </div>
                                                         ) : null}
+                                                        {(agentInterpretation?.citations || []).length > 0 ? (
+                                                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                                                                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Grounding Citations</div>
+                                                                <div className="mt-2 space-y-2">
+                                                                    {(agentInterpretation?.citations || []).map((citation, index) => (
+                                                                        <div key={`${citation.kind}-${citation.source}-${index}`} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs dark:border-slate-700 dark:bg-slate-950/40">
+                                                                            <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{citation.kind}</span> · <span className="font-medium text-slate-800 dark:text-slate-200">{citation.source}</span>
+                                                                            {citation.section ? <span> · {citation.section}</span> : null}
+                                                                            <div className="mt-1 text-slate-600 dark:text-slate-300">{citation.note}</div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : null}
                                                         {agentInterpretation?.likely_root_cause ? (
                                                             <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
                                                                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Likely Root Cause</div>
@@ -2068,6 +2082,22 @@ const SRESmartBotIncidentsPage: React.FC = () => {
                                                                                 {(agentInterpretation.watchouts || []).map((watchout) => (
                                                                                     <div key={watchout} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
                                                                                         {watchout}
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : null}
+                                                                    {(agentInterpretation.citations || []).length > 0 ? (
+                                                                        <div className="rounded-xl border border-slate-200 bg-white/90 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+                                                                            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Grounding Citations</div>
+                                                                            <div className="mt-2 space-y-2">
+                                                                                {(agentInterpretation.citations || []).map((citation, index) => (
+                                                                                    <div key={`${citation.kind}-${citation.source}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
+                                                                                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{citation.kind}</div>
+                                                                                        <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">
+                                                                                            {citation.source}{citation.section ? ` • ${citation.section}` : ''}
+                                                                                        </div>
+                                                                                        <div className="mt-1">{citation.note}</div>
                                                                                     </div>
                                                                                 ))}
                                                                             </div>
