@@ -1,10 +1,6 @@
-import Drawer from "@/components/ui/Drawer.tsx";
-import HelpTooltip from "@/components/common/HelpTooltip";
-import {
-  CopyableCodeBlock,
-  TooltipDrawer,
-} from "@/components/admin/providers/TooltipDrawer";
 import { TenantAssetDriftBadge } from "@/components/admin/providers/TenantAssetDriftBadge";
+import HelpTooltip from "@/components/common/HelpTooltip";
+import Drawer from "@/components/ui/Drawer.tsx";
 import { NIL_TENANT_ID } from "@/constants/tenant";
 import { useCanManageAdmin } from "@/hooks/useAccess";
 import { adminService } from "@/services/adminService";
@@ -26,247 +22,45 @@ import {
   Check,
   Copy,
   Edit2,
-  Eye,
-  EyeOff,
   HelpCircle,
   RefreshCw,
-  Server,
   TestTube,
   Trash2,
   X,
-  Zap,
 } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  blockedByLabel,
+  buildTenantNamespaceName,
+  formatAssetVersion,
+  guidanceForReadinessItem,
+  isLikelyConnectivityIssue,
+  isPrepareRunActiveStatus,
+  kubernetesProviderTypes,
+  providerTypeIcons,
+  statusColors,
+  tektonJobStatusColors,
+  tenantNamespaceTenantIDLabelKey,
+} from "./adminInfraProviderDetailShared";
 
-const statusColors: Record<string, string> = {
-  online: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  offline: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  maintenance:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  pending: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-};
+const TestConnectionDrawer = lazy(() =>
+  import("./adminInfraProviderDetailDrawers").then((module) => ({
+    default: module.TestConnectionDrawer,
+  })),
+);
+const BootstrapRBACDrawer = lazy(() =>
+  import("./adminInfraProviderDetailDrawers").then((module) => ({
+    default: module.BootstrapRBACDrawer,
+  })),
+);
+const InfraProviderConfigurationSection = lazy(
+  () => import("./adminInfraProviderConfigurationSection"),
+);
 
-const providerTypeIcons: Record<string, React.ReactNode> = {
-  kubernetes: <Zap className="h-5 w-5" />,
-  "aws-eks": <Server className="h-5 w-5" />, // AWS icon placeholder
-  "gcp-gke": <Server className="h-5 w-5" />, // GCP icon placeholder
-  "azure-aks": <Server className="h-5 w-5" />, // Azure icon placeholder
-  "oci-oke": <Server className="h-5 w-5" />, // Oracle icon placeholder
-  "vmware-vks": <Server className="h-5 w-5" />, // VMware icon placeholder
-  openshift: <Server className="h-5 w-5" />, // OpenShift icon placeholder
-  rancher: <Server className="h-5 w-5" />, // Rancher icon placeholder
-  build_nodes: <Server className="h-5 w-5" />,
-};
 
-const kubernetesProviderTypes = new Set([
-  "kubernetes",
-  "aws-eks",
-  "gcp-gke",
-  "azure-aks",
-  "oci-oke",
-  "vmware-vks",
-  "openshift",
-  "rancher",
-]);
 
-const tektonJobStatusColors: Record<string, string> = {
-  pending: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  running:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  succeeded:
-    "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  failed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
-};
-
-const isPrepareRunActiveStatus = (status?: string | null): boolean =>
-  status === "pending" || status === "running";
-
-const formatAssetVersion = (version?: string | null): string => {
-  const value = (version || "").trim();
-  if (!value) return "unknown";
-  if (value.startsWith("sha256:")) {
-    const digest = value.slice("sha256:".length);
-    if (digest.length > 8) {
-      return `sha256:${digest.slice(0, 4)}...${digest.slice(-4)}`;
-    }
-  }
-  if (value.length > 20) {
-    return `${value.slice(0, 10)}...${value.slice(-6)}`;
-  }
-  return value;
-};
-
-const bootstrapNamespaceTemplate = `apiVersion: v1
-kind: Namespace
-metadata:
-  name: imagefactory-system
-  labels:
-    app: image-factory
-    managedBy: image-factory
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: image-factory-bootstrap-sa
-  namespace: imagefactory-system`;
-
-const runtimeNamespaceTemplate = `apiVersion: v1
-kind: Namespace
-metadata:
-  name: imagefactory-system
-  labels:
-    app: image-factory
-    managedBy: image-factory
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: image-factory-runtime-sa
-  namespace: imagefactory-system`;
-
-const bootstrapClusterRoleTemplate = `apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: image-factory-bootstrap-role
-rules:
-- apiGroups: [""]
-  resources: ["namespaces"]
-  verbs: ["get", "list", "create", "patch", "update"]
-- apiGroups: ["rbac.authorization.k8s.io"]
-  resources: ["roles", "rolebindings"]
-  verbs: ["get", "list", "watch", "create", "patch", "update"]
-- apiGroups: ["tekton.dev"]
-  resources: ["tasks", "pipelines"]
-  verbs: ["get", "list", "watch", "create", "patch", "update"]
-- apiGroups: ["tekton.dev"]
-  resources: ["pipelineruns"]
-  verbs: ["create", "get", "list", "watch", "patch", "update"]
-- apiGroups: [""]
-  resources: ["pods", "secrets", "configmaps", "persistentvolumeclaims"]
-  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: image-factory-bootstrap-binding
-subjects:
-- kind: ServiceAccount
-  name: image-factory-bootstrap-sa
-  namespace: imagefactory-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: image-factory-bootstrap-role`;
-
-const runtimeRoleTemplate = `apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: image-factory-runtime-role
-  namespace: image-factory-tenant1234
-rules:
-- apiGroups: ["tekton.dev"]
-  resources: ["tasks", "pipelines"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["tekton.dev"]
-  resources: ["taskruns"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["tekton.dev"]
-  resources: ["pipelineruns"]
-  verbs: ["create", "get", "list", "watch", "delete"]
-- apiGroups: [""]
-  resources: ["pods", "pods/log", "pods/exec", "secrets", "configmaps", "serviceaccounts", "events", "persistentvolumeclaims"]
-  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: image-factory-runtime-binding
-  namespace: image-factory-tenant1234
-subjects:
-- kind: ServiceAccount
-  name: image-factory-runtime-sa
-  namespace: imagefactory-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: image-factory-runtime-role`;
-
-const serviceAccountTokenTemplate = `# Kubernetes v1.24+ typically does not auto-create long-lived service account token Secrets.
-# Use TokenRequest via kubectl (recommended):
-#
-# 1 year = 8760h (cluster policies may cap max duration)
-kubectl -n imagefactory-system create token image-factory-bootstrap-sa --duration=8760h`;
-
-const runtimeServiceAccountTokenTemplate = `# Kubernetes v1.24+ typically does not auto-create long-lived service account token Secrets.
-# Use TokenRequest via kubectl (recommended):
-#
-# 1 year = 8760h (cluster policies may cap max duration)
-kubectl -n imagefactory-system create token image-factory-runtime-sa --duration=8760h`;
-
-const buildTenantNamespaceName = (tenantId: string) => {
-  const normalized = (tenantId || "").trim();
-  if (!normalized) return "";
-  return `image-factory-${normalized.slice(0, 8)}`;
-};
-
-const tenantNamespaceTenantIDLabelKey = "imagefactory.io/tenant-id";
-
-const isLikelyConnectivityIssue = (value: string): boolean => {
-  const normalized = value.toLowerCase();
-  return (
-    normalized.includes("kubeconfig") ||
-    normalized.includes("failed to create kubernetes client") ||
-    normalized.includes("kubernetes api unreachable") ||
-    normalized.includes("namespace probe failed") ||
-    normalized.includes("dial tcp") ||
-    normalized.includes("i/o timeout") ||
-    normalized.includes("connection refused") ||
-    normalized.includes("no such host") ||
-    normalized.includes("tls handshake timeout") ||
-    normalized.includes("context deadline exceeded") ||
-    normalized.includes("tekton api preflight failed")
-  );
-};
-
-const guidanceForReadinessItem = (item: string): string => {
-  const normalized = item.toLowerCase();
-  if (normalized.includes("missing tekton task")) {
-    return "Apply latest Tekton tasks in target namespace (kubectl apply -k backend/tekton).";
-  }
-  if (normalized.includes("missing tekton pipeline")) {
-    return "Apply latest Tekton pipelines in target namespace (kubectl apply -k backend/tekton).";
-  }
-  if (normalized.includes("missing namespace")) {
-    return "Prepare provider/tenant namespace and ensure target namespace exists.";
-  }
-  if (normalized.includes("access denied") || normalized.includes("forbidden")) {
-    return "Expand runtime service account RBAC for namespaces, Tekton resources, pods, and secrets.";
-  }
-  if (normalized.includes("cluster_capacity")) {
-    return "Cluster is reachable but currently unschedulable due to capacity.";
-  }
-  return "Run Prepare Provider and fix the failing prerequisite shown in the readiness checklist.";
-};
-
-const blockedByLabel = (key: string): string => {
-  switch (key) {
-    case "cluster_capacity":
-      return "Cluster capacity unavailable";
-    case "provider_not_ready":
-      return "Provider readiness check failed";
-    case "provider_status_offline":
-      return "Provider is offline";
-    case "provider_status_maintenance":
-      return "Provider in maintenance";
-    case "provider_status_pending":
-      return "Provider still pending";
-    default:
-      return key.replace(/_/g, " ");
-  }
-};
 
 /**
  * AdminInfrastructureProviderDetailPage - Admin component for viewing infrastructure provider details
@@ -374,7 +168,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
   );
   const providerProfileVersion =
     typeof provider?.config?.tekton_profile_version === "string" &&
-    provider.config.tekton_profile_version.trim() !== ""
+      provider.config.tekton_profile_version.trim() !== ""
       ? provider.config.tekton_profile_version.trim().toLowerCase()
       : "v1";
 
@@ -1571,7 +1365,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
     displayedPrepareRun?.requested_actions?.runtime_auth_regeneration === true;
   const runtimeAuthRegenerationStatus =
     typeof displayedPrepareRun?.result_summary?.runtime_auth_regeneration ===
-    "string"
+      "string"
       ? displayedPrepareRun.result_summary.runtime_auth_regeneration
       : null;
   const runtimeAuthRegenerationApplied =
@@ -1589,34 +1383,34 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
     complete: boolean;
     value?: unknown;
   }> = [
-    {
-      key: "tekton_resources",
-      label: "Tekton API preflight",
-      complete: Object.prototype.hasOwnProperty.call(
-        tenantPrepareSummary,
-        "tekton_resources",
-      ),
-      value: tenantPrepareSummary.tekton_resources,
-    },
-    {
-      key: "rbac_applied_objects",
-      label: "Runtime RBAC applied",
-      complete: Object.prototype.hasOwnProperty.call(
-        tenantPrepareSummary,
-        "rbac_applied_objects",
-      ),
-      value: tenantPrepareSummary.rbac_applied_objects,
-    },
-    {
-      key: "assets_applied_objects",
-      label: "Tekton assets applied",
-      complete: Object.prototype.hasOwnProperty.call(
-        tenantPrepareSummary,
-        "assets_applied_objects",
-      ),
-      value: tenantPrepareSummary.assets_applied_objects,
-    },
-  ];
+      {
+        key: "tekton_resources",
+        label: "Tekton API preflight",
+        complete: Object.prototype.hasOwnProperty.call(
+          tenantPrepareSummary,
+          "tekton_resources",
+        ),
+        value: tenantPrepareSummary.tekton_resources,
+      },
+      {
+        key: "rbac_applied_objects",
+        label: "Runtime RBAC applied",
+        complete: Object.prototype.hasOwnProperty.call(
+          tenantPrepareSummary,
+          "rbac_applied_objects",
+        ),
+        value: tenantPrepareSummary.rbac_applied_objects,
+      },
+      {
+        key: "assets_applied_objects",
+        label: "Tekton assets applied",
+        complete: Object.prototype.hasOwnProperty.call(
+          tenantPrepareSummary,
+          "assets_applied_objects",
+        ),
+        value: tenantPrepareSummary.assets_applied_objects,
+      },
+    ];
   const readinessStatus =
     tektonStatus?.readiness_status || provider.readiness_status || "unknown";
   const readinessMissingPrereqs =
@@ -1631,11 +1425,11 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
     tektonStatus?.required_pipelines && tektonStatus.required_pipelines.length > 0
       ? tektonStatus.required_pipelines
       : [
-          "image-factory-build-v1-docker",
-          "image-factory-build-v1-buildx",
-          "image-factory-build-v1-kaniko",
-          "image-factory-build-v1-packer",
-        ];
+        "image-factory-build-v1-docker",
+        "image-factory-build-v1-buildx",
+        "image-factory-build-v1-kaniko",
+        "image-factory-build-v1-packer",
+      ];
   const isProviderSchedulable =
     provider.status === "online" && provider.is_schedulable;
   const schedulableReason =
@@ -1648,7 +1442,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
     "image_factory_managed";
   const visibleAuthConfig =
     provider?.config?.[
-      isManagedBootstrapProvider ? "bootstrap_auth" : "runtime_auth"
+    isManagedBootstrapProvider ? "bootstrap_auth" : "runtime_auth"
     ];
   const visibleAuthLabel = isManagedBootstrapProvider
     ? "Bootstrap Authentication"
@@ -1714,27 +1508,27 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
     label: string;
     status: "pending" | "running" | "failed" | "passed";
   }> = [
-    {
-      key: "connectivity",
-      label: "Connectivity",
-      status: resolvePrepareStageStatus("connectivity"),
-    },
-    {
-      key: "permission_audit",
-      label: "Permission Audit",
-      status: resolvePrepareStageStatus("permission_audit"),
-    },
-    {
-      key: "bootstrap",
-      label: "Bootstrap",
-      status: resolvePrepareStageStatus("bootstrap"),
-    },
-    {
-      key: "readiness",
-      label: "Readiness",
-      status: resolvePrepareStageStatus("readiness"),
-    },
-  ];
+      {
+        key: "connectivity",
+        label: "Connectivity",
+        status: resolvePrepareStageStatus("connectivity"),
+      },
+      {
+        key: "permission_audit",
+        label: "Permission Audit",
+        status: resolvePrepareStageStatus("permission_audit"),
+      },
+      {
+        key: "bootstrap",
+        label: "Bootstrap",
+        status: resolvePrepareStageStatus("bootstrap"),
+      },
+      {
+        key: "readiness",
+        label: "Readiness",
+        status: resolvePrepareStageStatus("readiness"),
+      },
+    ];
   const prepareStageColor = (
     status: "pending" | "running" | "failed" | "passed",
   ) => {
@@ -1902,79 +1696,79 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
     detail: string;
     status: "pending" | "running" | "failed" | "passed" | "blocked";
   }> = [
-    {
-      key: "cluster_connectivity",
-      label: "1. Cluster Connectivity",
-      detail: "Provider config resolves and Kubernetes API is reachable.",
-      status: sevenStepState(
-        !!providerConfigCheck?.ok && !!kubernetesAPICheck?.ok,
-        providerConfigCheck?.ok === false || kubernetesAPICheck?.ok === false,
-        !!providerConfigCheck || !!kubernetesAPICheck,
-      ),
-    },
-    {
-      key: "tekton_api",
-      label: "2. Tekton APIs Available",
-      detail:
-        "Tekton API resources are discoverable and usable by checks/bootstrap.",
-      status: sevenStepState(
-        tektonAPIReady,
-        tektonAPICheckFailed,
-        !!bootstrapApplyCheck || !!readinessCheck,
-      ),
-    },
-    {
-      key: "target_namespace",
-      label: "3. Target Namespace Exists",
-      detail: "The provider target namespace is present.",
-      status: sevenStepState(
-        !!readinessCheck && !namespaceFailed,
-        namespaceFailed,
-        !!readinessCheck,
-      ),
-    },
-    {
-      key: "required_tasks",
-      label: "4. Required Tasks Present",
-      detail:
-        `${requiredTektonTasksForReadiness.join(", ")} are available.`,
-      status: sevenStepState(
-        !!readinessCheck && !tasksFailed,
-        tasksFailed,
-        !!readinessCheck,
-      ),
-    },
-    {
-      key: "required_pipelines",
-      label: "5. Required Pipelines Present",
-      detail: `${requiredTektonPipelinesForReadiness.join(", ")} are present in the target namespace.`,
-      status: sevenStepState(
-        !!readinessCheck && !pipelinesFailed,
-        pipelinesFailed,
-        !!readinessCheck,
-      ),
-    },
-    {
-      key: "runtime_permissions",
-      label: "6. Runtime Permissions Valid",
-      detail: "Permission audit validates required runtime/build verbs.",
-      status: sevenStepState(
-        permissionAuditPassed,
-        permissionAuditFailed,
-        permissionAuditChecks.length > 0,
-      ),
-    },
-    {
-      key: "registry_secret_flow",
-      label: "7. Registry Secret Flow Ready",
-      detail: "Registry docker-config secret prerequisite is satisfied.",
-      status: sevenStepState(
-        !!readinessCheck && !registrySecretFailed,
-        registrySecretFailed,
-        !!readinessCheck,
-      ),
-    },
-  ];
+      {
+        key: "cluster_connectivity",
+        label: "1. Cluster Connectivity",
+        detail: "Provider config resolves and Kubernetes API is reachable.",
+        status: sevenStepState(
+          !!providerConfigCheck?.ok && !!kubernetesAPICheck?.ok,
+          providerConfigCheck?.ok === false || kubernetesAPICheck?.ok === false,
+          !!providerConfigCheck || !!kubernetesAPICheck,
+        ),
+      },
+      {
+        key: "tekton_api",
+        label: "2. Tekton APIs Available",
+        detail:
+          "Tekton API resources are discoverable and usable by checks/bootstrap.",
+        status: sevenStepState(
+          tektonAPIReady,
+          tektonAPICheckFailed,
+          !!bootstrapApplyCheck || !!readinessCheck,
+        ),
+      },
+      {
+        key: "target_namespace",
+        label: "3. Target Namespace Exists",
+        detail: "The provider target namespace is present.",
+        status: sevenStepState(
+          !!readinessCheck && !namespaceFailed,
+          namespaceFailed,
+          !!readinessCheck,
+        ),
+      },
+      {
+        key: "required_tasks",
+        label: "4. Required Tasks Present",
+        detail:
+          `${requiredTektonTasksForReadiness.join(", ")} are available.`,
+        status: sevenStepState(
+          !!readinessCheck && !tasksFailed,
+          tasksFailed,
+          !!readinessCheck,
+        ),
+      },
+      {
+        key: "required_pipelines",
+        label: "5. Required Pipelines Present",
+        detail: `${requiredTektonPipelinesForReadiness.join(", ")} are present in the target namespace.`,
+        status: sevenStepState(
+          !!readinessCheck && !pipelinesFailed,
+          pipelinesFailed,
+          !!readinessCheck,
+        ),
+      },
+      {
+        key: "runtime_permissions",
+        label: "6. Runtime Permissions Valid",
+        detail: "Permission audit validates required runtime/build verbs.",
+        status: sevenStepState(
+          permissionAuditPassed,
+          permissionAuditFailed,
+          permissionAuditChecks.length > 0,
+        ),
+      },
+      {
+        key: "registry_secret_flow",
+        label: "7. Registry Secret Flow Ready",
+        detail: "Registry docker-config secret prerequisite is satisfied.",
+        status: sevenStepState(
+          !!readinessCheck && !registrySecretFailed,
+          registrySecretFailed,
+          !!readinessCheck,
+        ),
+      },
+    ];
   const tektonWorkSequence = (() => {
     // Post-process statuses so "blocked" only appears for steps after the first real failure
     // when a run has completed as failed. This prevents Step 1 from ever being shown as blocked.
@@ -2047,8 +1841,8 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
       : providerConfigCheck?.ok && kubernetesAPICheck?.ok
         ? "done"
         : provider.health_status === "healthy" ||
-            provider.health_status === "warning" ||
-            readinessStatus === "ready"
+          provider.health_status === "warning" ||
+          readinessStatus === "ready"
           ? "done"
           : provider.health_status === "unhealthy"
             ? "blocked"
@@ -2090,35 +1884,35 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
     detail: string;
     status: OnboardingStepStatus;
   }> = [
-    {
-      key: "connectivity",
-      label: "1. Connectivity + Auth",
-      detail: "Validate provider config and Kubernetes API reachability.",
-      status: connectivityStepStatus,
-    },
-    {
-      key: "prepare",
-      label: "2. Prepare Provider",
-      detail: "Run the orchestration flow for checks, bootstrap, and readiness.",
-      status: prepareStepStatus,
-    },
-    {
-      key: "readiness",
-      label: "3. Scheduling Gate",
-      detail: "Provider must be online, ready, and schedulable.",
-      status: readinessStepStatus,
-    },
-    {
-      key: "tenant-namespace",
-      label: "4. Tenant Namespace",
-      detail: !isManagedBootstrapProvider
-        ? "Not required for self-managed providers."
-        : !isSystemAdmin
-          ? "System admin access is required for tenant namespace provisioning."
-          : "Prepare namespace assets for the selected tenant before builds.",
-      status: tenantProvisionStepStatus,
-    },
-  ];
+      {
+        key: "connectivity",
+        label: "1. Connectivity + Auth",
+        detail: "Validate provider config and Kubernetes API reachability.",
+        status: connectivityStepStatus,
+      },
+      {
+        key: "prepare",
+        label: "2. Prepare Provider",
+        detail: "Run the orchestration flow for checks, bootstrap, and readiness.",
+        status: prepareStepStatus,
+      },
+      {
+        key: "readiness",
+        label: "3. Scheduling Gate",
+        detail: "Provider must be online, ready, and schedulable.",
+        status: readinessStepStatus,
+      },
+      {
+        key: "tenant-namespace",
+        label: "4. Tenant Namespace",
+        detail: !isManagedBootstrapProvider
+          ? "Not required for self-managed providers."
+          : !isSystemAdmin
+            ? "System admin access is required for tenant namespace provisioning."
+            : "Prepare namespace assets for the selected tenant before builds.",
+        status: tenantProvisionStepStatus,
+      },
+    ];
   const onboardingComplete =
     connectivityStepStatus === "done" &&
     prepareStepStatus === "done" &&
@@ -2177,11 +1971,10 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
           {canManageAdmin && (
             <button
               onClick={handleToggleStatus}
-              className={`px-4 py-2 rounded-md flex items-center gap-2 ${
-                provider.status === "online"
-                  ? "bg-red-600 text-white hover:bg-red-700"
-                  : "bg-green-600 text-white hover:bg-green-700"
-              }`}
+              className={`px-4 py-2 rounded-md flex items-center gap-2 ${provider.status === "online"
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-green-600 text-white hover:bg-green-700"
+                }`}
             >
               {provider.status === "online" ? (
                 <X className="h-4 w-4" />
@@ -2223,340 +2016,28 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
       )}
 
       {/* Test Connection Drawer */}
-      <Drawer
-        isOpen={showTestDrawer}
-        onClose={handleCloseTestDrawer}
-        title="Testing Connection"
-        description="Testing connectivity to the infrastructure provider"
-      >
-        <div className="space-y-6">
-          {/* Progress Steps */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-              Test Progress
-            </h3>
+      {showTestDrawer ? (
+        <Suspense fallback={null}>
+          <TestConnectionDrawer
+            isOpen={showTestDrawer}
+            onClose={handleCloseTestDrawer}
+            testProgress={testProgress}
+            testError={testError}
+            provider={provider!}
+            visibleAuthConfig={visibleAuthConfig as Record<string, unknown> | undefined}
+          />
+        </Suspense>
+      ) : null}
 
-            <div className="space-y-3">
-              <div
-                className={`flex items-center space-x-3 ${testProgress === "initializing" ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}
-              >
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center ${testProgress === "initializing" ? "bg-blue-100 dark:bg-blue-900" : "bg-gray-100 dark:bg-gray-800"}`}
-                >
-                  {testProgress === "initializing" && (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  )}
-                  {testProgress === "connecting" && (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  )}
-                  {testProgress === "receiving" && (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  )}
-                  {testProgress === "completed" && (
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  )}
-                  {testProgress === "failed" && (
-                    <X className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  )}
-                </div>
-                <span className="text-sm">
-                  {testProgress === "initializing" && "Initializing test..."}
-                  {testProgress === "connecting" && "Connecting to provider..."}
-                  {testProgress === "receiving" && "Receiving response..."}
-                  {testProgress === "completed" && "Connection test completed"}
-                  {testProgress === "failed" && "Connection test failed"}
-                </span>
-              </div>
-            </div>
-
-            {/* Provider Info */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                Provider Information
-              </h4>
-              <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-gray-500 dark:text-gray-400">
-                    Provider Type:
-                  </dt>
-                  <dd className="text-gray-900 dark:text-white font-medium">
-                    {provider?.provider_type}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-500 dark:text-gray-400">
-                    Provider Name:
-                  </dt>
-                  <dd className="text-gray-900 dark:text-white font-medium">
-                    {provider?.display_name}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-500 dark:text-gray-400">Status:</dt>
-                  <dd className="text-gray-900 dark:text-white font-medium">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[provider?.status || "pending"]}`}
-                    >
-                      {provider?.status}
-                    </span>
-                  </dd>
-                </div>
-                {provider?.health_status && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Health Status:
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white font-medium">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          provider.health_status === "healthy"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : provider.health_status === "warning"
-                              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                        }`}
-                      >
-                        {provider.health_status}
-                      </span>
-                    </dd>
-                  </div>
-                )}
-                {provider?.last_health_check && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Last Health Check:
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white font-medium">
-                      {new Date(provider.last_health_check).toLocaleString()}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-
-            {/* Configuration Details */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                Configuration
-              </h4>
-              <dl className="space-y-2 text-sm">
-                {provider &&
-                  provider?.provider_type === "kubernetes" &&
-                  (visibleAuthConfig?.auth_method ||
-                    provider?.config?.auth_method) && (
-                    <div className="flex justify-between">
-                      <dt className="text-gray-500 dark:text-gray-400">
-                        Authentication Method:
-                      </dt>
-                      <dd className="text-gray-900 dark:text-white font-medium capitalize">
-                        {(
-                          visibleAuthConfig?.auth_method ||
-                          provider.config?.auth_method ||
-                          "unknown"
-                        ).replace("_", " ")}
-                      </dd>
-                    </div>
-                  )}
-                {provider?.config?.apiServer && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      API Server Endpoint:
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white font-medium font-mono text-xs">
-                      {provider.config.apiServer}
-                    </dd>
-                  </div>
-                )}
-                {provider?.config?.endpoint &&
-                  provider?.provider_type !== "kubernetes" && (
-                    <div className="flex justify-between">
-                      <dt className="text-gray-500 dark:text-gray-400">
-                        API Endpoint:
-                      </dt>
-                      <dd className="text-gray-900 dark:text-white font-medium font-mono text-xs">
-                        {provider.config.endpoint}
-                      </dd>
-                    </div>
-                  )}
-                {provider?.config?.cluster_endpoint && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Cluster Endpoint:
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white font-medium font-mono text-xs">
-                      {provider.config.cluster_endpoint}
-                    </dd>
-                  </div>
-                )}
-                {provider?.config?.namespace &&
-                  !kubernetesProviderTypes.has(provider.provider_type) && (
-                    <div className="flex justify-between">
-                      <dt className="text-gray-500 dark:text-gray-400">
-                        Namespace:
-                      </dt>
-                      <dd className="text-gray-900 dark:text-white font-medium">
-                        {provider.config.namespace}
-                      </dd>
-                    </div>
-                  )}
-                {provider?.config?.region && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Region:
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white font-medium">
-                      {provider.config.region}
-                    </dd>
-                  </div>
-                )}
-                {provider?.config?.kubeconfig_path && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Kubeconfig Path:
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white font-medium font-mono text-xs">
-                      {provider.config.kubeconfig_path}
-                    </dd>
-                  </div>
-                )}
-                {provider?.capabilities && provider.capabilities.length > 0 && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Capabilities:
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white font-medium">
-                      <div className="flex flex-wrap gap-1">
-                        {provider.capabilities.map((capability, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                          >
-                            {capability}
-                          </span>
-                        ))}
-                      </div>
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-
-            {/* Test Details */}
-            {testProgress === "completed" && (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-green-900 dark:text-green-200 mb-2">
-                  Test Results
-                </h4>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-5 w-5 text-green-600" />
-                  <span className="text-sm text-green-800 dark:text-green-200">
-                    Successfully connected to provider
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  The provider is now online and ready to use.
-                </p>
-              </div>
-            )}
-
-            {testProgress === "failed" && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-red-900 dark:text-red-200 mb-2">
-                  Test Failed
-                </h4>
-                <div className="flex items-center space-x-2">
-                  <X className="h-5 w-5 text-red-600" />
-                  <span className="text-sm text-red-800 dark:text-red-200">
-                    Connection test failed
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  {testError ||
-                    "Please check your provider configuration and try again."}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Close Button */}
-          <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={handleCloseTestDrawer}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 font-medium"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </Drawer>
-
-      <TooltipDrawer
-        isOpen={showBootstrapRBACDrawer}
-        onClose={() => setShowBootstrapRBACDrawer(false)}
-        title={
-          isManagedBootstrapProvider
-            ? "Image Factory Managed Bootstrap RBAC"
-            : "Self-Managed Runtime RBAC"
-        }
-      >
-        <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
-          {isManagedBootstrapProvider ? (
-            <p>
-              Image Factory managed mode only needs bootstrap credentials here.
-              During provider/tenant prepare, Image Factory creates and manages
-              runtime service accounts and RBAC automatically.
-            </p>
-          ) : (
-            <p>
-              Self-managed mode assumes cluster bootstrap is handled outside of
-              Image Factory. You still need a runtime service account and
-              namespace-scoped RBAC so builds can run.
-            </p>
-          )}
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
-            Update namespace and object names before applying. These are secure
-            defaults to get started, not mandatory final production policy.
-          </div>
-
-          {isManagedBootstrapProvider ? (
-            <>
-              <CopyableCodeBlock
-                title="1) System Namespace + Service Accounts"
-                code={bootstrapNamespaceTemplate}
-                language="yaml"
-              />
-              <CopyableCodeBlock
-                title="2) Bootstrap ClusterRole + Binding (Managed Prepare)"
-                code={bootstrapClusterRoleTemplate}
-                language="yaml"
-              />
-              <CopyableCodeBlock
-                title="3) Bootstrap ServiceAccount Token (Recommended)"
-                code={serviceAccountTokenTemplate}
-                language="bash"
-              />
-            </>
-          ) : (
-            <>
-              <CopyableCodeBlock
-                title="1) System Namespace + Runtime Service Account"
-                code={runtimeNamespaceTemplate}
-                language="yaml"
-              />
-              <CopyableCodeBlock
-                title="2) Tenant Namespace Runtime Role + Binding (Least Privilege)"
-                code={runtimeRoleTemplate}
-                language="yaml"
-              />
-              <CopyableCodeBlock
-                title="3) Runtime ServiceAccount Token Setup"
-                code={runtimeServiceAccountTokenTemplate}
-                language="bash"
-              />
-            </>
-          )}
-        </div>
-      </TooltipDrawer>
+      {showBootstrapRBACDrawer ? (
+        <Suspense fallback={null}>
+          <BootstrapRBACDrawer
+            isOpen={showBootstrapRBACDrawer}
+            onClose={() => setShowBootstrapRBACDrawer(false)}
+            isManagedBootstrapProvider={isManagedBootstrapProvider}
+          />
+        </Suspense>
+      ) : null}
 
       {/* Provider Details */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2625,15 +2106,14 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                 </dt>
                 <dd className="mt-1">
                   <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      provider.health_status === "healthy"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                        : provider.health_status === "warning"
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                          : provider.health_status === "unhealthy"
-                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                    }`}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${provider.health_status === "healthy"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                      : provider.health_status === "warning"
+                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                        : provider.health_status === "unhealthy"
+                          ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                      }`}
                   >
                     {provider.health_status || "unknown"}
                   </span>
@@ -2694,13 +2174,12 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                   </dt>
                   <dd className="mt-1">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        provider.config?.tekton_enabled === true
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : provider.config?.tekton_enabled === false
-                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                      }`}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${provider.config?.tekton_enabled === true
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : provider.config?.tekton_enabled === false
+                          ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                        }`}
                     >
                       {provider.config?.tekton_enabled === true
                         ? "Enabled"
@@ -2718,14 +2197,13 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                   </dt>
                   <dd className="mt-1">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        provider.config?.quarantine_dispatch_enabled === true
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : provider.config?.quarantine_dispatch_enabled ===
-                              false
-                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                      }`}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${provider.config?.quarantine_dispatch_enabled === true
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : provider.config?.quarantine_dispatch_enabled ===
+                          false
+                          ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                        }`}
                     >
                       {provider.config?.quarantine_dispatch_enabled === true
                         ? "Enabled"
@@ -2916,13 +2394,12 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
             <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    isViewingHistoricalPrepareRun
-                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      : prepareWsConnected
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                        : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                  }`}
+                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${isViewingHistoricalPrepareRun
+                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                    : prepareWsConnected
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                      : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                    }`}
                 >
                   {isViewingHistoricalPrepareRun
                     ? "Historical"
@@ -2939,25 +2416,23 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                 </span>
                 <span className="text-gray-600 dark:text-gray-300">Status</span>
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    displayedPrepareRun?.status === "succeeded"
-                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                      : displayedPrepareRun?.status === "failed"
-                        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                        : displayedPrepareRun?.status
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                          : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                  }`}
+                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${displayedPrepareRun?.status === "succeeded"
+                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                    : displayedPrepareRun?.status === "failed"
+                      ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                      : displayedPrepareRun?.status
+                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                        : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                    }`}
                 >
                   {displayedPrepareRun?.status || "idle"}
                 </span>
                 {runtimeAuthRegenerationRequested && (
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      runtimeAuthRegenerationApplied
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                        : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
-                    }`}
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${runtimeAuthRegenerationApplied
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                      : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
+                      }`}
                   >
                     {runtimeAuthRegenerationApplied
                       ? "Runtime Auth Regenerated"
@@ -3061,11 +2536,10 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
-                              check.ok
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            }`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${check.ok
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                              }`}
                           >
                             {check.ok ? "OK" : "Fail"}
                           </span>
@@ -3125,7 +2599,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
         >
           <div className="space-y-4">
             {!effectiveTenantNamespaceId ||
-            effectiveTenantNamespaceId === NIL_TENANT_ID ? (
+              effectiveTenantNamespaceId === NIL_TENANT_ID ? (
               <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-200">
                 Select a tenant to view or provision its namespace.
               </div>
@@ -3181,7 +2655,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                       className="inline-flex min-h-10 w-full sm:w-auto sm:min-w-[12rem] items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {tenantNamespacePrepareActionLoading ||
-                      hasActiveTenantNamespacePrepare
+                        hasActiveTenantNamespacePrepare
                         ? "Provisioning…"
                         : "Prepare"}
                     </button>
@@ -3195,7 +2669,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                       className="inline-flex min-h-10 w-full sm:w-auto sm:min-w-[12rem] items-center justify-center rounded-md border border-red-200 bg-red-100 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
                     >
                       {tenantNamespacePrepareActionLoading ||
-                      hasActiveTenantNamespacePrepare
+                        hasActiveTenantNamespacePrepare
                         ? "Working…"
                         : "Deprovision"}
                     </button>
@@ -3208,11 +2682,10 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                       Live Stream
                     </div>
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
-                        tenantNamespacePrepareWsConnected
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                      }`}
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${tenantNamespacePrepareWsConnected
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                        }`}
                     >
                       {tenantNamespacePrepareWsConnected
                         ? "connected"
@@ -3282,15 +2755,14 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                     </div>
                     <div className="mt-1">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          tenantNamespacePrepare?.status === "succeeded"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : tenantNamespacePrepare?.status === "failed"
-                              ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                              : tenantNamespacePrepare?.status
-                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                        }`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tenantNamespacePrepare?.status === "succeeded"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : tenantNamespacePrepare?.status === "failed"
+                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                            : tenantNamespacePrepare?.status
+                              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                              : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                          }`}
                       >
                         {tenantNamespacePrepare?.status ||
                           "no tenant namespace prepare run yet"}
@@ -3365,7 +2837,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                           onClick={() =>
                             void copyToClipboard(
                               tenantNamespacePrepare.installed_asset_version ||
-                                "",
+                              "",
                               "tenant-asset-installed",
                             )
                           }
@@ -3388,8 +2860,8 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                     <div className="mt-1 text-sm text-gray-900 dark:text-white">
                       {tenantNamespacePrepare?.updated_at
                         ? new Date(
-                            tenantNamespacePrepare.updated_at,
-                          ).toLocaleString()
+                          tenantNamespacePrepare.updated_at,
+                        ).toLocaleString()
                         : "never"}
                     </div>
                   </div>
@@ -3432,13 +2904,12 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                             {step.label}
                           </div>
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
-                              step.complete
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                : hasActiveTenantNamespacePrepare
-                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                  : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                            }`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${step.complete
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              : hasActiveTenantNamespacePrepare
+                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                                : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                              }`}
                           >
                             {step.complete
                               ? "done"
@@ -3471,15 +2942,15 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   {canManageAdmin &&
                     provider.bootstrap_mode === "image_factory_managed" && (
-                    <button
-                      type="button"
-                      onClick={handleRegenerateRuntimeAuth}
-                      disabled={prepareActionLoading || hasActivePrepareRun}
-                      className="px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-50"
-                    >
-                      Regenerate Runtime Auth
-                    </button>
-                  )}
+                      <button
+                        type="button"
+                        onClick={handleRegenerateRuntimeAuth}
+                        disabled={prepareActionLoading || hasActivePrepareRun}
+                        className="px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-50"
+                      >
+                        Regenerate Runtime Auth
+                      </button>
+                    )}
                   {canManageAdmin && (
                     <button
                       type="button"
@@ -3587,13 +3058,12 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                         <div>
                           Status:{" "}
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              prepareStatus.active_run.status === "succeeded"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                : prepareStatus.active_run.status === "failed"
-                                  ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                  : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                            }`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${prepareStatus.active_run.status === "succeeded"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              : prepareStatus.active_run.status === "failed"
+                                ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                                : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                              }`}
                           >
                             {prepareStatus.active_run.status}
                           </span>
@@ -3646,13 +3116,12 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                               {new Date(run.created_at).toLocaleString()}
                             </span>
                             <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                run.status === "succeeded"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                  : run.status === "failed"
-                                    ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                    : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                              }`}
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${run.status === "succeeded"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                : run.status === "failed"
+                                  ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                                  : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                                }`}
                             >
                               {run.status}
                             </span>
@@ -3755,7 +3224,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                                   check.details?.remediation_commands,
                                 )
                                   ? (check.details
-                                      ?.remediation_commands as string[])
+                                    ?.remediation_commands as string[])
                                   : [];
                                 const remediation =
                                   typeof check.details?.remediation === "string"
@@ -3917,7 +3386,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                             className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {tenantNamespacePrepareActionLoading ||
-                            hasActiveTenantNamespacePrepare
+                              hasActiveTenantNamespacePrepare
                               ? "Provisioning…"
                               : "Provision Tenant Namespace"}
                           </button>
@@ -3933,7 +3402,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                             className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-red-200 bg-red-100 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
                           >
                             {tenantNamespacePrepareActionLoading ||
-                            hasActiveTenantNamespacePrepare
+                              hasActiveTenantNamespacePrepare
                               ? "Working…"
                               : "Deprovision Tenant Namespace"}
                           </button>
@@ -4016,15 +3485,14 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                         </div>
                         <div className="mt-1">
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              tenantNamespacePrepare?.status === "succeeded"
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                : tenantNamespacePrepare?.status === "failed"
-                                  ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                  : tenantNamespacePrepare?.status
-                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                    : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                            }`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tenantNamespacePrepare?.status === "succeeded"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              : tenantNamespacePrepare?.status === "failed"
+                                ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                                : tenantNamespacePrepare?.status
+                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                                  : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                              }`}
                           >
                             {tenantNamespacePrepare?.status ||
                               "no tenant namespace prepare run yet"}
@@ -4064,7 +3532,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                                 onClick={() =>
                                   void copyToClipboard(
                                     tenantNamespacePrepare.desired_asset_version ||
-                                      "",
+                                    "",
                                     "tenant-asset-desired-inline",
                                   )
                                 }
@@ -4098,7 +3566,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                                 onClick={() =>
                                   void copyToClipboard(
                                     tenantNamespacePrepare.installed_asset_version ||
-                                      "",
+                                    "",
                                     "tenant-asset-installed-inline",
                                   )
                                 }
@@ -4376,12 +3844,12 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                       Last checked:{" "}
                       {tektonStatus?.readiness_last_checked
                         ? new Date(
-                            tektonStatus.readiness_last_checked,
-                          ).toLocaleString()
+                          tektonStatus.readiness_last_checked,
+                        ).toLocaleString()
                         : provider.readiness_last_checked
                           ? new Date(
-                              provider.readiness_last_checked,
-                            ).toLocaleString()
+                            provider.readiness_last_checked,
+                          ).toLocaleString()
                           : "never"}
                     </div>
                     {readinessMissingPrereqs.length > 0 && (
@@ -4478,7 +3946,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                   Job Events
                 </div>
                 {tektonStatus?.active_job_events &&
-                tektonStatus.active_job_events.length > 0 ? (
+                  tektonStatus.active_job_events.length > 0 ? (
                   <div className="max-h-56 overflow-y-auto space-y-2">
                     {tektonStatus.active_job_events.map((event) => (
                       <div
@@ -4517,7 +3985,7 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
                   Recent Jobs
                 </div>
                 {tektonStatus?.recent_jobs &&
-                tektonStatus.recent_jobs.length > 0 ? (
+                  tektonStatus.recent_jobs.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead>
@@ -4592,116 +4060,17 @@ const AdminInfrastructureProviderDetailPage: React.FC = () => {
         )}
 
         {/* Configuration */}
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              Configuration
-            </h3>
-            {configEntries.length > 0 ||
-            (visibleAuthConfig &&
-              typeof visibleAuthConfig === "object" &&
-              Object.keys(visibleAuthConfig).length > 0) ? (
-              <dl className="space-y-4">
-                {visibleAuthConfig &&
-                  typeof visibleAuthConfig === "object" &&
-                  Object.entries(visibleAuthConfig).length > 0 && (
-                    <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3">
-                      <dt className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
-                        {visibleAuthLabel}
-                      </dt>
-                      <div className="space-y-2">
-                        {Object.entries(visibleAuthConfig).map(
-                          ([authKey, authValue]) => {
-                            const fieldPath = `${isManagedBootstrapProvider ? "bootstrap_auth" : "runtime_auth"}.${authKey}`;
-                            const isSensitive = isSensitiveKey(authKey);
-                            const isVisible = visibleSensitiveFields[fieldPath];
-                            return (
-                              <div key={fieldPath}>
-                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 capitalize flex items-center justify-between">
-                                  <span>
-                                    {authKey
-                                      .replace(/([A-Z])/g, " $1")
-                                      .replace(/^./, (str) =>
-                                        str.toUpperCase(),
-                                      )}
-                                  </span>
-                                  {isSensitive && (
-                                    <button
-                                      onClick={() =>
-                                        toggleSensitiveField(fieldPath)
-                                      }
-                                      className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 p-1 rounded"
-                                      title={
-                                        isVisible
-                                          ? "Hide sensitive data"
-                                          : "Show sensitive data"
-                                      }
-                                    >
-                                      {isVisible ? (
-                                        <EyeOff className="h-4 w-4" />
-                                      ) : (
-                                        <Eye className="h-4 w-4" />
-                                      )}
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="mt-1 text-sm text-gray-900 dark:text-white font-mono bg-white dark:bg-gray-800 p-2 rounded break-all">
-                                  {isSensitive && !isVisible
-                                    ? "••••••••••••••••••••••••••••••••"
-                                    : typeof authValue === "object"
-                                      ? JSON.stringify(authValue, null, 2)
-                                      : String(authValue)}
-                                </div>
-                              </div>
-                            );
-                          },
-                        )}
-                      </div>
-                    </div>
-                  )}
-                {configEntries.map(([key, value]) => (
-                  <div key={key}>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 capitalize flex items-center justify-between">
-                      <span>
-                        {key
-                          .replace(/([A-Z])/g, " $1")
-                          .replace(/^./, (str) => str.toUpperCase())}
-                      </span>
-                      {isSensitiveKey(key) && (
-                        <button
-                          onClick={() => toggleSensitiveField(key)}
-                          className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 p-1 rounded"
-                          title={
-                            visibleSensitiveFields[key]
-                              ? "Hide sensitive data"
-                              : "Show sensitive data"
-                          }
-                        >
-                          {visibleSensitiveFields[key] ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      )}
-                    </dt>
-                    <dd className="mt-1 text-sm text-gray-900 dark:text-white font-mono bg-gray-50 dark:bg-gray-700 p-2 rounded break-all">
-                      {isSensitiveKey(key) && !visibleSensitiveFields[key]
-                        ? "••••••••••••••••••••••••••••••••"
-                        : typeof value === "object"
-                          ? JSON.stringify(value, null, 2)
-                          : String(value)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                No configuration details available
-              </p>
-            )}
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <InfraProviderConfigurationSection
+            configEntries={configEntries}
+            visibleAuthConfig={visibleAuthConfig as Record<string, unknown> | undefined}
+            visibleAuthLabel={visibleAuthLabel}
+            isManagedBootstrapProvider={isManagedBootstrapProvider}
+            visibleSensitiveFields={visibleSensitiveFields}
+            isSensitiveKey={isSensitiveKey}
+            toggleSensitiveField={toggleSensitiveField}
+          />
+        </Suspense>
       </div>
     </div>
   );

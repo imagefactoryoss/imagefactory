@@ -218,7 +218,7 @@ func TestAuthMiddleware_Authenticate(t *testing.T) {
 	t.Run("system admin missing X-Tenant-ID returns 400", func(t *testing.T) {
 		logger := zaptest.NewLogger(t)
 		mockUser := &MockUserService{}
-		usr, _ := user.NewUser("admin@imagefactory.local", "Admin", "User", "password")
+		usr, _ := user.NewUser("admin@imgfactory.com", "Admin", "User", "password")
 		mockUser.On("ValidateToken", mock.Anything, "valid-token").Return(usr, nil)
 
 		middleware := NewAuthMiddleware(mockUser, nil, nil, logger, nil)
@@ -242,7 +242,7 @@ func TestAuthMiddleware_Authenticate(t *testing.T) {
 	t.Run("non-admin missing X-Tenant-ID returns 400", func(t *testing.T) {
 		logger := zaptest.NewLogger(t)
 		mockUser := &MockUserService{}
-		usr, _ := user.NewUser("user@imagefactory.local", "Normal", "User", "password")
+		usr, _ := user.NewUser("user@imgfactory.com", "Normal", "User", "password")
 		mockUser.On("ValidateToken", mock.Anything, "valid-token").Return(usr, nil)
 
 		middleware := NewAuthMiddleware(mockUser, nil, nil, logger, nil)

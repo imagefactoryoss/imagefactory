@@ -21,8 +21,8 @@ ON CONFLICT DO NOTHING;
 -- SEED ESSENTIAL SYSTEM USERS (minimal required users)
 -- ============================================================================
 INSERT INTO users (email, first_name, last_name, is_ldap_user, status, email_verified) VALUES
-('admin@imagefactory.local', 'Admin', 'User', true, 'active', true),
-('system@imagefactory.local', 'System', 'User', false, 'active', true)
+('admin@imgfactory.com', 'Admin', 'User', true, 'active', true),
+('system@imgfactory.com', 'System', 'User', false, 'active', true)
 ON CONFLICT (email) DO NOTHING;
 
 -- ============================================================================
@@ -61,7 +61,7 @@ SELECT
   u.id,
   u.id
 FROM users u
-WHERE u.email = 'admin@imagefactory.local'
+WHERE u.email = 'admin@imgfactory.com'
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
@@ -406,7 +406,7 @@ INSERT INTO user_role_assignments (user_id, role_id, assigned_by_user_id, assign
 SELECT u.id, r.id, u.id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM users u
 CROSS JOIN rbac_roles r
-WHERE u.email = 'admin@imagefactory.local'
+WHERE u.email = 'admin@imgfactory.com'
   AND r.name = 'System Administrator'
   AND r.is_system = true
   AND r.tenant_id IS NULL

@@ -49,7 +49,7 @@ The Image Factory Team
 
 ---
 Image Factory - Secure Container Platform for Modern Development
-support@example.com | Documentation | Status Page`,
+support@imgfactory.com | Documentation | Status Page`,
 		HTMLTemplate: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -255,7 +255,7 @@ support@example.com | Documentation | Status Page`,
         <div class="footer">
             <h5>Image Factory</h5>
             <p>Secure Container Platform for Modern Development<br>
-            <a href="mailto:support@example.com">support@example.com</a> | <a href="#">Documentation</a> | <a href="#">Status Page</a></p>
+            <a href="mailto:support@imgfactory.com">support@imgfactory.com</a> | <a href="#">Documentation</a> | <a href="#">Status Page</a></p>
             <p style="margin-top: 16px; font-size: 11px;">
                 Didn't expect this invitation? You can safely ignore this email.
             </p>

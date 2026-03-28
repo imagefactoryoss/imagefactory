@@ -295,7 +295,7 @@ func setDefaults() {
 
 	// Frontend defaults
 	viper.SetDefault("frontend.base_url", "http://localhost:3000")
-	viper.SetDefault("frontend.dashboard_url", "https://dashboard.imagefactory.local")
+	viper.SetDefault("frontend.dashboard_url", "https://dashboard.imgfactory.com")
 
 	// Dispatcher defaults
 	viper.SetDefault("dispatcher.enabled", true)

@@ -453,7 +453,7 @@ func (suite *AuthIntegrationTestSuite) TestLDAPLoginSimulation() {
 		suite.T().Skip("LDAP service is not configured for integration test")
 	}
 
-	loginEmail := envOrDefault("LDAP_IT_LOGIN_EMAIL", "alice.johnson@imagefactory.local")
+	loginEmail := envOrDefault("LDAP_IT_LOGIN_EMAIL", "alice.johnson@imgfactory.com")
 	loginPassword := envOrFirst("password", "LDAP_IT_LOGIN_PASSWORD")
 
 	parts := strings.Split(loginEmail, "@")

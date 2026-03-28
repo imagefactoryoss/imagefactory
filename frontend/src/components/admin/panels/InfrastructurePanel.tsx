@@ -253,6 +253,7 @@ export const InfrastructurePanel: React.FC = () => {
         return Math.round((used / total) * 100);
     };
 
+    // Format bytes to human readable
     if (!user) {
         return (
             <div className="flex items-center justify-center p-4">

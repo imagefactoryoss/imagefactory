@@ -1,11 +1,11 @@
-import Drawer from '@/components/ui/Drawer'
 import ExternalImportRequestForm from '@/components/images/ExternalImportRequestForm'
+import Drawer from '@/components/ui/Drawer'
 import { useConfirmDialog } from '@/context/ConfirmDialogContext'
-import { ImageImportApiError, imageImportService } from '@/services/imageImportService'
 import { eprRegistrationService } from '@/services/eprRegistrationService'
-import { mapQuarantineImportErrorMessage } from '@/utils/quarantineErrorMessages'
+import { ImageImportApiError, imageImportService } from '@/services/imageImportService'
+import type { EPRRegistrationRequest, ImageImportRequest } from '@/types'
 import { getImportDiagnostic, getImportDiagnosticClasses, getImportProgressLabel, getImportRemediationHint, getImportSyncStateLabel, hasMeaningfulJSONEvidence } from '@/utils/imageImportDiagnostics'
-import type { ImageImportRequest, EPRRegistrationRequest } from '@/types'
+import { mapQuarantineImportErrorMessage } from '@/utils/quarantineErrorMessages'
 import { AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
@@ -476,29 +476,29 @@ const QuarantineRequestsPage: React.FC<QuarantineRequestsPageProps> = ({ mode = 
             </div>
 
             {!isEprMode ? (
-            <section className="rounded-lg border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-800 dark:bg-sky-950/20">
-                <h2 className="text-sm font-semibold text-sky-900 dark:text-sky-200">How Quarantine Requests Work</h2>
-                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <div className="rounded-md border border-sky-200 bg-white/90 p-3 dark:border-sky-800 dark:bg-slate-900/70">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">1. Submit</p>
-                        <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
-                            Provide <EPRTerm /> + image details and choose whether registry auth is needed.
-                        </p>
+                <section className="rounded-lg border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-800 dark:bg-sky-950/20">
+                    <h2 className="text-sm font-semibold text-sky-900 dark:text-sky-200">How Quarantine Requests Work</h2>
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="rounded-md border border-sky-200 bg-white/90 p-3 dark:border-sky-800 dark:bg-slate-900/70">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">1. Submit</p>
+                            <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
+                                Provide <EPRTerm /> + image details and choose whether registry auth is needed.
+                            </p>
+                        </div>
+                        <div className="rounded-md border border-sky-200 bg-white/90 p-3 dark:border-sky-800 dark:bg-slate-900/70">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">2. Approve + Process</p>
+                            <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
+                                Request is reviewed, then import + scan pipeline runs with policy evaluation.
+                            </p>
+                        </div>
+                        <div className="rounded-md border border-sky-200 bg-white/90 p-3 dark:border-sky-800 dark:bg-slate-900/70">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">3. Outcome</p>
+                            <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
+                                Status and evidence appear in history; notifications are sent when state changes.
+                            </p>
+                        </div>
                     </div>
-                    <div className="rounded-md border border-sky-200 bg-white/90 p-3 dark:border-sky-800 dark:bg-slate-900/70">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">2. Approve + Process</p>
-                        <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
-                            Request is reviewed, then import + scan pipeline runs with policy evaluation.
-                        </p>
-                    </div>
-                    <div className="rounded-md border border-sky-200 bg-white/90 p-3 dark:border-sky-800 dark:bg-slate-900/70">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">3. Outcome</p>
-                        <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
-                            Status and evidence appear in history; notifications are sent when state changes.
-                        </p>
-                    </div>
-                </div>
-            </section>
+                </section>
             ) : null}
 
             {!isEntitlementDenied ? (
@@ -525,14 +525,14 @@ const QuarantineRequestsPage: React.FC<QuarantineRequestsPageProps> = ({ mode = 
                                 </button>
                             ) : null}
                             {!isEprMode ? (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setImportDraftValues(null)
-                                    setCreateImportDrawerOpen(true)
-                                }}
-                                className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200 dark:hover:bg-emerald-900/30"
-                            >
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setImportDraftValues(null)
+                                        setCreateImportDrawerOpen(true)
+                                    }}
+                                    className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200 dark:hover:bg-emerald-900/30"
+                                >
                                     Create Quarantine Request
                                 </button>
                             ) : null}
@@ -560,401 +560,400 @@ const QuarantineRequestsPage: React.FC<QuarantineRequestsPageProps> = ({ mode = 
             ) : null}
 
             {!isRequestsMode ? (
-            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-white">EPR Registration Requests</h2>
-                    <button
-                        type="button"
-                        onClick={() => loadEPRRequests()}
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                        Refresh
-                    </button>
-                </div>
-                {eprLoading ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Loading EPR requests...</p>
-                ) : eprRequests.length === 0 ? (
-                    <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No EPR registration requests yet.</p>
-                        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                            If the product/technology is not in the enterprise registry, submit an EPR registration request first.
-                        </p>
+                <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="text-base font-semibold text-slate-900 dark:text-white">EPR Registration Requests</h2>
                         <button
                             type="button"
-                            onClick={() => {
-                                setEprForm({
-                                    eprRecordId: generateEPRRecordID(),
-                                    productName: '',
-                                    technologyName: '',
-                                    businessJustification: '',
-                                })
-                                setEprFormError(null)
-                                setCreateEprDrawerOpen(true)
-                            }}
-                            className="mt-3 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/35"
-                        >
-                            Create EPR Registration
-                        </button>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
-                        <table className="min-w-full text-xs">
-                            <thead className="bg-slate-50 dark:bg-slate-800/70">
-                                <tr className="text-left text-slate-600 dark:text-slate-300">
-                                    <th className="px-3 py-2 font-medium">EPR</th>
-                                    <th className="px-3 py-2 font-medium">Product / Technology</th>
-                                    <th className="px-3 py-2 font-medium">Status</th>
-                                    <th className="px-3 py-2 font-medium">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                                {eprRequests.map((row) => (
-                                    <tr
-                                        key={row.id}
-                                        className="cursor-pointer bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70"
-                                        onClick={() => setSelectedEprRequest(row)}
-                                    >
-                                        <td className="px-3 py-2 align-top text-slate-900 dark:text-slate-100">{row.epr_record_id}</td>
-                                        <td className="px-3 py-2 align-top text-slate-700 dark:text-slate-300">
-                                            <p>{row.product_name}</p>
-                                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{row.technology_name}</p>
-                                        </td>
-                                        <td className="px-3 py-2 align-top">
-                                            <span className={`rounded-full px-2 py-0.5 font-semibold ${row.status === 'approved'
-                                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-                                                : row.status === 'rejected'
-                                                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'
-                                                    : row.status === 'withdrawn'
-                                                        ? 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200'
-                                                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
-                                                }`}>
-                                                {row.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2 align-top">
-                                            <div className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSelectedEprRequest(row)}
-                                                    className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                                                >
-                                                    View
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCloneEPRRequest(row)}
-                                                    className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                                                >
-                                                    Clone
-                                                </button>
-                                                {row.status === 'pending' ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleWithdrawEPRRequest(row)}
-                                                        disabled={Boolean(withdrawingEprIds[row.id])}
-                                                        className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-900/30"
-                                                    >
-                                                        {withdrawingEprIds[row.id] ? 'Withdrawing...' : 'Withdraw'}
-                                                    </button>
-                                                ) : null}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </section>
-            ) : null}
-
-            {!isEprMode ? (
-            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-white">Quarantine Request Queue</h2>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setImportDraftValues(null)
-                                setCreateImportDrawerOpen(true)
-                            }}
-                            className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200 dark:hover:bg-emerald-900/30"
-                        >
-                            Create Quarantine Request
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => loadImportRequests()}
+                            onClick={() => loadEPRRequests()}
                             className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                             Refresh
                         </button>
                     </div>
-                </div>
-
-                {!loading && !error ? (
-                    <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                            <p className="font-semibold">All</p>
-                            <p className="mt-0.5 text-lg font-bold">{queueCounts.all}</p>
-                        </div>
-                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
-                            <p className="font-semibold">Pending</p>
-                            <p className="mt-0.5 text-lg font-bold">{queueCounts.pending}</p>
-                        </div>
-                        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-200">
-                            <p className="font-semibold">In Progress</p>
-                            <p className="mt-0.5 text-lg font-bold">{queueCounts.in_progress}</p>
-                        </div>
-                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200">
-                            <p className="font-semibold">Completed</p>
-                            <p className="mt-0.5 text-lg font-bold">{queueCounts.completed}</p>
-                        </div>
-                        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-200">
-                            <p className="font-semibold">Failed</p>
-                            <p className="mt-0.5 text-lg font-bold">{queueCounts.failed}</p>
-                        </div>
-                    </div>
-                ) : null}
-
-                {!loading && !error ? (
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                        {[
-                            { key: 'all', label: 'All', count: queueCounts.all },
-                            { key: 'pending', label: 'Pending', count: queueCounts.pending },
-                            { key: 'in_progress', label: 'In Progress', count: queueCounts.in_progress },
-                            { key: 'completed', label: 'Completed', count: queueCounts.completed },
-                            { key: 'failed', label: 'Failed', count: queueCounts.failed },
-                        ].map((tab) => (
-                            <button
-                                key={tab.key}
-                                type="button"
-                                onClick={() => setQueueTab(tab.key as 'all' | 'pending' | 'in_progress' | 'completed' | 'failed')}
-                                className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                                    queueTab === tab.key
-                                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/30 dark:text-blue-200'
-                                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
-                                }`}
-                            >
-                                {tab.label} ({tab.count})
-                            </button>
-                        ))}
-                    </div>
-                ) : null}
-
-                {!loading && !error ? (
-                    <div className="mb-4 grid grid-cols-1 gap-2 lg:grid-cols-4">
-                        <input
-                            value={queueSearch}
-                            onChange={(event) => setQueueSearch(event.target.value)}
-                            placeholder="Search image, EPR, registry, state"
-                            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                        />
-                        <select
-                            value={queueSyncState}
-                            onChange={(event) => setQueueSyncState(event.target.value)}
-                            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                            <option value="all">All Sync States</option>
-                            {availableSyncStates.map((state) => (
-                                <option key={state} value={state}>
-                                    {getImportSyncStateLabel(state)}
-                                </option>
-                            ))}
-                        </select>
-                        <select
-                            value={queueRetryable}
-                            onChange={(event) => setQueueRetryable(event.target.value as 'all' | 'retryable' | 'stable')}
-                            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                            <option value="all">All Retry States</option>
-                            <option value="retryable">Retryable</option>
-                            <option value="stable">Stable</option>
-                        </select>
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={queueSort}
-                                onChange={(event) => setQueueSort(event.target.value as 'updated_desc' | 'updated_asc' | 'created_desc' | 'created_asc')}
-                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                            >
-                                <option value="updated_desc">Updated (Newest)</option>
-                                <option value="updated_asc">Updated (Oldest)</option>
-                                <option value="created_desc">Created (Newest)</option>
-                                <option value="created_asc">Created (Oldest)</option>
-                            </select>
-                            {hasQueueFilters ? (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setQueueTab('all')
-                                        setQueueSearch('')
-                                        setQueueSyncState('all')
-                                        setQueueRetryable('all')
-                                        setQueueSort('updated_desc')
-                                    }}
-                                    className="rounded-md border border-slate-300 px-2 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                                >
-                                    Reset
-                                </button>
-                            ) : null}
-                        </div>
-                    </div>
-                ) : null}
-
-                {loading ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Loading request activity...</p>
-                ) : error ? (
-                    <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
-                        <p>{error}</p>
-                        {isEntitlementDenied ? (
-                            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
-                                Review capability status in{' '}
-                                <Link to="/help/capability-access" className="underline font-medium">
-                                    Capability Matrix
-                                </Link>
-                                .
+                    {eprLoading ? (
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Loading EPR requests...</p>
+                    ) : eprRequests.length === 0 ? (
+                        <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No EPR registration requests yet.</p>
+                            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                                If the product/technology is not in the enterprise registry, submit an EPR registration request first.
                             </p>
-                        ) : null}
-                    </div>
-                ) : importRequests.length === 0 ? (
-                    <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No quarantine requests yet.</p>
-                        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                            Create a request when product/technology already exists in <EPRTerm /> and you are ready to import and scan.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setImportDraftValues(null)
-                                setCreateImportDrawerOpen(true)
-                            }}
-                            className="mt-3 inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200 dark:hover:bg-emerald-900/30"
-                        >
-                            Create Quarantine Request
-                        </button>
-                    </div>
-                ) : pagedImportRequests.length === 0 ? (
-                    <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No requests match current filters.</p>
-                        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                            Adjust search/filters or reset the queue view.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        <div className="text-xs text-slate-600 dark:text-slate-300">
-                            Showing {(safeQueuePage - 1) * queuePageSize + 1}-
-                            {Math.min(safeQueuePage * queuePageSize, filteredImportRequests.length)} of {filteredImportRequests.length}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEprForm({
+                                        eprRecordId: generateEPRRecordID(),
+                                        productName: '',
+                                        technologyName: '',
+                                        businessJustification: '',
+                                    })
+                                    setEprFormError(null)
+                                    setCreateEprDrawerOpen(true)
+                                }}
+                                className="mt-3 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/35"
+                            >
+                                Create EPR Registration
+                            </button>
                         </div>
-                        {pagedImportRequests.map((row) => (
-                            <div key={row.id} className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
-                                <div className="mb-2 flex flex-wrap items-center gap-2">
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getImportStatusColor(row.status)}`}>
-                                        {row.status}
-                                    </span>
-                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                                        {getImportProgressLabel(row)}
-                                    </span>
-                                    {row.retryable ? (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
-                                            <Clock className="h-3 w-3" />
-                                            Retryable
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                                            <CheckCircle2 className="h-3 w-3" />
-                                            Stable
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-sm text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                    EPR {row.epr_record_id} • Updated {new Date(row.updated_at).toLocaleString()}
-                                </p>
-                                {(() => {
-                                    const diagnostic = getImportDiagnostic(row)
-                                    return (
-                                        <div className={`mt-2 rounded-md border px-2 py-1 text-xs ${getImportDiagnosticClasses(diagnostic.tone)}`}>
-                                            <p className="font-semibold">{diagnostic.title}</p>
-                                            <p className="mt-0.5">{diagnostic.message}</p>
-                                        </div>
-                                    )
-                                })()}
-                                <div className="mt-2 flex items-center gap-2">
-                                    <Link
-                                        to={`/quarantine/requests/${row.id}`}
-                                        className="rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-900/40"
-                                    >
-                                        View Status
-                                    </Link>
+                    ) : (
+                        <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
+                            <table className="min-w-full text-xs">
+                                <thead className="bg-slate-50 dark:bg-slate-800/70">
+                                    <tr className="text-left text-slate-600 dark:text-slate-300">
+                                        <th className="px-3 py-2 font-medium">EPR</th>
+                                        <th className="px-3 py-2 font-medium">Product / Technology</th>
+                                        <th className="px-3 py-2 font-medium">Status</th>
+                                        <th className="px-3 py-2 font-medium">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                    {eprRequests.map((row) => (
+                                        <tr
+                                            key={row.id}
+                                            className="cursor-pointer bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70"
+                                            onClick={() => setSelectedEprRequest(row)}
+                                        >
+                                            <td className="px-3 py-2 align-top text-slate-900 dark:text-slate-100">{row.epr_record_id}</td>
+                                            <td className="px-3 py-2 align-top text-slate-700 dark:text-slate-300">
+                                                <p>{row.product_name}</p>
+                                                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{row.technology_name}</p>
+                                            </td>
+                                            <td className="px-3 py-2 align-top">
+                                                <span className={`rounded-full px-2 py-0.5 font-semibold ${row.status === 'approved'
+                                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+                                                    : row.status === 'rejected'
+                                                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'
+                                                        : row.status === 'withdrawn'
+                                                            ? 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200'
+                                                            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+                                                    }`}>
+                                                    {row.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2 align-top">
+                                                <div className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedEprRequest(row)}
+                                                        className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                                    >
+                                                        View
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCloneEPRRequest(row)}
+                                                        className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                                    >
+                                                        Clone
+                                                    </button>
+                                                    {row.status === 'pending' ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleWithdrawEPRRequest(row)}
+                                                            disabled={Boolean(withdrawingEprIds[row.id])}
+                                                            className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-900/30"
+                                                        >
+                                                            {withdrawingEprIds[row.id] ? 'Withdrawing...' : 'Withdraw'}
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
+            ) : null}
+
+            {!isEprMode ? (
+                <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="mb-4 flex items-center justify-between">
+                        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Quarantine Request Queue</h2>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setImportDraftValues(null)
+                                    setCreateImportDrawerOpen(true)
+                                }}
+                                className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200 dark:hover:bg-emerald-900/30"
+                            >
+                                Create Quarantine Request
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => loadImportRequests()}
+                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    {!loading && !error ? (
+                        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                <p className="font-semibold">All</p>
+                                <p className="mt-0.5 text-lg font-bold">{queueCounts.all}</p>
+                            </div>
+                            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+                                <p className="font-semibold">Pending</p>
+                                <p className="mt-0.5 text-lg font-bold">{queueCounts.pending}</p>
+                            </div>
+                            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-200">
+                                <p className="font-semibold">In Progress</p>
+                                <p className="mt-0.5 text-lg font-bold">{queueCounts.in_progress}</p>
+                            </div>
+                            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200">
+                                <p className="font-semibold">Completed</p>
+                                <p className="mt-0.5 text-lg font-bold">{queueCounts.completed}</p>
+                            </div>
+                            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-200">
+                                <p className="font-semibold">Failed</p>
+                                <p className="mt-0.5 text-lg font-bold">{queueCounts.failed}</p>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {!loading && !error ? (
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                            {[
+                                { key: 'all', label: 'All', count: queueCounts.all },
+                                { key: 'pending', label: 'Pending', count: queueCounts.pending },
+                                { key: 'in_progress', label: 'In Progress', count: queueCounts.in_progress },
+                                { key: 'completed', label: 'Completed', count: queueCounts.completed },
+                                { key: 'failed', label: 'Failed', count: queueCounts.failed },
+                            ].map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    type="button"
+                                    onClick={() => setQueueTab(tab.key as 'all' | 'pending' | 'in_progress' | 'completed' | 'failed')}
+                                    className={`rounded-full border px-3 py-1 text-xs font-medium ${queueTab === tab.key
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/30 dark:text-blue-200'
+                                            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                                        }`}
+                                >
+                                    {tab.label} ({tab.count})
+                                </button>
+                            ))}
+                        </div>
+                    ) : null}
+
+                    {!loading && !error ? (
+                        <div className="mb-4 grid grid-cols-1 gap-2 lg:grid-cols-4">
+                            <input
+                                value={queueSearch}
+                                onChange={(event) => setQueueSearch(event.target.value)}
+                                placeholder="Search image, EPR, registry, state"
+                                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                            />
+                            <select
+                                value={queueSyncState}
+                                onChange={(event) => setQueueSyncState(event.target.value)}
+                                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                            >
+                                <option value="all">All Sync States</option>
+                                {availableSyncStates.map((state) => (
+                                    <option key={state} value={state}>
+                                        {getImportSyncStateLabel(state)}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={queueRetryable}
+                                onChange={(event) => setQueueRetryable(event.target.value as 'all' | 'retryable' | 'stable')}
+                                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                            >
+                                <option value="all">All Retry States</option>
+                                <option value="retryable">Retryable</option>
+                                <option value="stable">Stable</option>
+                            </select>
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={queueSort}
+                                    onChange={(event) => setQueueSort(event.target.value as 'updated_desc' | 'updated_asc' | 'created_desc' | 'created_asc')}
+                                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                >
+                                    <option value="updated_desc">Updated (Newest)</option>
+                                    <option value="updated_asc">Updated (Oldest)</option>
+                                    <option value="created_desc">Created (Newest)</option>
+                                    <option value="created_asc">Created (Oldest)</option>
+                                </select>
+                                {hasQueueFilters ? (
                                     <button
                                         type="button"
-                                        onClick={() => setSelectedRequest(row)}
-                                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        onClick={() => {
+                                            setQueueTab('all')
+                                            setQueueSearch('')
+                                            setQueueSyncState('all')
+                                            setQueueRetryable('all')
+                                            setQueueSort('updated_desc')
+                                        }}
+                                        className="rounded-md border border-slate-300 px-2 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                                     >
-                                        Details
+                                        Reset
                                     </button>
-                                    {row.retryable && row.status === 'failed' ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRetry(row)}
-                                            disabled={Boolean(retryingIds[row.id])}
-                                            className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
-                                        >
-                                            {retryingIds[row.id] ? 'Retrying...' : 'Retry'}
-                                        </button>
-                                    ) : null}
-                                    <button
-                                        type="button"
-                                        onClick={() => handleCloneImportRequest(row)}
-                                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                                    >
-                                        Clone
-                                    </button>
-                                    {row.status === 'pending' ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleWithdrawImportRequest(row)}
-                                            disabled={Boolean(withdrawingImportIds[row.id])}
-                                            className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-900/30"
-                                        >
-                                            {withdrawingImportIds[row.id] ? 'Withdrawing...' : 'Withdraw'}
-                                        </button>
-                                    ) : null}
-                                </div>
-                                {row.error_message ? (
-                                    <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-                                        <AlertTriangle className="h-3 w-3" />
-                                        {row.error_message}
-                                    </div>
                                 ) : null}
                             </div>
-                        ))}
-                        <div className="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
-                            <button
-                                type="button"
-                                disabled={safeQueuePage <= 1}
-                                onClick={() => setQueuePage((prev) => Math.max(1, prev - 1))}
-                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                                Previous
-                            </button>
-                            <p className="text-xs text-slate-600 dark:text-slate-300">
-                                Page {safeQueuePage} of {queueTotalPages}
+                        </div>
+                    ) : null}
+
+                    {loading ? (
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Loading request activity...</p>
+                    ) : error ? (
+                        <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
+                            <p>{error}</p>
+                            {isEntitlementDenied ? (
+                                <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
+                                    Review capability status in{' '}
+                                    <Link to="/help/capability-access" className="underline font-medium">
+                                        Capability Matrix
+                                    </Link>
+                                    .
+                                </p>
+                            ) : null}
+                        </div>
+                    ) : importRequests.length === 0 ? (
+                        <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No quarantine requests yet.</p>
+                            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                                Create a request when product/technology already exists in <EPRTerm /> and you are ready to import and scan.
                             </p>
                             <button
                                 type="button"
-                                disabled={safeQueuePage >= queueTotalPages}
-                                onClick={() => setQueuePage((prev) => Math.min(queueTotalPages, prev + 1))}
-                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                onClick={() => {
+                                    setImportDraftValues(null)
+                                    setCreateImportDrawerOpen(true)
+                                }}
+                                className="mt-3 inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200 dark:hover:bg-emerald-900/30"
                             >
-                                Next
+                                Create Quarantine Request
                             </button>
                         </div>
-                    </div>
-                )}
-            </section>
+                    ) : pagedImportRequests.length === 0 ? (
+                        <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No requests match current filters.</p>
+                            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                                Adjust search/filters or reset the queue view.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="text-xs text-slate-600 dark:text-slate-300">
+                                Showing {(safeQueuePage - 1) * queuePageSize + 1}-
+                                {Math.min(safeQueuePage * queuePageSize, filteredImportRequests.length)} of {filteredImportRequests.length}
+                            </div>
+                            {pagedImportRequests.map((row) => (
+                                <div key={row.id} className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getImportStatusColor(row.status)}`}>
+                                            {row.status}
+                                        </span>
+                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                                            {getImportProgressLabel(row)}
+                                        </span>
+                                        {row.retryable ? (
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+                                                <Clock className="h-3 w-3" />
+                                                Retryable
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                                                <CheckCircle2 className="h-3 w-3" />
+                                                Stable
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                        EPR {row.epr_record_id} • Updated {new Date(row.updated_at).toLocaleString()}
+                                    </p>
+                                    {(() => {
+                                        const diagnostic = getImportDiagnostic(row)
+                                        return (
+                                            <div className={`mt-2 rounded-md border px-2 py-1 text-xs ${getImportDiagnosticClasses(diagnostic.tone)}`}>
+                                                <p className="font-semibold">{diagnostic.title}</p>
+                                                <p className="mt-0.5">{diagnostic.message}</p>
+                                            </div>
+                                        )
+                                    })()}
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <Link
+                                            to={`/quarantine/requests/${row.id}`}
+                                            className="rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-900/40"
+                                        >
+                                            View Status
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedRequest(row)}
+                                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        >
+                                            Details
+                                        </button>
+                                        {row.retryable && row.status === 'failed' ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRetry(row)}
+                                                disabled={Boolean(retryingIds[row.id])}
+                                                className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                                            >
+                                                {retryingIds[row.id] ? 'Retrying...' : 'Retry'}
+                                            </button>
+                                        ) : null}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCloneImportRequest(row)}
+                                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        >
+                                            Clone
+                                        </button>
+                                        {row.status === 'pending' ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleWithdrawImportRequest(row)}
+                                                disabled={Boolean(withdrawingImportIds[row.id])}
+                                                className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-900/30"
+                                            >
+                                                {withdrawingImportIds[row.id] ? 'Withdrawing...' : 'Withdraw'}
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                    {row.error_message ? (
+                                        <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            {row.error_message}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ))}
+                            <div className="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
+                                <button
+                                    type="button"
+                                    disabled={safeQueuePage <= 1}
+                                    onClick={() => setQueuePage((prev) => Math.max(1, prev - 1))}
+                                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    Previous
+                                </button>
+                                <p className="text-xs text-slate-600 dark:text-slate-300">
+                                    Page {safeQueuePage} of {queueTotalPages}
+                                </p>
+                                <button
+                                    type="button"
+                                    disabled={safeQueuePage >= queueTotalPages}
+                                    onClick={() => setQueuePage((prev) => Math.min(queueTotalPages, prev + 1))}
+                                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </section>
             ) : null}
 
             <Drawer
@@ -974,7 +973,7 @@ const QuarantineRequestsPage: React.FC<QuarantineRequestsPageProps> = ({ mode = 
                                 <li>Status: {selectedRequest.status}</li>
                                 <li>Sync State: {getImportSyncStateLabel(selectedRequest.sync_state)}</li>
                                 {selectedRequest.execution_state && (
-                                  <li>Execution State: {getImportProgressLabel(selectedRequest)}</li>
+                                    <li>Execution State: {getImportProgressLabel(selectedRequest)}</li>
                                 )}
                                 {selectedRequest.dispatch_queued_at ? <li>Dispatch Queued: {new Date(selectedRequest.dispatch_queued_at).toLocaleString()}</li> : null}
                                 {selectedRequest.pipeline_started_at ? <li>Pipeline Started: {new Date(selectedRequest.pipeline_started_at).toLocaleString()}</li> : null}
@@ -987,9 +986,9 @@ const QuarantineRequestsPage: React.FC<QuarantineRequestsPageProps> = ({ mode = 
                             </ul>
                         </div>
 
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Request Data</p>
-                                <div className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Request Data</p>
+                            <div className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
                                 <p><span className="font-semibold">EPR Record:</span> {selectedRequest.epr_record_id}</p>
                                 <p><span className="font-semibold">Source Registry:</span> {selectedRequest.source_registry}</p>
                                 <p><span className="font-semibold">Source Image:</span> {selectedRequest.source_image_ref}</p>
@@ -997,22 +996,22 @@ const QuarantineRequestsPage: React.FC<QuarantineRequestsPageProps> = ({ mode = 
                                 {selectedRequest.error_message ? <p><span className="font-semibold">Last Error:</span> {selectedRequest.error_message}</p> : null}
                                 {selectedRequest.failure_class ? <p><span className="font-semibold">Failure Class:</span> {selectedRequest.failure_class}</p> : null}
                                 {selectedRequest.failure_code ? <p><span className="font-semibold">Failure Code:</span> {selectedRequest.failure_code}</p> : null}
-                                </div>
-                                {retryActionError ? (
-                                  <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-                                    <span className="font-semibold">Retry Policy:</span> {retryActionError}
-                                  </div>
-                                ) : null}
                             </div>
+                            {retryActionError ? (
+                                <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                                    <span className="font-semibold">Retry Policy:</span> {retryActionError}
+                                </div>
+                            ) : null}
+                        </div>
 
                         <div className={`rounded-lg border p-4 ${getImportDiagnosticClasses(getImportDiagnostic(selectedRequest).tone)}`}>
                             <p className="text-xs font-semibold uppercase tracking-wide">Operational Diagnostics</p>
                             <p className="mt-1 text-xs font-semibold">{getImportDiagnostic(selectedRequest).title}</p>
                             <p className="mt-1 text-xs">{getImportDiagnostic(selectedRequest).message}</p>
                             {getImportRemediationHint(selectedRequest) ? (
-                              <p className="mt-2 text-xs">
-                                <span className="font-semibold">Recommended Action:</span> {getImportRemediationHint(selectedRequest)}
-                              </p>
+                                <p className="mt-2 text-xs">
+                                    <span className="font-semibold">Recommended Action:</span> {getImportRemediationHint(selectedRequest)}
+                                </p>
                             ) : null}
                         </div>
 

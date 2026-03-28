@@ -1,9 +1,9 @@
 import Drawer from '@/components/ui/Drawer'
 import { useConfirmDialog } from '@/context/ConfirmDialogContext'
 import { adminService } from '@/services/adminService'
-import { ImageImportApiError, imageImportService } from '@/services/imageImportService'
 import { eprRegistrationService } from '@/services/eprRegistrationService'
-import type { ImageImportRequest, ReleaseGovernancePolicyConfig, ReleaseMetricsSnapshot, EPRRegistrationRequest } from '@/types'
+import { ImageImportApiError, imageImportService } from '@/services/imageImportService'
+import type { EPRRegistrationRequest, ImageImportRequest, ReleaseGovernancePolicyConfig, ReleaseMetricsSnapshot } from '@/types'
 import { getImportDiagnostic, getImportDiagnosticClasses, getImportProgressLabel, getImportRemediationHint, getImportSyncStateLabel, hasMeaningfulJSONEvidence } from '@/utils/imageImportDiagnostics'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
@@ -252,10 +252,10 @@ const QuarantineReviewWorkbenchPage: React.FC<QuarantineReviewWorkbenchPageProps
         prev.map((item) =>
           item.id === row.id
             ? {
-                ...item,
-                status: 'approved',
-                updated_at: now,
-              }
+              ...item,
+              status: 'approved',
+              updated_at: now,
+            }
             : item
         )
       )
@@ -287,10 +287,10 @@ const QuarantineReviewWorkbenchPage: React.FC<QuarantineReviewWorkbenchPageProps
         prev.map((item) =>
           item.id === row.id
             ? {
-                ...item,
-                status: 'failed',
-                updated_at: now,
-              }
+              ...item,
+              status: 'failed',
+              updated_at: now,
+            }
             : item
         )
       )
@@ -554,240 +554,240 @@ const QuarantineReviewWorkbenchPage: React.FC<QuarantineReviewWorkbenchPageProps
       </div>
 
       {!isEprMode ? (
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        {!isDashboardMode ? (
-          <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search by image, EPR, status, sync state"
-              className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            />
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as 'all' | ImageImportRequest['status'])}
-              className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            >
-              <option value="all">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="importing">Importing</option>
-              <option value="success">Success</option>
-              <option value="quarantined">Quarantined</option>
-              <option value="failed">Failed</option>
-            </select>
-            <div className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
-              Filtered rows: <span className="font-semibold">{filteredRows.length}</span>
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          {!isDashboardMode ? (
+            <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search by image, EPR, status, sync state"
+                className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as 'all' | ImageImportRequest['status'])}
+                className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              >
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="importing">Importing</option>
+                <option value="success">Success</option>
+                <option value="quarantined">Quarantined</option>
+                <option value="failed">Failed</option>
+              </select>
+              <div className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                Filtered rows: <span className="font-semibold">{filteredRows.length}</span>
+              </div>
             </div>
-          </div>
-        ) : null}
-        {!isRequestsMode ? (
-          <>
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                Pending Decisions ({pendingRows.length})
-              </h2>
-              {isDashboardMode ? (
-                <Link to="/reviewer/quarantine/requests" className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">
-                  View all requests
-                </Link>
-              ) : null}
-            </div>
-            {loading ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading review queue...</p>
-            ) : error ? (
-              <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
-                <p>{error}</p>
-                {permissionDenied ? (
-                  <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
-                    Review access requirements in{' '}
-                    <Link to="/help/capability-access" className="font-medium underline">
-                      Capability Matrix
-                    </Link>
-                    .
-                  </p>
+          ) : null}
+          {!isRequestsMode ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+                  Pending Decisions ({pendingRows.length})
+                </h2>
+                {isDashboardMode ? (
+                  <Link to="/reviewer/quarantine/requests" className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">
+                    View all requests
+                  </Link>
                 ) : null}
               </div>
-            ) : visiblePendingRows.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No pending approvals.</p>
-            ) : (
-              <div className="mt-3 space-y-3">
-                {visiblePendingRows.map((row) => {
-                  const diagnostic = getImportDiagnostic(row)
-                  return (
-                    <div key={row.id} className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                          {getImportProgressLabel(row)}
-                        </span>
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
-                          {row.status}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        EPR {row.epr_record_id} • Updated {new Date(row.updated_at).toLocaleString()}
-                      </p>
-                      <div className={`mt-2 rounded-md border px-2 py-1 text-xs ${getImportDiagnosticClasses(diagnostic.tone)}`}>
-                        <p className="font-semibold">{diagnostic.title}</p>
-                        <p className="mt-0.5">{diagnostic.message}</p>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <Link
-                          to={`${requestDetailBasePath}/${row.id}`}
-                          className="rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/40"
-                        >
-                          View Status
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => setSelected(row)}
-                          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                          Details
-                        </button>
-                        <button
-                          type="button"
-                          disabled={Boolean(actionBusy[row.id])}
-                          onClick={() => void handleApprove(row)}
-                          className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
-                        >
-                          {actionBusy[row.id] ? 'Submitting...' : 'Approve'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={Boolean(actionBusy[row.id])}
-                          onClick={() => void handleReject(row)}
-                          className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/40"
-                        >
-                          {actionBusy[row.id] ? 'Submitting...' : 'Reject'}
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                Review List ({filteredRows.length})
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Click a row or `Details` to inspect full request payload.</p>
-            </div>
-            {loading ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading review queue...</p>
-            ) : error ? (
-              <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
-                <p>{error}</p>
-                {permissionDenied ? (
-                  <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
-                    Review access requirements in{' '}
-                    <Link to="/help/capability-access" className="font-medium underline">
-                      Capability Matrix
-                    </Link>
-                    .
-                  </p>
-                ) : null}
-              </div>
-            ) : filteredRows.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No requests match the current filters.</p>
-            ) : (
-              <div className="mt-3 overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
-                <table className="min-w-full text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-800/70">
-                    <tr className="text-left text-slate-600 dark:text-slate-300">
-                      <th className="px-3 py-2 font-medium">Status</th>
-                      <th className="px-3 py-2 font-medium">Image</th>
-                      <th className="px-3 py-2 font-medium">EPR</th>
-                      <th className="px-3 py-2 font-medium">Updated</th>
-                      <th className="px-3 py-2 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="cursor-pointer bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70"
-                      onClick={() => setSelected(row)}
-                      onKeyDown={(event) => handleRowKeyActivate(event, () => setSelected(row))}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Open request ${row.source_image_ref}`}
-                    >
-                        <td className="px-3 py-2 align-top">
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+              {loading ? (
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading review queue...</p>
+              ) : error ? (
+                <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
+                  <p>{error}</p>
+                  {permissionDenied ? (
+                    <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
+                      Review access requirements in{' '}
+                      <Link to="/help/capability-access" className="font-medium underline">
+                        Capability Matrix
+                      </Link>
+                      .
+                    </p>
+                  ) : null}
+                </div>
+              ) : visiblePendingRows.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No pending approvals.</p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {visiblePendingRows.map((row) => {
+                    const diagnostic = getImportDiagnostic(row)
+                    return (
+                      <div key={row.id} className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                            {getImportProgressLabel(row)}
+                          </span>
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
                             {row.status}
                           </span>
-                          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{getImportProgressLabel(row)}</p>
-                        </td>
-                        <td className="px-3 py-2 align-top text-slate-900 dark:text-slate-100">
-                          <p className="line-clamp-1">{row.source_image_ref}</p>
-                          {row.release_blocker_reason ? (
-                            <p className="mt-1 line-clamp-1 text-[11px] text-amber-700 dark:text-amber-300">{row.release_blocker_reason}</p>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-2 align-top text-slate-700 dark:text-slate-300">{row.epr_record_id}</td>
-                        <td className="px-3 py-2 align-top text-slate-600 dark:text-slate-400">{new Date(row.updated_at).toLocaleString()}</td>
-                        <td className="px-3 py-2 align-top">
-                          <div className="flex flex-wrap items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
-                            <Link
-                              to={`${requestDetailBasePath}/${row.id}`}
-                              className="rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-800 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/40"
-                            >
-                              View Status
-                            </Link>
-                            <button
-                              type="button"
-                              onClick={() => setSelected(row)}
-                              className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                              Details
-                            </button>
-                            {row.status === 'pending' ? (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={Boolean(actionBusy[row.id])}
-                                  onClick={() => void handleApprove(row)}
-                                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
-                                >
-                                  {actionBusy[row.id] ? '...' : 'Approve'}
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={Boolean(actionBusy[row.id])}
-                                  onClick={() => void handleReject(row)}
-                                  className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/40"
-                                >
-                                  {actionBusy[row.id] ? '...' : 'Reject'}
-                                </button>
-                              </>
+                        </div>
+                        <p className="text-sm text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          EPR {row.epr_record_id} • Updated {new Date(row.updated_at).toLocaleString()}
+                        </p>
+                        <div className={`mt-2 rounded-md border px-2 py-1 text-xs ${getImportDiagnosticClasses(diagnostic.tone)}`}>
+                          <p className="font-semibold">{diagnostic.title}</p>
+                          <p className="mt-0.5">{diagnostic.message}</p>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <Link
+                            to={`${requestDetailBasePath}/${row.id}`}
+                            className="rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/40"
+                          >
+                            View Status
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => setSelected(row)}
+                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                          >
+                            Details
+                          </button>
+                          <button
+                            type="button"
+                            disabled={Boolean(actionBusy[row.id])}
+                            onClick={() => void handleApprove(row)}
+                            className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+                          >
+                            {actionBusy[row.id] ? 'Submitting...' : 'Approve'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={Boolean(actionBusy[row.id])}
+                            onClick={() => void handleReject(row)}
+                            className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/40"
+                          >
+                            {actionBusy[row.id] ? 'Submitting...' : 'Reject'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+                  Review List ({filteredRows.length})
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Click a row or `Details` to inspect full request payload.</p>
+              </div>
+              {loading ? (
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading review queue...</p>
+              ) : error ? (
+                <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
+                  <p>{error}</p>
+                  {permissionDenied ? (
+                    <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
+                      Review access requirements in{' '}
+                      <Link to="/help/capability-access" className="font-medium underline">
+                        Capability Matrix
+                      </Link>
+                      .
+                    </p>
+                  ) : null}
+                </div>
+              ) : filteredRows.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No requests match the current filters.</p>
+              ) : (
+                <div className="mt-3 overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-800/70">
+                      <tr className="text-left text-slate-600 dark:text-slate-300">
+                        <th className="px-3 py-2 font-medium">Status</th>
+                        <th className="px-3 py-2 font-medium">Image</th>
+                        <th className="px-3 py-2 font-medium">EPR</th>
+                        <th className="px-3 py-2 font-medium">Updated</th>
+                        <th className="px-3 py-2 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                      {filteredRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="cursor-pointer bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70"
+                          onClick={() => setSelected(row)}
+                          onKeyDown={(event) => handleRowKeyActivate(event, () => setSelected(row))}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`Open request ${row.source_image_ref}`}
+                        >
+                          <td className="px-3 py-2 align-top">
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+                              {row.status}
+                            </span>
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{getImportProgressLabel(row)}</p>
+                          </td>
+                          <td className="px-3 py-2 align-top text-slate-900 dark:text-slate-100">
+                            <p className="line-clamp-1">{row.source_image_ref}</p>
+                            {row.release_blocker_reason ? (
+                              <p className="mt-1 line-clamp-1 text-[11px] text-amber-700 dark:text-amber-300">{row.release_blocker_reason}</p>
                             ) : null}
-                            {row.release_state === 'ready_for_release' ? (
+                          </td>
+                          <td className="px-3 py-2 align-top text-slate-700 dark:text-slate-300">{row.epr_record_id}</td>
+                          <td className="px-3 py-2 align-top text-slate-600 dark:text-slate-400">{new Date(row.updated_at).toLocaleString()}</td>
+                          <td className="px-3 py-2 align-top">
+                            <div className="flex flex-wrap items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+                              <Link
+                                to={`${requestDetailBasePath}/${row.id}`}
+                                className="rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-800 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/40"
+                              >
+                                View Status
+                              </Link>
                               <button
                                 type="button"
-                                disabled={Boolean(actionBusy[row.id])}
-                                onClick={() => void handleRelease(row)}
-                                className="rounded-md border border-indigo-300 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-800 hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/40"
+                                onClick={() => setSelected(row)}
+                                className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                               >
-                                {actionBusy[row.id] ? '...' : 'Release'}
+                                Details
                               </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </section>
+                              {row.status === 'pending' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={Boolean(actionBusy[row.id])}
+                                    onClick={() => void handleApprove(row)}
+                                    className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+                                  >
+                                    {actionBusy[row.id] ? '...' : 'Approve'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={Boolean(actionBusy[row.id])}
+                                    onClick={() => void handleReject(row)}
+                                    className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/40"
+                                  >
+                                    {actionBusy[row.id] ? '...' : 'Reject'}
+                                  </button>
+                                </>
+                              ) : null}
+                              {row.release_state === 'ready_for_release' ? (
+                                <button
+                                  type="button"
+                                  disabled={Boolean(actionBusy[row.id])}
+                                  onClick={() => void handleRelease(row)}
+                                  className="rounded-md border border-indigo-300 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-800 hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/40"
+                                >
+                                  {actionBusy[row.id] ? '...' : 'Release'}
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </section>
       ) : null}
 
       {!isRequestsMode ? (
@@ -821,11 +821,10 @@ const QuarantineReviewWorkbenchPage: React.FC<QuarantineReviewWorkbenchPageProps
                   key={chip.key}
                   type="button"
                   onClick={() => setEprQueueFilter(chip.key as 'all' | 'pending' | 'approved' | 'active' | 'expiring' | 'expired' | 'suspended')}
-                  className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
-                    eprQueueFilter === chip.key
+                  className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${eprQueueFilter === chip.key
                       ? 'border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-700 dark:bg-blue-900/40 dark:text-blue-200'
                       : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
-                  }`}
+                    }`}
                 >
                   {chip.label}
                 </button>
@@ -835,11 +834,10 @@ const QuarantineReviewWorkbenchPage: React.FC<QuarantineReviewWorkbenchPageProps
           <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">EPR Lifecycle Metrics</p>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                eprLifecycleThresholdBreached
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${eprLifecycleThresholdBreached
                   ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
                   : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-              }`}>
+                }`}>
                 {eprLifecycleThresholdBreached ? 'degraded' : 'healthy'}
               </span>
             </div>
@@ -939,15 +937,14 @@ const QuarantineReviewWorkbenchPage: React.FC<QuarantineReviewWorkbenchPageProps
                         </span>
                       </td>
                       <td className="px-3 py-2 align-top">
-                        <span className={`rounded-full px-2 py-0.5 font-medium ${
-                          row.lifecycle_status === 'suspended'
+                        <span className={`rounded-full px-2 py-0.5 font-medium ${row.lifecycle_status === 'suspended'
                             ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'
                             : row.lifecycle_status === 'expired'
                               ? 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100'
                               : row.lifecycle_status === 'expiring'
                                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
                                 : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-                        }`}>
+                          }`}>
                           {row.lifecycle_status || 'active'}
                         </span>
                       </td>
@@ -1040,157 +1037,157 @@ const QuarantineReviewWorkbenchPage: React.FC<QuarantineReviewWorkbenchPageProps
       )}
 
       {!isRequestsMode && !isEprMode ? (
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className={`mb-3 rounded-md border px-3 py-2 ${releaseFailureThresholdBreached || blockedThresholdBreached
-          ? 'border-amber-200 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/25'
-          : 'border-emerald-200 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20'
-          }`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Release Governance</h2>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${releaseFailureThresholdBreached || blockedThresholdBreached
-              ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
-              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200'
-              }`}>
-              {releaseFailureThresholdBreached || blockedThresholdBreached ? 'degraded' : 'healthy'}
-            </span>
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] md:grid-cols-4">
-            <p className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Requested: <span className="font-semibold">{releaseMetrics.requested}</span></p>
-            <p className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Released: <span className="font-semibold">{releaseMetrics.released}</span></p>
-            <p className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Failed: <span className="font-semibold">{releaseMetrics.failed}</span></p>
-            <p className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-              Failure Ratio: <span className="font-semibold">{(releaseFailureRatio * 100).toFixed(1)}%</span>
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className={`mb-3 rounded-md border px-3 py-2 ${releaseFailureThresholdBreached || blockedThresholdBreached
+            ? 'border-amber-200 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/25'
+            : 'border-emerald-200 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20'
+            }`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Release Governance</h2>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${releaseFailureThresholdBreached || blockedThresholdBreached
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
+                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200'
+                }`}>
+                {releaseFailureThresholdBreached || blockedThresholdBreached ? 'degraded' : 'healthy'}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] md:grid-cols-4">
+              <p className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Requested: <span className="font-semibold">{releaseMetrics.requested}</span></p>
+              <p className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Released: <span className="font-semibold">{releaseMetrics.released}</span></p>
+              <p className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Failed: <span className="font-semibold">{releaseMetrics.failed}</span></p>
+              <p className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                Failure Ratio: <span className="font-semibold">{(releaseFailureRatio * 100).toFixed(1)}%</span>
+              </p>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-600 dark:text-slate-300">
+              Thresholds: ratio {(releasePolicy.failure_ratio_threshold * 100).toFixed(1)}% after {releasePolicy.minimum_samples} samples, blocked lane trigger {releasePolicy.consecutive_failures_threshold}, window {releasePolicy.window_minutes}m.
             </p>
           </div>
-          <p className="mt-2 text-[11px] text-slate-600 dark:text-slate-300">
-            Thresholds: ratio {(releasePolicy.failure_ratio_threshold * 100).toFixed(1)}% after {releasePolicy.minimum_samples} samples, blocked lane trigger {releasePolicy.consecutive_failures_threshold}, window {releasePolicy.window_minutes}m.
-          </p>
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/20">
-            <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Ready ({releaseReadyRows.length})</h3>
-            {releaseReadyRows.length === 0 ? (
-              <p className="mt-2 text-xs text-emerald-800/80 dark:text-emerald-300">No release-ready artifacts.</p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {releaseReadyRows.map((row) => (
-                  <div key={row.id} className="rounded-md border border-emerald-200 bg-white p-2.5 dark:border-emerald-800 dark:bg-slate-900">
-                    <p className="text-xs font-medium text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
-                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      {row.source_image_digest ? `Digest ${row.source_image_digest}` : 'Digest pending'}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/20">
+              <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Ready ({releaseReadyRows.length})</h3>
+              {releaseReadyRows.length === 0 ? (
+                <p className="mt-2 text-xs text-emerald-800/80 dark:text-emerald-300">No release-ready artifacts.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {releaseReadyRows.map((row) => (
+                    <div key={row.id} className="rounded-md border border-emerald-200 bg-white p-2.5 dark:border-emerald-800 dark:bg-slate-900">
+                      <p className="text-xs font-medium text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
+                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                        {row.source_image_digest ? `Digest ${row.source_image_digest}` : 'Digest pending'}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelected(row)}
+                          className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          Details
+                        </button>
+                        <button
+                          type="button"
+                          disabled={Boolean(actionBusy[row.id])}
+                          onClick={() => void handleRelease(row)}
+                          className="rounded-md border border-indigo-300 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-800 hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/40"
+                        >
+                          {actionBusy[row.id] ? 'Submitting...' : 'Release'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-800 dark:bg-amber-950/20">
+              <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Blocked ({releaseBlockedRows.length})</h3>
+              {releaseBlockedRows.length === 0 ? (
+                <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-300">No blocked artifacts.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {releaseBlockedRows.map((row) => (
+                    <div key={row.id} className="rounded-md border border-amber-200 bg-white p-2.5 dark:border-amber-800 dark:bg-slate-900">
+                      <p className="text-xs font-medium text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
+                      <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+                        {row.release_blocker_reason || row.error_message || 'Not eligible for release yet'}
+                      </p>
                       <button
                         type="button"
                         onClick={() => setSelected(row)}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                        className="mt-2 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
                         Details
                       </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-md border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-800 dark:bg-sky-950/20">
+              <h3 className="text-sm font-semibold text-sky-900 dark:text-sky-200">In Progress ({releaseInProgressRows.length})</h3>
+              {releaseInProgressRows.length === 0 ? (
+                <p className="mt-2 text-xs text-sky-800/80 dark:text-sky-300">No in-progress releases.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {releaseInProgressRows.map((row) => (
+                    <div key={row.id} className="rounded-md border border-sky-200 bg-white p-2.5 dark:border-sky-800 dark:bg-slate-900">
+                      <p className="text-xs font-medium text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
+                      <p className="mt-1 text-[11px] text-sky-800 dark:text-sky-300">Release request accepted and awaiting completion.</p>
                       <button
                         type="button"
-                        disabled={Boolean(actionBusy[row.id])}
-                        onClick={() => void handleRelease(row)}
-                        className="rounded-md border border-indigo-300 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-800 hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/40"
+                        onClick={() => setSelected(row)}
+                        className="mt-2 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
-                        {actionBusy[row.id] ? 'Submitting...' : 'Release'}
+                        Details
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-800 dark:bg-amber-950/20">
-            <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Blocked ({releaseBlockedRows.length})</h3>
-            {releaseBlockedRows.length === 0 ? (
-              <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-300">No blocked artifacts.</p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {releaseBlockedRows.map((row) => (
-                  <div key={row.id} className="rounded-md border border-amber-200 bg-white p-2.5 dark:border-amber-800 dark:bg-slate-900">
-                    <p className="text-xs font-medium text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
-                    <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
-                      {row.release_blocker_reason || row.error_message || 'Not eligible for release yet'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setSelected(row)}
-                      className="mt-2 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      Details
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="rounded-md border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-800 dark:bg-indigo-950/20">
+              <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">Released ({releasedRows.length})</h3>
+              {releasedRows.length === 0 ? (
+                <p className="mt-2 text-xs text-indigo-800/80 dark:text-indigo-300">No released artifacts yet.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {releasedRows.map((row) => (
+                    <div key={row.id} className="rounded-md border border-indigo-200 bg-white p-2.5 dark:border-indigo-800 dark:bg-slate-900">
+                      <p className="text-xs font-medium text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
+                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Available for tenant consumption.</p>
+                      <button
+                        type="button"
+                        onClick={() => setSelected(row)}
+                        className="mt-2 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        Details
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-
-          <div className="rounded-md border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-800 dark:bg-sky-950/20">
-            <h3 className="text-sm font-semibold text-sky-900 dark:text-sky-200">In Progress ({releaseInProgressRows.length})</h3>
-            {releaseInProgressRows.length === 0 ? (
-              <p className="mt-2 text-xs text-sky-800/80 dark:text-sky-300">No in-progress releases.</p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {releaseInProgressRows.map((row) => (
-                  <div key={row.id} className="rounded-md border border-sky-200 bg-white p-2.5 dark:border-sky-800 dark:bg-slate-900">
-                    <p className="text-xs font-medium text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
-                    <p className="mt-1 text-[11px] text-sky-800 dark:text-sky-300">Release request accepted and awaiting completion.</p>
-                    <button
-                      type="button"
-                      onClick={() => setSelected(row)}
-                      className="mt-2 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      Details
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-md border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-800 dark:bg-indigo-950/20">
-            <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">Released ({releasedRows.length})</h3>
-            {releasedRows.length === 0 ? (
-              <p className="mt-2 text-xs text-indigo-800/80 dark:text-indigo-300">No released artifacts yet.</p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {releasedRows.map((row) => (
-                  <div key={row.id} className="rounded-md border border-indigo-200 bg-white p-2.5 dark:border-indigo-800 dark:bg-slate-900">
-                    <p className="text-xs font-medium text-slate-900 dark:text-slate-100">{row.source_image_ref}</p>
-                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Available for tenant consumption.</p>
-                    <button
-                      type="button"
-                      onClick={() => setSelected(row)}
-                      className="mt-2 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      Details
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+        </section>
       ) : null}
 
       {!isRequestsMode && !isEprMode ? (
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Recent Decisions</h2>
-        {recentRows.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No recent completed decisions.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {recentRows.map((row) => (
-              <div key={row.id} className="rounded-md border border-slate-200 p-2 text-xs text-slate-700 dark:border-slate-700 dark:text-slate-300">
-                <span className="font-semibold">{row.status}</span> • {row.source_image_ref}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Recent Decisions</h2>
+          {recentRows.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No recent completed decisions.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {recentRows.map((row) => (
+                <div key={row.id} className="rounded-md border border-slate-200 p-2 text-xs text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                  <span className="font-semibold">{row.status}</span> • {row.source_image_ref}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       ) : null}
 
       <Drawer

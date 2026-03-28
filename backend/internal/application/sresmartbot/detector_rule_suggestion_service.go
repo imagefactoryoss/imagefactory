@@ -67,7 +67,7 @@ func (s *DetectorRuleSuggestionService) ObserveSignal(ctx context.Context, incid
 		return
 	}
 	if mode == "training_auto_create" {
-		if _, err := s.AcceptSuggestion(ctx, suggestion.ID, "sre-smart-bot"); err != nil && s.logger != nil {
+		if _, err := s.AcceptSuggestion(ctx, suggestion.ID, "sre-smart-bot", nil); err != nil && s.logger != nil {
 			s.logger.Warn("Failed to auto-activate detector rule suggestion", zap.Error(err), zap.String("suggestion_id", suggestion.ID.String()))
 		}
 	}
@@ -131,7 +131,10 @@ func (s *DetectorRuleSuggestionService) ProposeFromIncident(ctx context.Context,
 	return suggestion, nil
 }
 
-func (s *DetectorRuleSuggestionService) AcceptSuggestion(ctx context.Context, suggestionID uuid.UUID, reviewedBy string) (*domainsresmartbot.DetectorRuleSuggestion, error) {
+// AcceptSuggestion promotes a detector rule suggestion into the active policy.
+// policyTenantID overrides which tenant scope the policy is written to; pass nil to fall back to
+// the suggestion's own tenant (the incident's original tenant).
+func (s *DetectorRuleSuggestionService) AcceptSuggestion(ctx context.Context, suggestionID uuid.UUID, reviewedBy string, policyTenantID *uuid.UUID) (*domainsresmartbot.DetectorRuleSuggestion, error) {
 	if s == nil || s.repo == nil || s.policyStore == nil {
 		return nil, nil
 	}
@@ -139,7 +142,14 @@ func (s *DetectorRuleSuggestionService) AcceptSuggestion(ctx context.Context, su
 	if err != nil {
 		return nil, err
 	}
-	policy, err := s.policyStore.GetRobotSREPolicyConfig(ctx, suggestion.TenantID)
+	// Determine the tenant scope for the policy write.  Prefer the explicitly provided
+	// policyTenantID (derived from the admin's current request context) so that a global
+	// admin accepting a suggestion always writes to the correct scope.
+	writeTenantID := suggestion.TenantID
+	if policyTenantID != nil {
+		writeTenantID = policyTenantID
+	}
+	policy, err := s.policyStore.GetRobotSREPolicyConfig(ctx, writeTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +160,7 @@ func (s *DetectorRuleSuggestionService) AcceptSuggestion(ctx context.Context, su
 		if parsed, parseErr := uuid.Parse(strings.TrimSpace(reviewedBy)); parseErr == nil {
 			updatedBy = parsed
 		}
-		if _, err := s.policyStore.UpdateRobotSREPolicyConfig(ctx, suggestion.TenantID, policy, updatedBy); err != nil {
+		if _, err := s.policyStore.UpdateRobotSREPolicyConfig(ctx, writeTenantID, policy, updatedBy); err != nil {
 			return nil, err
 		}
 	}

@@ -247,11 +247,10 @@ const BuildsPage: React.FC = () => {
                         Manage your container builds and deployments.
                     </p>
                     {hasProjects && (
-                        <p className={`mt-2 inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                            isWsConnected
+                        <p className={`mt-2 inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${isWsConnected
                                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                                 : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                        }`}>
+                            }`}>
                             {isWsConnected ? 'Live status updates on' : 'Live status updates reconnecting'}
                         </p>
                     )}
@@ -425,77 +424,77 @@ const BuildsPage: React.FC = () => {
 
                                                 return (
                                                     <tr key={build.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div>
-                                                            <Link
-                                                                to={`/builds/${build.id}`}
-                                                                className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600"
-                                                            >
-                                                                {build.manifest.name}
-                                                            </Link>
-                                                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                                {build.id.slice(0, 8)}...
-                                                            </div>
-                                                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                                <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                                                                    Source: {sourceLabel}
-                                                                </span>
-                                                                <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                                                                    Ref: {refPolicy === 'fixed'
-                                                                        ? 'Fixed'
-                                                                        : refPolicy === 'event_ref'
-                                                                            ? 'Webhook'
-                                                                            : 'Default'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(build.status)}`}>
-                                                            {build.status.charAt(0).toUpperCase() + build.status.slice(1)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                                        {build.manifest.type.charAt(0).toUpperCase() + build.manifest.type.slice(1)}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                                        {formatDuration(build)}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                                        {formatDate(build.createdAt)}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <div className="flex justify-end space-x-2">
-                                                            <Link
-                                                                to={`/builds/${build.id}`}
-                                                                className="text-blue-600 hover:text-blue-900"
-                                                            >
-                                                                View
-                                                            </Link>
-                                                            {build.status === 'running' && (
-                                                                <button
-                                                                    onClick={() => handleCancelBuild(build.id)}
-                                                                    className="text-red-600 hover:text-red-900"
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <div>
+                                                                <Link
+                                                                    to={`/builds/${build.id}`}
+                                                                    className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600"
                                                                 >
-                                                                    Cancel
+                                                                    {build.manifest.name}
+                                                                </Link>
+                                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                                    {build.id.slice(0, 8)}...
+                                                                </div>
+                                                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                                                    <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                                                                        Source: {sourceLabel}
+                                                                    </span>
+                                                                    <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                                                                        Ref: {refPolicy === 'fixed'
+                                                                            ? 'Fixed'
+                                                                            : refPolicy === 'event_ref'
+                                                                                ? 'Webhook'
+                                                                                : 'Default'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(build.status)}`}>
+                                                                {build.status.charAt(0).toUpperCase() + build.status.slice(1)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                            {build.manifest.type.charAt(0).toUpperCase() + build.manifest.type.slice(1)}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                                                            {formatDuration(build)}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                                                            {formatDate(build.createdAt)}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                            <div className="flex justify-end space-x-2">
+                                                                <Link
+                                                                    to={`/builds/${build.id}`}
+                                                                    className="text-blue-600 hover:text-blue-900"
+                                                                >
+                                                                    View
+                                                                </Link>
+                                                                {build.status === 'running' && (
+                                                                    <button
+                                                                        onClick={() => handleCancelBuild(build.id)}
+                                                                        className="text-red-600 hover:text-red-900"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleCloneBuild(build.id)}
+                                                                    className="text-indigo-700 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                                                >
+                                                                    Clone
                                                                 </button>
-                                                            )}
-                                                            <button
-                                                                onClick={() => handleCloneBuild(build.id)}
-                                                                className="text-indigo-700 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
-                                                            >
-                                                                Clone
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteBuild(build.id, build.status)}
-                                                                disabled={!canDeleteBuild(build.status)}
-                                                                className="text-red-700 hover:text-red-900 disabled:text-slate-400 disabled:cursor-not-allowed dark:text-red-400 dark:hover:text-red-300 dark:disabled:text-slate-500"
-                                                                title={canDeleteBuild(build.status) ? 'Delete build' : 'Cannot delete running or queued build'}
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    </td>
+                                                                <button
+                                                                    onClick={() => handleDeleteBuild(build.id, build.status)}
+                                                                    disabled={!canDeleteBuild(build.status)}
+                                                                    className="text-red-700 hover:text-red-900 disabled:text-slate-400 disabled:cursor-not-allowed dark:text-red-400 dark:hover:text-red-300 dark:disabled:text-slate-500"
+                                                                    title={canDeleteBuild(build.status) ? 'Delete build' : 'Cannot delete running or queued build'}
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </td>
                                                     </tr>
                                                 )
                                             })}

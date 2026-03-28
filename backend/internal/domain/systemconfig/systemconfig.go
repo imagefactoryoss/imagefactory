@@ -258,6 +258,11 @@ type OperationCapabilitiesConfig struct {
 	OnDemandImageScan bool `json:"ondemand_image_scanning"`
 }
 
+// ProductInfoMetadataConfig stores runtime product-info metadata for frontend presentation.
+type ProductInfoMetadataConfig struct {
+	LastBacklogSync string `json:"last_backlog_sync"`
+}
+
 // CapabilitySurfaceSet describes effective UI/action surface keys allowed for
 // the current tenant context.
 type CapabilitySurfaceSet struct {
@@ -389,6 +394,19 @@ type RobotSREMCPServer struct {
 	Settings         map[string]string `json:"settings,omitempty"`
 }
 
+// RobotSRERemediationPack defines guided remediation metadata exposed to the
+// admin API and incident workspace.
+type RobotSRERemediationPack struct {
+	Key              string   `json:"key"`
+	Version          string   `json:"version"`
+	Name             string   `json:"name"`
+	Summary          string   `json:"summary"`
+	RiskTier         string   `json:"risk_tier"`
+	ActionClass      string   `json:"action_class"`
+	RequiresApproval bool     `json:"requires_approval"`
+	IncidentTypes    []string `json:"incident_types"`
+}
+
 // RobotSREAgentRuntimeConfig controls the optional AI/agent feature layer that
 // sits on top of deterministic incident, policy, and approval logic.
 type RobotSREAgentRuntimeConfig struct {
@@ -426,8 +444,9 @@ type RobotSREPolicyConfig struct {
 	EnabledDomains                   []string                   `json:"enabled_domains"`
 	ChannelProviders                 []RobotSREChannelProvider  `json:"channel_providers,omitempty"`
 	MCPServers                       []RobotSREMCPServer        `json:"mcp_servers,omitempty"`
+	RemediationPacks                 []RobotSRERemediationPack  `json:"remediation_packs,omitempty"`
 	AgentRuntime                     RobotSREAgentRuntimeConfig `json:"agent_runtime"`
-	DetectorRules                    []RobotSREDetectorRule     `json:"detector_rules,omitempty"`
+	DetectorRules                    []RobotSREDetectorRule     `json:"detector_rules"`
 	OperatorRules                    []RobotSREOperatorRule     `json:"operator_rules,omitempty"`
 }
 

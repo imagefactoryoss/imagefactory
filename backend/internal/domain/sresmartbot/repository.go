@@ -137,6 +137,26 @@ type ApprovalFilter struct {
 	Offset            int
 }
 
+type RemediationPackRun struct {
+	ID              uuid.UUID       `json:"id"`
+	TenantID        *uuid.UUID      `json:"tenant_id,omitempty"`
+	IncidentID      uuid.UUID       `json:"incident_id"`
+	PackKey         string          `json:"pack_key"`
+	PackVersion     string          `json:"pack_version"`
+	RunKind         string          `json:"run_kind"`
+	Status          string          `json:"status"`
+	RequestedBy     string          `json:"requested_by,omitempty"`
+	RequestID       string          `json:"request_id,omitempty"`
+	ApprovalID      *uuid.UUID      `json:"approval_id,omitempty"`
+	ActionAttemptID *uuid.UUID      `json:"action_attempt_id,omitempty"`
+	Summary         string          `json:"summary,omitempty"`
+	ResultPayload   json.RawMessage `json:"result_payload,omitempty"`
+	StartedAt       *time.Time      `json:"started_at,omitempty"`
+	CompletedAt     *time.Time      `json:"completed_at,omitempty"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+}
+
 type DetectorRuleSuggestionStatus string
 
 const (
@@ -204,4 +224,6 @@ type Repository interface {
 	GetDetectorRuleSuggestion(ctx context.Context, id uuid.UUID) (*DetectorRuleSuggestion, error)
 	GetDetectorRuleSuggestionByFingerprint(ctx context.Context, fingerprint string) (*DetectorRuleSuggestion, error)
 	ListDetectorRuleSuggestions(ctx context.Context, filter DetectorRuleSuggestionFilter) ([]*DetectorRuleSuggestion, error)
+	CreateRemediationPackRun(ctx context.Context, run *RemediationPackRun) error
+	ListRemediationPackRunsByIncident(ctx context.Context, incidentID uuid.UUID) ([]*RemediationPackRun, error)
 }

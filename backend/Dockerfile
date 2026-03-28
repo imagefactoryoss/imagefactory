@@ -34,12 +34,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
     -ldflags "-X main.buildVersion=${BUILD_VERSION} -X main.buildCommit=${BUILD_COMMIT} -X main.buildTime=${BUILD_TIME} -X main.buildDirty=${BUILD_DIRTY}" \
     -o email-template-seeder ./cmd/email-template-seeder
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
-    -ldflags "-X main.buildVersion=${BUILD_VERSION} -X main.buildCommit=${BUILD_COMMIT} -X main.buildTime=${BUILD_TIME} -X main.buildDirty=${BUILD_DIRTY}" \
-    -o external-service-seeder ./cmd/external-service-seeder
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
-    -ldflags "-X main.buildVersion=${BUILD_VERSION} -X main.buildCommit=${BUILD_COMMIT} -X main.buildTime=${BUILD_TIME} -X main.buildDirty=${BUILD_DIRTY}" \
-    -o external-tenant-service ./cmd/external-tenant-service
 
 # Final stage
 FROM alpine:latest
@@ -60,8 +54,6 @@ COPY --from=builder /app/server .
 COPY --from=builder /app/migrate .
 COPY --from=builder /app/essential-config-seeder .
 COPY --from=builder /app/email-template-seeder .
-COPY --from=builder /app/external-service-seeder .
-COPY --from=builder /app/external-tenant-service .
 
 # Copy migrations if needed
 COPY --from=builder /app/migrations ./migrations

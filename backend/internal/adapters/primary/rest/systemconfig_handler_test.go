@@ -707,3 +707,53 @@ func TestSystemConfigHandler_TektonTaskImages_UpdateInvalidPayload(t *testing.T)
 	handler.UpdateTektonTaskImages(updateResp, updateReq)
 	require.Equal(t, http.StatusBadRequest, updateResp.Code, updateResp.Body.String())
 }
+
+func TestSystemConfigHandler_ProductInfoMetadata_GetDefaults(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+	repo := newInMemorySystemConfigRepo()
+	service := systemconfig.NewService(repo, logger)
+	handler := &SystemConfigHandler{
+		systemConfigService: service,
+		logger:              logger,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/product-info-metadata", nil)
+	resp := httptest.NewRecorder()
+
+	handler.GetProductInfoMetadata(resp, req)
+	require.Equal(t, http.StatusOK, resp.Code, resp.Body.String())
+
+	var out systemconfig.ProductInfoMetadataConfig
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &out))
+	assert.Equal(t, "", out.LastBacklogSync)
+}
+
+func TestSystemConfigHandler_ProductInfoMetadata_ConfiguredValue(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+	repo := newInMemorySystemConfigRepo()
+	service := systemconfig.NewService(repo, logger)
+	handler := &SystemConfigHandler{
+		systemConfigService: service,
+		logger:              logger,
+	}
+
+	_, err := service.CreateOrUpdateCategoryConfig(
+		context.Background(),
+		nil,
+		systemconfig.ConfigTypeToolSettings,
+		"product_info_metadata",
+		systemconfig.ProductInfoMetadataConfig{LastBacklogSync: "2026-03-17"},
+		uuid.New(),
+	)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/product-info-metadata", nil)
+	resp := httptest.NewRecorder()
+
+	handler.GetProductInfoMetadata(resp, req)
+	require.Equal(t, http.StatusOK, resp.Code, resp.Body.String())
+
+	var out systemconfig.ProductInfoMetadataConfig
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &out))
+	assert.Equal(t, "2026-03-17", out.LastBacklogSync)
+}

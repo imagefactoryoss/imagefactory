@@ -70,7 +70,15 @@ func (s *sreRepoStub) CreateFinding(ctx context.Context, finding *domainsresmart
 }
 
 func (s *sreRepoStub) ListFindingsByIncident(ctx context.Context, incidentID uuid.UUID) ([]*domainsresmartbot.Finding, error) {
-	return nil, nil
+	result := make([]*domainsresmartbot.Finding, 0)
+	for _, finding := range s.findings {
+		if finding == nil || finding.IncidentID == nil || *finding.IncidentID != incidentID {
+			continue
+		}
+		copy := *finding
+		result = append(result, &copy)
+	}
+	return result, nil
 }
 
 func (s *sreRepoStub) AddEvidence(ctx context.Context, evidence *domainsresmartbot.Evidence) error {
@@ -80,7 +88,15 @@ func (s *sreRepoStub) AddEvidence(ctx context.Context, evidence *domainsresmartb
 }
 
 func (s *sreRepoStub) ListEvidenceByIncident(ctx context.Context, incidentID uuid.UUID) ([]*domainsresmartbot.Evidence, error) {
-	return nil, nil
+	result := make([]*domainsresmartbot.Evidence, 0)
+	for _, evidence := range s.evidence {
+		if evidence == nil || evidence.IncidentID != incidentID {
+			continue
+		}
+		copy := *evidence
+		result = append(result, &copy)
+	}
+	return result, nil
 }
 
 func (s *sreRepoStub) CreateActionAttempt(ctx context.Context, attempt *domainsresmartbot.ActionAttempt) error {
@@ -94,7 +110,15 @@ func (s *sreRepoStub) UpdateActionAttempt(ctx context.Context, attempt *domainsr
 }
 
 func (s *sreRepoStub) ListActionAttemptsByIncident(ctx context.Context, incidentID uuid.UUID) ([]*domainsresmartbot.ActionAttempt, error) {
-	return nil, nil
+	result := make([]*domainsresmartbot.ActionAttempt, 0)
+	for _, action := range s.actions {
+		if action == nil || action.IncidentID != incidentID {
+			continue
+		}
+		copy := *action
+		result = append(result, &copy)
+	}
+	return result, nil
 }
 
 func (s *sreRepoStub) CreateApproval(ctx context.Context, approval *domainsresmartbot.Approval) error {
@@ -106,7 +130,7 @@ func (s *sreRepoStub) UpdateApproval(ctx context.Context, approval *domainsresma
 }
 
 func (s *sreRepoStub) ListApprovalsByIncident(ctx context.Context, incidentID uuid.UUID) ([]*domainsresmartbot.Approval, error) {
-	return nil, nil
+	return []*domainsresmartbot.Approval{}, nil
 }
 
 func (s *sreRepoStub) ListApprovals(ctx context.Context, filter domainsresmartbot.ApprovalFilter) ([]*domainsresmartbot.Approval, error) {
@@ -149,6 +173,14 @@ func (s *sreRepoStub) GetDetectorRuleSuggestionByFingerprint(ctx context.Context
 
 func (s *sreRepoStub) ListDetectorRuleSuggestions(ctx context.Context, filter domainsresmartbot.DetectorRuleSuggestionFilter) ([]*domainsresmartbot.DetectorRuleSuggestion, error) {
 	return s.suggestions, nil
+}
+
+func (s *sreRepoStub) CreateRemediationPackRun(ctx context.Context, run *domainsresmartbot.RemediationPackRun) error {
+	return nil
+}
+
+func (s *sreRepoStub) ListRemediationPackRunsByIncident(ctx context.Context, incidentID uuid.UUID) ([]*domainsresmartbot.RemediationPackRun, error) {
+	return []*domainsresmartbot.RemediationPackRun{}, nil
 }
 
 type srePublisherStub struct {
