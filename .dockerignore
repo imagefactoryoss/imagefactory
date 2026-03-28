@@ -28,7 +28,13 @@ backend/external-tenant-service
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+frontend/.vite/
+frontend/.cache/
 
 # Repository-level dependencies and caches
 node_modules/
 coverage/
+
+# Release/build bundles not needed in OSS source tar image
+release/
+dist/
