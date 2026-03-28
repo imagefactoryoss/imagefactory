@@ -8,6 +8,6 @@ keywords:
   - image-factory
   - ci
   - containers
-home: https://github.com/<your-org>/image-factory
+home: https://github.com/srikarm/image-factory
 sources:
-  - https://github.com/<your-org>/image-factory
+  - https://github.com/srikarm/image-factory

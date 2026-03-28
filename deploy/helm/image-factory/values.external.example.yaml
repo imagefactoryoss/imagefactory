@@ -1,9 +1,9 @@
 database:
   mode: external
-  host: db.example.com
+  host: aws-1-us-east-2.pooler.supabase.com
   port: 5432
-  name: image_factory
-  user: postgres
+  name: postgres
+  user: postgres.cqraxvwtvscccvwoggjx
   password: "REPLACE_ME"
   sslMode: require
   schema: image_factory

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ type SRESmartBotHandler struct {
 	repo                      sresmartbot.Repository
 	actionService             *appsresmartbot.ActionService
 	demoService               *appsresmartbot.DemoService
+	remediationPackService    *appsresmartbot.RemediationPackService
 	detectorSuggestionService *appsresmartbot.DetectorRuleSuggestionService
 	workspaceService          *appsresmartbot.WorkspaceService
 	mcpService                *appsresmartbot.MCPService
@@ -32,6 +34,7 @@ func NewSRESmartBotHandler(
 	repo sresmartbot.Repository,
 	actionService *appsresmartbot.ActionService,
 	demoService *appsresmartbot.DemoService,
+	remediationPackService *appsresmartbot.RemediationPackService,
 	detectorSuggestionService *appsresmartbot.DetectorRuleSuggestionService,
 	workspaceService *appsresmartbot.WorkspaceService,
 	mcpService *appsresmartbot.MCPService,
@@ -44,6 +47,7 @@ func NewSRESmartBotHandler(
 		repo:                      repo,
 		actionService:             actionService,
 		demoService:               demoService,
+		remediationPackService:    remediationPackService,
 		detectorSuggestionService: detectorSuggestionService,
 		workspaceService:          workspaceService,
 		mcpService:                mcpService,
@@ -121,6 +125,23 @@ type sreDemoScenario struct {
 
 type listSREDemoScenariosResponse struct {
 	Scenarios []sreDemoScenario `json:"scenarios"`
+}
+
+type listSRERemediationPacksResponse struct {
+	Packs []appsresmartbot.RemediationPack `json:"packs"`
+}
+
+type listSRERemediationPackRunsResponse struct {
+	Runs []*sresmartbot.RemediationPackRun `json:"runs"`
+}
+
+type runSRERemediationPackRequest struct {
+	ApprovalID string `json:"approval_id,omitempty"`
+	RequestID  string `json:"request_id,omitempty"`
+}
+
+type runSRERemediationPackResponse struct {
+	Run *sresmartbot.RemediationPackRun `json:"run"`
 }
 
 type generateSREDemoIncidentRequest struct {
@@ -211,6 +232,416 @@ func (h *SRESmartBotHandler) GenerateDemoIncident(w http.ResponseWriter, r *http
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(sreMutationResponse{Incident: incident})
+}
+
+func (h *SRESmartBotHandler) ListRemediationPacks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		WriteError(w, r.Context(), MethodNotAllowed("Method not allowed"))
+		return
+	}
+	if h.remediationPackService == nil {
+		WriteError(w, r.Context(), InternalServer("Remediation pack service is not configured"))
+		return
+	}
+
+	var tenantID *uuid.UUID
+	if authCtx, ok := middleware.GetAuthContext(r); ok {
+		tenantID = &authCtx.TenantID
+		if authCtx.IsSystemAdmin && isAllTenantsScopeRequested(r, authCtx) {
+			tenantID = nil
+		}
+	}
+
+	packs := h.remediationPackService.ListPacks(r.Context(), tenantID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(listSRERemediationPacksResponse{Packs: packs})
+}
+
+func (h *SRESmartBotHandler) ListIncidentRemediationPacks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		WriteError(w, r.Context(), MethodNotAllowed("Method not allowed"))
+		return
+	}
+	if h.remediationPackService == nil {
+		WriteError(w, r.Context(), InternalServer("Remediation pack service is not configured"))
+		return
+	}
+
+	incidentID, err := uuid.Parse(strings.TrimSpace(chi.URLParam(r, "id")))
+	if err != nil {
+		WriteError(w, r.Context(), BadRequest("Invalid incident id"))
+		return
+	}
+
+	incident, err := h.repo.GetIncident(r.Context(), incidentID)
+	if err != nil {
+		h.logger.Error("Failed to get incident for remediation packs", zap.Error(err), zap.String("incident_id", incidentID.String()))
+		WriteError(w, r.Context(), NotFound("Incident not found").WithCause(err))
+		return
+	}
+
+	packs := h.remediationPackService.ListPacksForIncidentType(r.Context(), incident.TenantID, incident.IncidentType)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(listSRERemediationPacksResponse{Packs: packs})
+}
+
+func (h *SRESmartBotHandler) ListIncidentRemediationPackRuns(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		WriteError(w, r.Context(), MethodNotAllowed("Method not allowed"))
+		return
+	}
+
+	incidentID, err := uuid.Parse(strings.TrimSpace(chi.URLParam(r, "id")))
+	if err != nil {
+		WriteError(w, r.Context(), BadRequest("Invalid incident id"))
+		return
+	}
+
+	runs, err := h.repo.ListRemediationPackRunsByIncident(r.Context(), incidentID)
+	if err != nil {
+		h.logger.Error("Failed to list remediation pack runs", zap.Error(err), zap.String("incident_id", incidentID.String()))
+		WriteError(w, r.Context(), InternalServer("Failed to list remediation pack runs").WithCause(err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(listSRERemediationPackRunsResponse{Runs: runs})
+}
+
+func (h *SRESmartBotHandler) DryRunIncidentRemediationPack(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		WriteError(w, r.Context(), MethodNotAllowed("Method not allowed"))
+		return
+	}
+	if h.remediationPackService == nil {
+		WriteError(w, r.Context(), InternalServer("Remediation pack service is not configured"))
+		return
+	}
+
+	incidentID, err := uuid.Parse(strings.TrimSpace(chi.URLParam(r, "id")))
+	if err != nil {
+		WriteError(w, r.Context(), BadRequest("Invalid incident id"))
+		return
+	}
+	packKey := strings.TrimSpace(chi.URLParam(r, "packKey"))
+	if packKey == "" {
+		WriteError(w, r.Context(), BadRequest("pack_key is required"))
+		return
+	}
+
+	incident, err := h.repo.GetIncident(r.Context(), incidentID)
+	if err != nil {
+		h.logger.Error("Failed to get incident for remediation pack dry run", zap.Error(err), zap.String("incident_id", incidentID.String()))
+		WriteError(w, r.Context(), NotFound("Incident not found").WithCause(err))
+		return
+	}
+
+	pack, ok := h.remediationPackService.ResolvePackForIncidentType(r.Context(), incident.TenantID, incident.IncidentType, packKey)
+	if !ok {
+		WriteError(w, r.Context(), NotFound("Remediation pack not available for this incident type"))
+		return
+	}
+
+	now := time.Now().UTC()
+	authCtx, hasAuth := middleware.GetAuthContext(r)
+	requestedBy := ""
+	if hasAuth {
+		requestedBy = authCtx.UserID.String()
+	}
+
+	status := "completed"
+	preconditions := []map[string]interface{}{
+		{
+			"id":      "incident_active",
+			"title":   "Incident should still be active",
+			"status":  incident.Status,
+			"passed":  incident.Status != sresmartbot.IncidentStatusResolved && incident.Status != sresmartbot.IncidentStatusSuppressed,
+			"summary": "Dry-run checks whether the incident is still actionable.",
+		},
+		{
+			"id":      "pack_incident_type_match",
+			"title":   "Pack supports incident type",
+			"status":  "matched",
+			"passed":  true,
+			"summary": "Pack key is valid for this incident type.",
+		},
+	}
+
+	payload, _ := json.Marshal(map[string]interface{}{
+		"incident_id":       incident.ID,
+		"incident_type":     incident.IncidentType,
+		"pack_key":          pack.Key,
+		"pack_version":      pack.Version,
+		"risk_tier":         pack.RiskTier,
+		"requires_approval": pack.RequiresApproval,
+		"execution_mode":    "dry_run",
+		"preconditions":     preconditions,
+	})
+
+	run := &sresmartbot.RemediationPackRun{
+		ID:            uuid.New(),
+		TenantID:      incident.TenantID,
+		IncidentID:    incident.ID,
+		PackKey:       pack.Key,
+		PackVersion:   pack.Version,
+		RunKind:       "dry_run",
+		Status:        status,
+		RequestedBy:   requestedBy,
+		Summary:       "Dry-run completed with deterministic precondition checks",
+		ResultPayload: payload,
+		StartedAt:     &now,
+		CompletedAt:   &now,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	if err := h.repo.CreateRemediationPackRun(r.Context(), run); err != nil {
+		h.logger.Error("Failed to persist remediation pack dry run", zap.Error(err), zap.String("incident_id", incidentID.String()), zap.String("pack_key", pack.Key))
+		WriteError(w, r.Context(), InternalServer("Failed to persist remediation pack dry run").WithCause(err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(runSRERemediationPackResponse{Run: run})
+}
+
+func (h *SRESmartBotHandler) ExecuteIncidentRemediationPack(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		WriteError(w, r.Context(), MethodNotAllowed("Method not allowed"))
+		return
+	}
+	if h.remediationPackService == nil {
+		WriteError(w, r.Context(), InternalServer("Remediation pack service is not configured"))
+		return
+	}
+
+	incidentID, err := uuid.Parse(strings.TrimSpace(chi.URLParam(r, "id")))
+	if err != nil {
+		WriteError(w, r.Context(), BadRequest("Invalid incident id"))
+		return
+	}
+	packKey := strings.TrimSpace(chi.URLParam(r, "packKey"))
+	if packKey == "" {
+		WriteError(w, r.Context(), BadRequest("pack_key is required"))
+		return
+	}
+
+	incident, err := h.repo.GetIncident(r.Context(), incidentID)
+	if err != nil {
+		h.logger.Error("Failed to get incident for remediation pack execute", zap.Error(err), zap.String("incident_id", incidentID.String()))
+		WriteError(w, r.Context(), NotFound("Incident not found").WithCause(err))
+		return
+	}
+
+	pack, ok := h.remediationPackService.ResolvePackForIncidentType(r.Context(), incident.TenantID, incident.IncidentType, packKey)
+	if !ok {
+		WriteError(w, r.Context(), NotFound("Remediation pack not available for this incident type"))
+		return
+	}
+
+	var req runSRERemediationPackRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	var approvalID *uuid.UUID
+	if strings.TrimSpace(req.ApprovalID) != "" {
+		parsed, parseErr := uuid.Parse(strings.TrimSpace(req.ApprovalID))
+		if parseErr != nil {
+			WriteError(w, r.Context(), BadRequest("Invalid approval_id"))
+			return
+		}
+		approvalID = &parsed
+	}
+
+	if pack.RequiresApproval {
+		if approvalID == nil {
+			WriteError(w, r.Context(), BadRequest("approval_id is required for this remediation pack"))
+			return
+		}
+		approvals, listErr := h.repo.ListApprovalsByIncident(r.Context(), incident.ID)
+		if listErr != nil {
+			h.logger.Error("Failed to validate approval for remediation pack execute", zap.Error(listErr), zap.String("incident_id", incident.ID.String()))
+			WriteError(w, r.Context(), InternalServer("Failed to validate approval").WithCause(listErr))
+			return
+		}
+		approved := false
+		for _, approval := range approvals {
+			if approval != nil && approval.ID == *approvalID && strings.EqualFold(strings.TrimSpace(approval.Status), "approved") {
+				approved = true
+				break
+			}
+		}
+		if !approved {
+			WriteError(w, r.Context(), BadRequest("A valid approved approval_id is required before execution"))
+			return
+		}
+	}
+
+	now := time.Now().UTC()
+	authCtx, hasAuth := middleware.GetAuthContext(r)
+	requestedBy := ""
+	if hasAuth {
+		requestedBy = authCtx.UserID.String()
+	}
+
+	requestID := strings.TrimSpace(req.RequestID)
+	if requestID == "" {
+		requestID = uuid.New().String()
+	}
+
+	payload, _ := json.Marshal(map[string]interface{}{
+		"incident_id":           incident.ID,
+		"incident_type":         incident.IncidentType,
+		"pack_key":              pack.Key,
+		"pack_version":          pack.Version,
+		"risk_tier":             pack.RiskTier,
+		"requires_approval":     pack.RequiresApproval,
+		"execution_mode":        "guarded",
+		"approval_enforced":     pack.RequiresApproval,
+		"execution_disposition": "recorded",
+		"message":               "Execution contract recorded.",
+	})
+
+	run := &sresmartbot.RemediationPackRun{
+		ID:            uuid.New(),
+		TenantID:      incident.TenantID,
+		IncidentID:    incident.ID,
+		PackKey:       pack.Key,
+		PackVersion:   pack.Version,
+		RunKind:       "execute",
+		Status:        "completed",
+		RequestedBy:   requestedBy,
+		RequestID:     requestID,
+		ApprovalID:    approvalID,
+		Summary:       "Execution recorded under guarded remediation contract",
+		ResultPayload: payload,
+		StartedAt:     &now,
+		CompletedAt:   &now,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	actionKey, mapped := remediationPackActionKey(pack.Key)
+	if mapped && h.actionService != nil {
+		actionID := uuid.New()
+		actionAttempt := &sresmartbot.ActionAttempt{
+			ID:               actionID,
+			IncidentID:       incident.ID,
+			ActionKey:        actionKey,
+			ActionClass:      strings.TrimSpace(pack.ActionClass),
+			TargetKind:       "incident",
+			TargetRef:        incident.ID.String(),
+			Status:           "approved",
+			ActorType:        "operator",
+			ActorID:          requestedBy,
+			ApprovalRequired: false,
+			RequestedAt:      now,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}
+		if err := h.repo.CreateActionAttempt(r.Context(), actionAttempt); err != nil {
+			h.logger.Error("Failed to create remediation action attempt", zap.Error(err), zap.String("incident_id", incident.ID.String()), zap.String("pack_key", pack.Key), zap.String("action_key", actionKey))
+			run.Status = "failed"
+			run.Summary = "Failed to create remediation action attempt"
+			run.ResultPayload = mustJSONRaw(map[string]interface{}{
+				"incident_id":       incident.ID,
+				"pack_key":          pack.Key,
+				"action_key":        actionKey,
+				"execution_mode":    "action_service",
+				"approval_enforced": pack.RequiresApproval,
+				"error":             err.Error(),
+			})
+		} else {
+			executedAction, execErr := h.actionService.ExecuteAction(r.Context(), incident.ID, actionID, requestedBy, incident.TenantID)
+			run.ActionAttemptID = &actionID
+			if execErr != nil {
+				h.logger.Warn("Remediation action execution failed", zap.Error(execErr), zap.String("incident_id", incident.ID.String()), zap.String("pack_key", pack.Key), zap.String("action_key", actionKey))
+				run.Status = "failed"
+				run.Summary = "Remediation execution failed"
+				run.ResultPayload = mustJSONRaw(map[string]interface{}{
+					"incident_id":       incident.ID,
+					"pack_key":          pack.Key,
+					"action_key":        actionKey,
+					"execution_mode":    "action_service",
+					"approval_enforced": pack.RequiresApproval,
+					"error":             execErr.Error(),
+				})
+			} else {
+				run.Status = "completed"
+				run.Summary = "Execution completed through allowlisted action binding"
+				run.ResultPayload = mustJSONRaw(map[string]interface{}{
+					"incident_id":         incident.ID,
+					"pack_key":            pack.Key,
+					"action_key":          actionKey,
+					"execution_mode":      "action_service",
+					"approval_enforced":   pack.RequiresApproval,
+					"action_attempt_id":   actionID,
+					"action_status":       executedAction.Status,
+					"action_completed_at": executedAction.CompletedAt,
+				})
+			}
+		}
+	} else if mapped && h.actionService == nil {
+		run.Status = "completed"
+		run.Summary = "Execution recorded; action service unavailable in runtime"
+		run.ResultPayload = mustJSONRaw(map[string]interface{}{
+			"incident_id":           incident.ID,
+			"pack_key":              pack.Key,
+			"action_key":            actionKey,
+			"execution_mode":        "guarded_noop",
+			"approval_enforced":     pack.RequiresApproval,
+			"execution_disposition": "recorded",
+			"message":               "Action service unavailable; execution recorded only.",
+		})
+	} else {
+		run.Status = "completed"
+		run.Summary = "Execution recorded; no allowlisted action binding for this remediation pack"
+		run.ResultPayload = mustJSONRaw(map[string]interface{}{
+			"incident_id":           incident.ID,
+			"pack_key":              pack.Key,
+			"execution_mode":        "guarded_noop",
+			"approval_enforced":     pack.RequiresApproval,
+			"execution_disposition": "recorded",
+			"message":               "No allowlisted action binding for this remediation pack key.",
+		})
+	}
+	run.UpdatedAt = time.Now().UTC()
+
+	if err := h.repo.CreateRemediationPackRun(r.Context(), run); err != nil {
+		h.logger.Error("Failed to persist remediation pack execution", zap.Error(err), zap.String("incident_id", incidentID.String()), zap.String("pack_key", pack.Key))
+		WriteError(w, r.Context(), InternalServer("Failed to persist remediation pack execution").WithCause(err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(runSRERemediationPackResponse{Run: run})
+}
+
+func remediationPackActionKey(packKey string) (string, bool) {
+	switch strings.TrimSpace(packKey) {
+	case "async_backlog_pressure_pack":
+		return "reconcile_tenant_assets", true
+	case "nats_transport_stability_pack":
+		return "review_provider_connectivity", true
+	case "provider_connectivity_drift_pack":
+		return "review_provider_connectivity", true
+	default:
+		return "", false
+	}
+}
+
+func mustJSONRaw(v interface{}) json.RawMessage {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return json.RawMessage(`{"error":"failed to serialize payload"}`)
+	}
+	return b
 }
 
 func (h *SRESmartBotHandler) ListIncidents(w http.ResponseWriter, r *http.Request) {
@@ -379,7 +810,12 @@ func (h *SRESmartBotHandler) AcceptDetectorRuleSuggestion(w http.ResponseWriter,
 		return
 	}
 	authCtx, _ := middleware.GetAuthContext(r)
-	suggestion, err := h.detectorSuggestionService.AcceptSuggestion(r.Context(), suggestionID, authCtx.UserID.String())
+	var policyTenantID *uuid.UUID
+	if authCtx.TenantID != uuid.Nil {
+		tid := authCtx.TenantID
+		policyTenantID = &tid
+	}
+	suggestion, err := h.detectorSuggestionService.AcceptSuggestion(r.Context(), suggestionID, authCtx.UserID.String(), policyTenantID)
 	if err != nil {
 		h.logger.Error("Failed to accept detector rule suggestion", zap.Error(err))
 		WriteError(w, r.Context(), BadRequest(err.Error()).WithCause(err))
@@ -761,7 +1197,7 @@ func (h *SRESmartBotHandler) GetAgentSuggestedAction(w http.ResponseWriter, r *h
 	if !isAllTenantsScopeRequested(r, authCtx) {
 		tenantID = &authCtx.TenantID
 	}
-	suggestedAction, err := h.agentService.BuildSuggestedAction(r.Context(), tenantID, incidentID)
+	suggestion, err := h.agentService.BuildSuggestedAction(r.Context(), tenantID, incidentID)
 	if err != nil {
 		h.logger.Error("Failed to build SRE agent suggested action", zap.Error(err), zap.String("incident_id", incidentID.String()))
 		WriteError(w, r.Context(), InternalServer("Failed to build agent suggested action").WithCause(err))
@@ -769,7 +1205,7 @@ func (h *SRESmartBotHandler) GetAgentSuggestedAction(w http.ResponseWriter, r *h
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(getSREAgentSuggestedActionResponse(*suggestedAction))
+	_ = json.NewEncoder(w).Encode(getSREAgentSuggestedActionResponse(*suggestion))
 }
 
 func (h *SRESmartBotHandler) GetAgentInterpretation(w http.ResponseWriter, r *http.Request) {

@@ -8,6 +8,7 @@ import (
 
 	domaininfrastructure "github.com/srikarm/image-factory/internal/domain/infrastructure"
 	domainsresmartbot "github.com/srikarm/image-factory/internal/domain/sresmartbot"
+	"github.com/srikarm/image-factory/internal/infrastructure/messaging"
 	"github.com/srikarm/image-factory/internal/infrastructure/releasecompliance"
 	"go.uber.org/zap"
 )
@@ -91,13 +92,47 @@ type AsyncBacklogSignalSnapshot struct {
 }
 
 type AsyncBacklogIssue struct {
-	Key       string
-	Kind      string
-	Summary   string
-	Severity  domainsresmartbot.IncidentSeverity
-	Count     int64
-	Threshold int64
-	Payload   map[string]interface{}
+	Key          string
+	Kind         string
+	DisplayName  string
+	IncidentType string
+	SignalType   string
+	FindingTitle string
+	EvidenceType string
+	ActionKey    string
+	TargetKind   string
+	TargetRef    string
+	Summary      string
+	Severity     domainsresmartbot.IncidentSeverity
+	Count        int64
+	Threshold    int64
+	Payload      map[string]interface{}
+}
+
+type NATSConsumerLagThresholds struct {
+	PendingMessagesThreshold int64
+	AckPendingThreshold      int64
+	StalledDuration          time.Duration
+}
+
+type NATSConsumerLagIssue struct {
+	Key          string
+	Kind         string
+	DisplayName  string
+	IncidentType string
+	SignalType   string
+	FindingTitle string
+	EvidenceType string
+	ActionKey    string
+	TargetKind   string
+	TargetRef    string
+	Summary      string
+	Severity     domainsresmartbot.IncidentSeverity
+	Stream       string
+	Consumer     string
+	Count        int64
+	Threshold    int64
+	Payload      map[string]interface{}
 }
 
 func ObserveRuntimeDependencyIssues(ctx context.Context, svc *Service, logger *zap.Logger, issues []RuntimeDependencyIssue, now time.Time, previous map[string]RuntimeDependencyIssue) map[string]RuntimeDependencyIssue {
@@ -806,15 +841,18 @@ func ObserveAsyncBacklogSignals(
 	current := make(map[string]AsyncBacklogIssue)
 	if issue, ok := evaluateBuildQueueBacklog(snapshot, thresholds); ok {
 		current[issue.Key] = issue
-		recordAsyncBacklogIssue(ctx, svc, logger, issue, now)
+		previousIssue, hadPrevious := previous[issue.Key]
+		recordAsyncBacklogIssue(ctx, svc, logger, issue, snapshot, previousIssue, hadPrevious, now)
 	}
 	if issue, ok := evaluateEmailQueueBacklog(snapshot, thresholds); ok {
 		current[issue.Key] = issue
-		recordAsyncBacklogIssue(ctx, svc, logger, issue, now)
+		previousIssue, hadPrevious := previous[issue.Key]
+		recordAsyncBacklogIssue(ctx, svc, logger, issue, snapshot, previousIssue, hadPrevious, now)
 	}
 	if issue, ok := evaluateMessagingOutboxBacklog(snapshot, thresholds); ok {
 		current[issue.Key] = issue
-		recordAsyncBacklogIssue(ctx, svc, logger, issue, now)
+		previousIssue, hadPrevious := previous[issue.Key]
+		recordAsyncBacklogIssue(ctx, svc, logger, issue, snapshot, previousIssue, hadPrevious, now)
 	}
 
 	for issueKey, issue := range previous {
@@ -846,15 +884,25 @@ func evaluateBuildQueueBacklog(snapshot AsyncBacklogSignalSnapshot, thresholds A
 		return AsyncBacklogIssue{}, false
 	}
 	return AsyncBacklogIssue{
-		Key:       "build_queue_backlog",
-		Kind:      "build_queue_backlog",
-		Summary:   fmt.Sprintf("Build queue depth is %d, above threshold %d", snapshot.BuildQueueDepth, thresholds.BuildQueueThreshold),
-		Severity:  severityForCount(snapshot.BuildQueueDepth, thresholds.BuildQueueThreshold*2),
-		Count:     snapshot.BuildQueueDepth,
-		Threshold: thresholds.BuildQueueThreshold,
+		Key:          "build_queue_backlog",
+		Kind:         "build_queue_backlog",
+		DisplayName:  "Dispatcher/workflow backlog pressure",
+		IncidentType: "dispatcher_backlog_pressure",
+		SignalType:   "dispatcher_backlog_pressure",
+		FindingTitle: "Dispatcher/workflow backlog pressure detected",
+		EvidenceType: "dispatcher_backlog_snapshot",
+		ActionKey:    "review_dispatcher_backlog_pressure",
+		TargetKind:   "async_pipeline",
+		TargetRef:    "dispatcher_workflow",
+		Summary:      fmt.Sprintf("Build queue depth is %d, above threshold %d", snapshot.BuildQueueDepth, thresholds.BuildQueueThreshold),
+		Severity:     severityForCount(snapshot.BuildQueueDepth, thresholds.BuildQueueThreshold*2),
+		Count:        snapshot.BuildQueueDepth,
+		Threshold:    thresholds.BuildQueueThreshold,
 		Payload: map[string]interface{}{
 			"build_queue_depth": snapshot.BuildQueueDepth,
 			"threshold":         thresholds.BuildQueueThreshold,
+			"queue_kind":        "dispatcher_workflow",
+			"subsystem":         "async_pipeline",
 		},
 	}, true
 }
@@ -864,15 +912,25 @@ func evaluateEmailQueueBacklog(snapshot AsyncBacklogSignalSnapshot, thresholds A
 		return AsyncBacklogIssue{}, false
 	}
 	return AsyncBacklogIssue{
-		Key:       "email_queue_backlog",
-		Kind:      "email_queue_backlog",
-		Summary:   fmt.Sprintf("Email queue depth is %d, above threshold %d", snapshot.EmailQueueDepth, thresholds.EmailQueueThreshold),
-		Severity:  severityForCount(snapshot.EmailQueueDepth, thresholds.EmailQueueThreshold*2),
-		Count:     snapshot.EmailQueueDepth,
-		Threshold: thresholds.EmailQueueThreshold,
+		Key:          "email_queue_backlog",
+		Kind:         "email_queue_backlog",
+		DisplayName:  "Email queue backlog pressure",
+		IncidentType: "email_queue_backlog_pressure",
+		SignalType:   "email_queue_backlog_pressure",
+		FindingTitle: "Email queue backlog pressure detected",
+		EvidenceType: "email_queue_backlog_snapshot",
+		ActionKey:    "review_async_worker_capacity",
+		TargetKind:   "worker_pool",
+		TargetRef:    "email_queue",
+		Summary:      fmt.Sprintf("Email queue depth is %d, above threshold %d", snapshot.EmailQueueDepth, thresholds.EmailQueueThreshold),
+		Severity:     severityForCount(snapshot.EmailQueueDepth, thresholds.EmailQueueThreshold*2),
+		Count:        snapshot.EmailQueueDepth,
+		Threshold:    thresholds.EmailQueueThreshold,
 		Payload: map[string]interface{}{
 			"email_queue_depth": snapshot.EmailQueueDepth,
 			"threshold":         thresholds.EmailQueueThreshold,
+			"queue_kind":        "email_queue",
+			"subsystem":         "worker_pool",
 		},
 	}, true
 }
@@ -882,27 +940,38 @@ func evaluateMessagingOutboxBacklog(snapshot AsyncBacklogSignalSnapshot, thresho
 		return AsyncBacklogIssue{}, false
 	}
 	return AsyncBacklogIssue{
-		Key:       "messaging_outbox_backlog",
-		Kind:      "messaging_outbox_backlog",
-		Summary:   fmt.Sprintf("Messaging outbox has %d pending records, above threshold %d", snapshot.MessagingOutboxPending, thresholds.MessagingOutboxThreshold),
-		Severity:  severityForCount(snapshot.MessagingOutboxPending, thresholds.MessagingOutboxThreshold*2),
-		Count:     snapshot.MessagingOutboxPending,
-		Threshold: thresholds.MessagingOutboxThreshold,
+		Key:          "messaging_outbox_backlog",
+		Kind:         "messaging_outbox_backlog",
+		DisplayName:  "Messaging outbox backlog pressure",
+		IncidentType: "messaging_outbox_backlog_pressure",
+		SignalType:   "messaging_outbox_backlog_pressure",
+		FindingTitle: "Messaging outbox backlog pressure detected",
+		EvidenceType: "messaging_outbox_backlog_snapshot",
+		ActionKey:    "review_messaging_transport_health",
+		TargetKind:   "message_bus",
+		TargetRef:    "messaging_outbox",
+		Summary:      fmt.Sprintf("Messaging outbox has %d pending records, above threshold %d", snapshot.MessagingOutboxPending, thresholds.MessagingOutboxThreshold),
+		Severity:     severityForCount(snapshot.MessagingOutboxPending, thresholds.MessagingOutboxThreshold*2),
+		Count:        snapshot.MessagingOutboxPending,
+		Threshold:    thresholds.MessagingOutboxThreshold,
 		Payload: map[string]interface{}{
 			"messaging_outbox_pending_count": snapshot.MessagingOutboxPending,
 			"threshold":                      thresholds.MessagingOutboxThreshold,
+			"queue_kind":                     "messaging_outbox",
+			"subsystem":                      "message_bus",
 		},
 	}, true
 }
 
-func recordAsyncBacklogIssue(ctx context.Context, svc *Service, logger *zap.Logger, issue AsyncBacklogIssue, now time.Time) {
+func recordAsyncBacklogIssue(ctx context.Context, svc *Service, logger *zap.Logger, issue AsyncBacklogIssue, snapshot AsyncBacklogSignalSnapshot, previous AsyncBacklogIssue, hadPrevious bool, now time.Time) {
 	if svc == nil {
 		return
 	}
+	payload := asyncBacklogEvidencePayload(issue, snapshot, previous, hadPrevious)
 	if err := svc.RecordObservation(ctx, SignalObservation{
 		CorrelationKey: asyncBacklogCorrelationKey(issue),
 		Domain:         "golden_signals",
-		IncidentType:   "backlog_pressure",
+		IncidentType:   asyncBacklogIncidentType(issue),
 		DisplayName:    asyncBacklogDisplayName(issue),
 		Summary:        issue.Summary,
 		Source:         "async_backlog_signal_runner",
@@ -910,30 +979,35 @@ func recordAsyncBacklogIssue(ctx context.Context, svc *Service, logger *zap.Logg
 		Confidence:     domainsresmartbot.IncidentConfidenceHigh,
 		OccurredAt:     now,
 		Metadata: map[string]interface{}{
-			"kind":      issue.Kind,
-			"count":     issue.Count,
-			"threshold": issue.Threshold,
+			"kind":                       issue.Kind,
+			"count":                      issue.Count,
+			"threshold":                  issue.Threshold,
+			"queue_kind":                 issue.TargetRef,
+			"subsystem":                  issue.TargetKind,
+			"transport_correlation_hint": "messaging_transport:nats_transport_degraded",
+			"transport_tool":             "messaging_transport.recent",
+			"async_backlog_tool":         "async_backlog.recent",
 		},
-		FindingTitle:   "Async backlog pressure detected",
+		FindingTitle:   asyncBacklogFindingTitle(issue),
 		FindingMessage: issue.Summary,
-		SignalType:     "async_backlog_pressure",
+		SignalType:     asyncBacklogSignalType(issue),
 		SignalKey:      issue.Key,
-		RawPayload:     issue.Payload,
+		RawPayload:     payload,
 	}); err != nil && logger != nil {
 		logger.Warn("Failed to record async backlog incident observation",
 			zap.String("issue_key", issue.Key),
 			zap.Error(err),
 		)
 	}
-	_ = svc.AddEvidence(ctx, asyncBacklogCorrelationKey(issue), "async_backlog_snapshot", issue.Summary, issue.Payload, now)
+	_ = svc.AddEvidence(ctx, asyncBacklogCorrelationKey(issue), asyncBacklogEvidenceType(issue), issue.Summary, payload, now)
 	_ = svc.EnsureActionAttempt(ctx, asyncBacklogCorrelationKey(issue), ActionAttemptSpec{
-		ActionKey:     "review_async_backlog",
+		ActionKey:     asyncBacklogActionKey(issue),
 		ActionClass:   "recommendation",
-		TargetKind:    "async_pipeline",
-		TargetRef:     issue.Kind,
+		TargetKind:    asyncBacklogTargetKind(issue),
+		TargetRef:     asyncBacklogTargetRef(issue),
 		Status:        "proposed",
 		ActorType:     "system",
-		ResultPayload: issue.Payload,
+		ResultPayload: payload,
 	}, now)
 }
 
@@ -942,6 +1016,9 @@ func asyncBacklogCorrelationKey(issue AsyncBacklogIssue) string {
 }
 
 func asyncBacklogDisplayName(issue AsyncBacklogIssue) string {
+	if strings.TrimSpace(issue.DisplayName) != "" {
+		return issue.DisplayName
+	}
 	switch issue.Kind {
 	case "build_queue_backlog":
 		return "Build queue backlog pressure"
@@ -952,6 +1029,436 @@ func asyncBacklogDisplayName(issue AsyncBacklogIssue) string {
 	default:
 		return "Async backlog pressure"
 	}
+}
+
+func asyncBacklogIncidentType(issue AsyncBacklogIssue) string {
+	if strings.TrimSpace(issue.IncidentType) != "" {
+		return issue.IncidentType
+	}
+	return "backlog_pressure"
+}
+
+func asyncBacklogSignalType(issue AsyncBacklogIssue) string {
+	if strings.TrimSpace(issue.SignalType) != "" {
+		return issue.SignalType
+	}
+	return "async_backlog_pressure"
+}
+
+func asyncBacklogFindingTitle(issue AsyncBacklogIssue) string {
+	if strings.TrimSpace(issue.FindingTitle) != "" {
+		return issue.FindingTitle
+	}
+	return "Async backlog pressure detected"
+}
+
+func asyncBacklogEvidenceType(issue AsyncBacklogIssue) string {
+	if strings.TrimSpace(issue.EvidenceType) != "" {
+		return issue.EvidenceType
+	}
+	return "async_backlog_snapshot"
+}
+
+func asyncBacklogActionKey(issue AsyncBacklogIssue) string {
+	if strings.TrimSpace(issue.ActionKey) != "" {
+		return issue.ActionKey
+	}
+	return "review_async_backlog"
+}
+
+func asyncBacklogTargetKind(issue AsyncBacklogIssue) string {
+	if strings.TrimSpace(issue.TargetKind) != "" {
+		return issue.TargetKind
+	}
+	return "async_pipeline"
+}
+
+func asyncBacklogTargetRef(issue AsyncBacklogIssue) string {
+	if strings.TrimSpace(issue.TargetRef) != "" {
+		return issue.TargetRef
+	}
+	return issue.Kind
+}
+
+func asyncBacklogEvidencePayload(issue AsyncBacklogIssue, snapshot AsyncBacklogSignalSnapshot, previous AsyncBacklogIssue, hadPrevious bool) map[string]interface{} {
+	payload := cloneMap(issue.Payload)
+	payload["count"] = issue.Count
+	payload["threshold_delta"] = issue.Count - issue.Threshold
+	payload["queue_kind"] = asyncBacklogTargetRef(issue)
+	payload["subsystem"] = asyncBacklogTargetKind(issue)
+	payload["recent_observations"] = map[string]interface{}{
+		"build_queue_depth":              snapshot.BuildQueueDepth,
+		"email_queue_depth":              snapshot.EmailQueueDepth,
+		"messaging_outbox_pending_count": snapshot.MessagingOutboxPending,
+	}
+	payload["correlation_hints"] = map[string]interface{}{
+		"transport_correlation_key": "messaging_transport:nats_transport_degraded",
+		"transport_tool":            "messaging_transport.recent",
+		"async_backlog_tool":        "async_backlog.recent",
+	}
+	payload["trend"] = asyncBacklogTrend(issue.Count, previous.Count, hadPrevious)
+	if hadPrevious {
+		payload["previous_observation_count"] = previous.Count
+		payload["count_delta"] = issue.Count - previous.Count
+	}
+	if issue.Threshold > 0 {
+		payload["threshold_ratio_percent"] = (issue.Count * 100) / issue.Threshold
+	}
+	return payload
+}
+
+func asyncBacklogTrend(current int64, previous int64, hadPrevious bool) string {
+	if !hadPrevious {
+		return "elevated"
+	}
+	if current > previous {
+		return "growing"
+	}
+	if current < previous {
+		return "improving"
+	}
+	return "stable"
+}
+
+func ObserveNATSConsumerLagSignals(
+	ctx context.Context,
+	svc *Service,
+	logger *zap.Logger,
+	snapshots []messaging.NATSConsumerLagSnapshot,
+	now time.Time,
+	previous map[string]NATSConsumerLagIssue,
+	thresholds NATSConsumerLagThresholds,
+) map[string]NATSConsumerLagIssue {
+	if thresholds.PendingMessagesThreshold < 1 {
+		thresholds.PendingMessagesThreshold = 25
+	}
+	if thresholds.AckPendingThreshold < 1 {
+		thresholds.AckPendingThreshold = 10
+	}
+	if thresholds.StalledDuration < 30*time.Second {
+		thresholds.StalledDuration = 5 * time.Minute
+	}
+
+	current := make(map[string]NATSConsumerLagIssue)
+	for _, snapshot := range snapshots {
+		if issue, ok := evaluateNATSConsumerLagPressure(snapshot, thresholds); ok {
+			current[issue.Key] = issue
+			previousIssue, hadPrevious := previous[issue.Key]
+			recordNATSConsumerLagIssue(ctx, svc, logger, issue, snapshot, previousIssue, hadPrevious, thresholds, now)
+		}
+		if issue, ok := evaluateNATSConsumerAckPressure(snapshot, thresholds); ok {
+			current[issue.Key] = issue
+			previousIssue, hadPrevious := previous[issue.Key]
+			recordNATSConsumerLagIssue(ctx, svc, logger, issue, snapshot, previousIssue, hadPrevious, thresholds, now)
+		}
+		if issue, ok := evaluateNATSConsumerStalledProgress(snapshot, now, thresholds); ok {
+			current[issue.Key] = issue
+			previousIssue, hadPrevious := previous[issue.Key]
+			recordNATSConsumerLagIssue(ctx, svc, logger, issue, snapshot, previousIssue, hadPrevious, thresholds, now)
+		}
+	}
+
+	for issueKey, issue := range previous {
+		if _, stillPresent := current[issueKey]; stillPresent {
+			continue
+		}
+		if svc == nil {
+			continue
+		}
+		if err := svc.ResolveIncident(ctx, natsConsumerLagCorrelationKey(issue), now,
+			fmt.Sprintf("NATS consumer pressure recovered for %s", issue.TargetRef),
+			map[string]interface{}{
+				"kind":       issue.Kind,
+				"stream":     issue.Stream,
+				"consumer":   issue.Consumer,
+				"target_ref": issue.TargetRef,
+				"source":     "nats_consumer_lag_signal_runner",
+			},
+		); err != nil && logger != nil {
+			logger.Warn("Failed to resolve NATS consumer lag incident",
+				zap.String("issue_key", issue.Key),
+				zap.Error(err),
+			)
+		}
+	}
+
+	return current
+}
+
+func evaluateNATSConsumerLagPressure(snapshot messaging.NATSConsumerLagSnapshot, thresholds NATSConsumerLagThresholds) (NATSConsumerLagIssue, bool) {
+	pendingCount := int64(snapshot.PendingCount)
+	if pendingCount < thresholds.PendingMessagesThreshold {
+		return NATSConsumerLagIssue{}, false
+	}
+	stream := natsConsumerStream(snapshot)
+	consumer := natsConsumerName(snapshot)
+	targetRef := natsConsumerTargetRef(stream, consumer)
+	return NATSConsumerLagIssue{
+		Key:          fmt.Sprintf("%s:%s:consumer_lag_pressure", stream, consumer),
+		Kind:         "consumer_lag_pressure",
+		DisplayName:  fmt.Sprintf("NATS consumer lag pressure for %s", targetRef),
+		IncidentType: "nats_consumer_lag_pressure",
+		SignalType:   "nats_consumer_lag_pressure",
+		FindingTitle: "NATS consumer lag pressure detected",
+		EvidenceType: "nats_consumer_lag_snapshot",
+		ActionKey:    "review_nats_consumer_lag",
+		TargetKind:   "nats_consumer",
+		TargetRef:    targetRef,
+		Summary:      fmt.Sprintf("NATS consumer %s has %d pending messages, above threshold %d", targetRef, pendingCount, thresholds.PendingMessagesThreshold),
+		Severity:     severityForCount(pendingCount, thresholds.PendingMessagesThreshold*2),
+		Stream:       stream,
+		Consumer:     consumer,
+		Count:        pendingCount,
+		Threshold:    thresholds.PendingMessagesThreshold,
+		Payload:      natsConsumerSnapshotPayload(snapshot),
+	}, true
+}
+
+func evaluateNATSConsumerAckPressure(snapshot messaging.NATSConsumerLagSnapshot, thresholds NATSConsumerLagThresholds) (NATSConsumerLagIssue, bool) {
+	ackPendingCount := int64(snapshot.AckPendingCount)
+	if ackPendingCount < thresholds.AckPendingThreshold {
+		return NATSConsumerLagIssue{}, false
+	}
+	stream := natsConsumerStream(snapshot)
+	consumer := natsConsumerName(snapshot)
+	targetRef := natsConsumerTargetRef(stream, consumer)
+	return NATSConsumerLagIssue{
+		Key:          fmt.Sprintf("%s:%s:pending_ack_saturation", stream, consumer),
+		Kind:         "pending_ack_saturation",
+		DisplayName:  fmt.Sprintf("NATS consumer pending-ack pressure for %s", targetRef),
+		IncidentType: "nats_consumer_ack_pressure",
+		SignalType:   "nats_consumer_ack_pressure",
+		FindingTitle: "NATS consumer pending-ack pressure detected",
+		EvidenceType: "nats_consumer_ack_pressure_snapshot",
+		ActionKey:    "review_nats_consumer_progress",
+		TargetKind:   "nats_consumer",
+		TargetRef:    targetRef,
+		Summary:      fmt.Sprintf("NATS consumer %s has %d pending acknowledgements, above threshold %d", targetRef, ackPendingCount, thresholds.AckPendingThreshold),
+		Severity:     severityForCount(ackPendingCount, thresholds.AckPendingThreshold*2),
+		Stream:       stream,
+		Consumer:     consumer,
+		Count:        ackPendingCount,
+		Threshold:    thresholds.AckPendingThreshold,
+		Payload:      natsConsumerSnapshotPayload(snapshot),
+	}, true
+}
+
+func evaluateNATSConsumerStalledProgress(snapshot messaging.NATSConsumerLagSnapshot, now time.Time, thresholds NATSConsumerLagThresholds) (NATSConsumerLagIssue, bool) {
+	if snapshot.PendingCount == 0 || snapshot.LastActive.IsZero() {
+		return NATSConsumerLagIssue{}, false
+	}
+	stalledSeconds := int64(now.Sub(snapshot.LastActive).Seconds())
+	thresholdSeconds := int64(thresholds.StalledDuration / time.Second)
+	if stalledSeconds < thresholdSeconds {
+		return NATSConsumerLagIssue{}, false
+	}
+	stream := natsConsumerStream(snapshot)
+	consumer := natsConsumerName(snapshot)
+	targetRef := natsConsumerTargetRef(stream, consumer)
+	payload := natsConsumerSnapshotPayload(snapshot)
+	payload["stalled_duration_seconds"] = stalledSeconds
+	payload["stalled_threshold_seconds"] = thresholdSeconds
+	return NATSConsumerLagIssue{
+		Key:          fmt.Sprintf("%s:%s:stalled_consumer_progress", stream, consumer),
+		Kind:         "stalled_consumer_progress",
+		DisplayName:  fmt.Sprintf("NATS consumer stalled progress for %s", targetRef),
+		IncidentType: "nats_consumer_stalled_progress",
+		SignalType:   "nats_consumer_stalled_progress",
+		FindingTitle: "NATS consumer stalled progress detected",
+		EvidenceType: "nats_consumer_progress_snapshot",
+		ActionKey:    "review_nats_consumer_progress",
+		TargetKind:   "nats_consumer",
+		TargetRef:    targetRef,
+		Summary:      fmt.Sprintf("NATS consumer %s has pending work but no recent progress for %d seconds", targetRef, stalledSeconds),
+		Severity:     severityForCount(stalledSeconds, thresholdSeconds*2),
+		Stream:       stream,
+		Consumer:     consumer,
+		Count:        stalledSeconds,
+		Threshold:    thresholdSeconds,
+		Payload:      payload,
+	}, true
+}
+
+func recordNATSConsumerLagIssue(
+	ctx context.Context,
+	svc *Service,
+	logger *zap.Logger,
+	issue NATSConsumerLagIssue,
+	snapshot messaging.NATSConsumerLagSnapshot,
+	previous NATSConsumerLagIssue,
+	hadPrevious bool,
+	thresholds NATSConsumerLagThresholds,
+	now time.Time,
+) {
+	if svc == nil {
+		return
+	}
+	payload := natsConsumerLagEvidencePayload(issue, snapshot, previous, hadPrevious, thresholds, now)
+	if err := svc.RecordObservation(ctx, SignalObservation{
+		CorrelationKey: natsConsumerLagCorrelationKey(issue),
+		Domain:         "golden_signals",
+		IncidentType:   issue.IncidentType,
+		DisplayName:    issue.DisplayName,
+		Summary:        issue.Summary,
+		Source:         "nats_consumer_lag_signal_runner",
+		Severity:       issue.Severity,
+		Confidence:     domainsresmartbot.IncidentConfidenceHigh,
+		OccurredAt:     now,
+		Metadata: map[string]interface{}{
+			"kind":                         issue.Kind,
+			"stream":                       issue.Stream,
+			"consumer":                     issue.Consumer,
+			"count":                        issue.Count,
+			"threshold":                    issue.Threshold,
+			"messaging_consumers_tool":     "messaging_consumers.recent",
+			"transport_tool":               "messaging_transport.recent",
+			"async_backlog_tool":           "async_backlog.recent",
+			"transport_correlation_hint":   "messaging_transport:nats_transport_degraded",
+			"pending_threshold":            thresholds.PendingMessagesThreshold,
+			"ack_pending_threshold":        thresholds.AckPendingThreshold,
+			"stalled_duration_threshold_s": int64(thresholds.StalledDuration / time.Second),
+		},
+		FindingTitle:   issue.FindingTitle,
+		FindingMessage: issue.Summary,
+		SignalType:     issue.SignalType,
+		SignalKey:      issue.Key,
+		RawPayload:     payload,
+	}); err != nil && logger != nil {
+		logger.Warn("Failed to record NATS consumer lag incident observation",
+			zap.String("issue_key", issue.Key),
+			zap.Error(err),
+		)
+	}
+	_ = svc.AddEvidence(ctx, natsConsumerLagCorrelationKey(issue), issue.EvidenceType, issue.Summary, payload, now)
+	_ = svc.EnsureActionAttempt(ctx, natsConsumerLagCorrelationKey(issue), ActionAttemptSpec{
+		ActionKey:     issue.ActionKey,
+		ActionClass:   "recommendation",
+		TargetKind:    issue.TargetKind,
+		TargetRef:     issue.TargetRef,
+		Status:        "proposed",
+		ActorType:     "system",
+		ResultPayload: payload,
+	}, now)
+}
+
+func natsConsumerLagCorrelationKey(issue NATSConsumerLagIssue) string {
+	return "golden_signal:nats_consumer:" + strings.TrimSpace(issue.Key)
+}
+
+func natsConsumerLagEvidencePayload(
+	issue NATSConsumerLagIssue,
+	snapshot messaging.NATSConsumerLagSnapshot,
+	previous NATSConsumerLagIssue,
+	hadPrevious bool,
+	thresholds NATSConsumerLagThresholds,
+	now time.Time,
+) map[string]interface{} {
+	payload := cloneMap(issue.Payload)
+	payload["count"] = issue.Count
+	payload["threshold"] = issue.Threshold
+	payload["threshold_delta"] = issue.Count - issue.Threshold
+	payload["stream"] = issue.Stream
+	payload["consumer"] = issue.Consumer
+	payload["target_ref"] = issue.TargetRef
+	payload["kind"] = issue.Kind
+	payload["recent_observations"] = map[string]interface{}{
+		"pending_count":          snapshot.PendingCount,
+		"ack_pending_count":      snapshot.AckPendingCount,
+		"waiting_count":          snapshot.WaitingCount,
+		"redelivered_count":      snapshot.RedeliveredCount,
+		"delivered_consumer_seq": snapshot.DeliveredConsumerSeq,
+		"delivered_stream_seq":   snapshot.DeliveredStreamSeq,
+		"ack_floor_consumer_seq": snapshot.AckFloorConsumerSeq,
+		"ack_floor_stream_seq":   snapshot.AckFloorStreamSeq,
+		"push_bound":             snapshot.PushBound,
+	}
+	if !snapshot.LastActive.IsZero() {
+		payload["last_active"] = snapshot.LastActive
+		payload["seconds_since_last_active"] = int64(now.Sub(snapshot.LastActive).Seconds())
+	}
+	payload["correlation_hints"] = map[string]interface{}{
+		"messaging_consumers_tool":   "messaging_consumers.recent",
+		"transport_tool":             "messaging_transport.recent",
+		"async_backlog_tool":         "async_backlog.recent",
+		"transport_correlation_key":  "messaging_transport:nats_transport_degraded",
+		"consumer_correlation_key":   natsConsumerLagCorrelationKey(issue),
+		"pending_threshold":          thresholds.PendingMessagesThreshold,
+		"ack_pending_threshold":      thresholds.AckPendingThreshold,
+		"stalled_duration_threshold": int64(thresholds.StalledDuration / time.Second),
+	}
+	payload["trend"] = natsConsumerLagTrend(issue.Count, previous.Count, hadPrevious)
+	if hadPrevious {
+		payload["previous_observation_count"] = previous.Count
+		payload["count_delta"] = issue.Count - previous.Count
+	}
+	if issue.Threshold > 0 {
+		payload["threshold_ratio_percent"] = (issue.Count * 100) / issue.Threshold
+	}
+	return payload
+}
+
+func natsConsumerLagTrend(current int64, previous int64, hadPrevious bool) string {
+	if !hadPrevious {
+		return "elevated"
+	}
+	if current > previous {
+		return "growing"
+	}
+	if current < previous {
+		return "improving"
+	}
+	return "stable"
+}
+
+func natsConsumerSnapshotPayload(snapshot messaging.NATSConsumerLagSnapshot) map[string]interface{} {
+	payload := map[string]interface{}{
+		"stream":                 natsConsumerStream(snapshot),
+		"consumer":               natsConsumerName(snapshot),
+		"pending_count":          snapshot.PendingCount,
+		"ack_pending_count":      snapshot.AckPendingCount,
+		"waiting_count":          snapshot.WaitingCount,
+		"redelivered_count":      snapshot.RedeliveredCount,
+		"delivered_consumer_seq": snapshot.DeliveredConsumerSeq,
+		"delivered_stream_seq":   snapshot.DeliveredStreamSeq,
+		"ack_floor_consumer_seq": snapshot.AckFloorConsumerSeq,
+		"ack_floor_stream_seq":   snapshot.AckFloorStreamSeq,
+		"push_bound":             snapshot.PushBound,
+	}
+	if !snapshot.LastActive.IsZero() {
+		payload["last_active"] = snapshot.LastActive
+	}
+	return payload
+}
+
+func natsConsumerStream(snapshot messaging.NATSConsumerLagSnapshot) string {
+	stream := strings.TrimSpace(snapshot.Stream)
+	if stream == "" {
+		return "unknown-stream"
+	}
+	return stream
+}
+
+func natsConsumerName(snapshot messaging.NATSConsumerLagSnapshot) string {
+	consumer := strings.TrimSpace(snapshot.Consumer)
+	if consumer == "" {
+		return "unknown-consumer"
+	}
+	return consumer
+}
+
+func natsConsumerTargetRef(stream string, consumer string) string {
+	return stream + "/" + consumer
+}
+
+func cloneMap(payload map[string]interface{}) map[string]interface{} {
+	if len(payload) == 0 {
+		return map[string]interface{}{}
+	}
+	cloned := make(map[string]interface{}, len(payload))
+	for key, value := range payload {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func severityForCount(count int64, criticalThreshold int64) domainsresmartbot.IncidentSeverity {
