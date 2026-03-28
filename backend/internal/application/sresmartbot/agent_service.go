@@ -82,6 +82,22 @@ type AgentSuggestedActionResponse struct {
 	HumanConfirmation         bool                    `json:"human_confirmation_required"`
 }
 
+type AgentIncidentScorecardResponse struct {
+	IncidentID                uuid.UUID             `json:"incident_id"`
+	Mode                      string                `json:"mode"`
+	Summary                   string                `json:"summary"`
+	ProbableCause             string                `json:"probable_cause"`
+	Confidence                string                `json:"confidence"`
+	SeverityScore             int64                 `json:"severity_score"`
+	SeverityLevel             string                `json:"severity_level"`
+	WhySevereCards            []AgentSeverityFactor `json:"why_severe_cards,omitempty"`
+	RecommendedAction         string                `json:"recommended_action"`
+	ActionKey                 string                `json:"action_key"`
+	BlastRadius               string                `json:"blast_radius"`
+	ExecutionRequiresApproval bool                  `json:"execution_requires_approval"`
+	HumanConfirmation         bool                  `json:"human_confirmation_required"`
+}
+
 type AgentService struct {
 	workspaceService *WorkspaceService
 	mcpService       *MCPService
@@ -172,6 +188,14 @@ func (s *AgentService) BuildSuggestedAction(ctx context.Context, tenantID *uuid.
 		return nil, err
 	}
 	return buildSuggestedActionFromDraft(draft), nil
+}
+
+func (s *AgentService) BuildIncidentScorecard(ctx context.Context, tenantID *uuid.UUID, incidentID uuid.UUID) (*AgentIncidentScorecardResponse, error) {
+	draft, err := s.BuildDraft(ctx, tenantID, incidentID)
+	if err != nil {
+		return nil, err
+	}
+	return buildIncidentScorecardFromDraft(draft), nil
 }
 
 func buildTriageFromDraft(draft *AgentDraftResponse) *AgentTriageResponse {
@@ -399,6 +423,39 @@ func buildSuggestedActionFromDraft(draft *AgentDraftResponse) *AgentSuggestedAct
 		ExecutionRequiresApproval: true,
 		ExecutionGuardrail:        "Suggestion is advisory-only. Execution must use the existing action + approval workflow and cannot bypass deterministic policy gates.",
 		EvidenceRefs:              evidenceRefs,
+		HumanConfirmation:         draft.HumanConfirmation,
+	}
+}
+
+func buildIncidentScorecardFromDraft(draft *AgentDraftResponse) *AgentIncidentScorecardResponse {
+	if draft == nil {
+		return nil
+	}
+	triage := buildTriageFromDraft(draft)
+	severity := buildSeverityFromDraft(draft)
+	suggestion := buildSuggestedActionFromDraft(draft)
+	if triage == nil || severity == nil || suggestion == nil {
+		return nil
+	}
+
+	whySevereCards := append([]AgentSeverityFactor(nil), severity.Factors...)
+	if len(whySevereCards) > 3 {
+		whySevereCards = whySevereCards[:3]
+	}
+
+	return &AgentIncidentScorecardResponse{
+		IncidentID:                draft.IncidentID,
+		Mode:                      "deterministic_incident_scorecard",
+		Summary:                   severity.Summary,
+		ProbableCause:             triage.ProbableCause,
+		Confidence:                triage.Confidence,
+		SeverityScore:             severity.Score,
+		SeverityLevel:             severity.Level,
+		WhySevereCards:            whySevereCards,
+		RecommendedAction:         triage.RecommendedAction,
+		ActionKey:                 suggestion.ActionKey,
+		BlastRadius:               suggestion.BlastRadius,
+		ExecutionRequiresApproval: suggestion.ExecutionRequiresApproval,
 		HumanConfirmation:         draft.HumanConfirmation,
 	}
 }

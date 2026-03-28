@@ -462,6 +462,18 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - added interpretation safety gate to reject unsafe generated summary content (approval-bypass/auto-execute phrasing) and fallback to deterministic grounded output.
   - added reproducible QA runner `scripts/qa/sre_smartbot_aiops_eval_validate.sh` and Make target `qa-sre-smartbot-aiops-eval` with artifact logs under `docs/qa/artifacts`.
 
+7. `AIOPS-07` Incident scorecard contract + expanded “Why Severe” cards
+- Status: `done`
+- Scope:
+  - add consolidated incident scorecard endpoint for operators: probable cause, confidence, severity score, top “why severe” cards, and approval-safe action guidance.
+  - render scorecard cards in incident AI surfaces for both desktop and mobile layouts.
+- Validation:
+  - backend tests for scorecard composition and why-severe card trimming.
+  - frontend build and SRE regression/eval harness remain green.
+- Completion note:
+  - added `GET /api/v1/admin/sre/incidents/{id}/agent/scorecard`.
+  - incident AI workspace now includes dedicated `Incident Scorecard` cards with severity + why-severe factor breakdown.
+
 0. Deployment guardrails: strict Helm configuration (no silent fallbacks) + Supabase pooler stability
 - Status: `done`
 - Priority: `P0`

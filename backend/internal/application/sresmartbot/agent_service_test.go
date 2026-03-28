@@ -282,3 +282,78 @@ func TestBuildSuggestedActionFromDraft_CategorizesBlastRadius(t *testing.T) {
 		t.Fatalf("expected release drift advisory action, got %q", suggestion.ActionKey)
 	}
 }
+
+func TestBuildIncidentScorecardFromDraft_ProjectsSeverityAndTriage(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.MustParse("77777777-7777-7777-7777-777777777777"),
+		Summary:    "Transport instability and backlog pressure are worsening.",
+		Hypotheses: []AgentDraftHypothesis{
+			{
+				Title:      "Messaging transport instability may be contributing to backlog growth",
+				Confidence: "high",
+				SignalsUsed: []string{
+					"messaging_transport.recent",
+					"async_backlog.recent",
+				},
+			},
+		},
+		ToolRuns: []MCPToolInvocationResult{
+			{ToolName: "messaging_transport.recent", ServerName: "Observability", Payload: map[string]any{"reconnects": int64(5), "disconnects": int64(2), "reconnect_threshold": int64(3)}},
+			{ToolName: "async_backlog.recent", ServerName: "Observability", Payload: map[string]any{"build_queue_depth": int64(12), "email_queue_depth": int64(4), "messaging_outbox_pending": int64(8)}},
+		},
+		HumanConfirmation: true,
+	}
+
+	scorecard := buildIncidentScorecardFromDraft(draft)
+	if scorecard == nil {
+		t.Fatal("expected incident scorecard response")
+	}
+	if scorecard.Mode != "deterministic_incident_scorecard" {
+		t.Fatalf("unexpected mode: %q", scorecard.Mode)
+	}
+	if scorecard.SeverityScore < 60 {
+		t.Fatalf("expected high severity score, got %d", scorecard.SeverityScore)
+	}
+	if scorecard.SeverityLevel != "high" {
+		t.Fatalf("expected high severity level, got %q", scorecard.SeverityLevel)
+	}
+	if scorecard.ProbableCause == "" || scorecard.Confidence == "" {
+		t.Fatalf("expected populated probable cause/confidence, got cause=%q confidence=%q", scorecard.ProbableCause, scorecard.Confidence)
+	}
+	if scorecard.ActionKey != "review_messaging_transport_health" {
+		t.Fatalf("expected transport review action key, got %q", scorecard.ActionKey)
+	}
+	if !scorecard.ExecutionRequiresApproval {
+		t.Fatal("expected scorecard action to remain approval-bound")
+	}
+	if len(scorecard.WhySevereCards) == 0 {
+		t.Fatal("expected at least one why-severe card")
+	}
+}
+
+func TestBuildIncidentScorecardFromDraft_TrimsWhySevereCards(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.MustParse("88888888-8888-8888-8888-888888888888"),
+		Summary:    "Correlated degradation across logs/http/backlog/transport.",
+		Hypotheses: []AgentDraftHypothesis{
+			{
+				Title:      "Service health is degrading through one or more golden signals",
+				Confidence: "high",
+			},
+		},
+		ToolRuns: []MCPToolInvocationResult{
+			{ToolName: "logs.recent", ServerName: "Observability", Payload: map[string]any{"match_count": int64(15)}},
+			{ToolName: "http_signals.recent", ServerName: "Observability", Payload: map[string]any{"error_rate_percent": int64(9), "average_latency_ms": int64(1300)}},
+			{ToolName: "async_backlog.recent", ServerName: "Observability", Payload: map[string]any{"build_queue_depth": int64(25), "email_queue_depth": int64(11), "messaging_outbox_pending": int64(16)}},
+			{ToolName: "messaging_transport.recent", ServerName: "Observability", Payload: map[string]any{"reconnects": int64(8), "disconnects": int64(3), "reconnect_threshold": int64(3)}},
+		},
+	}
+
+	scorecard := buildIncidentScorecardFromDraft(draft)
+	if scorecard == nil {
+		t.Fatal("expected incident scorecard response")
+	}
+	if len(scorecard.WhySevereCards) > 3 {
+		t.Fatalf("expected why-severe cards to be trimmed to 3, got %d", len(scorecard.WhySevereCards))
+	}
+}

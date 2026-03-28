@@ -102,6 +102,7 @@ type invokeSREMCPToolRequest struct {
 type getSREAgentDraftResponse = appsresmartbot.AgentDraftResponse
 type getSREAgentTriageResponse = appsresmartbot.AgentTriageResponse
 type getSREAgentSeverityResponse = appsresmartbot.AgentSeverityResponse
+type getSREAgentScorecardResponse = appsresmartbot.AgentIncidentScorecardResponse
 type getSREAgentSuggestedActionResponse = appsresmartbot.AgentSuggestedActionResponse
 type getSREAgentInterpretationResponse = appsresmartbot.AgentInterpretationResponse
 type probeSREAgentRuntimeResponse = appsresmartbot.AgentRuntimeProbeResponse
@@ -666,6 +667,40 @@ func (h *SRESmartBotHandler) GetAgentSeverity(w http.ResponseWriter, r *http.Req
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(getSREAgentSeverityResponse(*severity))
+}
+
+func (h *SRESmartBotHandler) GetAgentScorecard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		WriteError(w, r.Context(), MethodNotAllowed("Method not allowed"))
+		return
+	}
+	if h.agentService == nil {
+		WriteError(w, r.Context(), InternalServer("Agent service is not configured"))
+		return
+	}
+	authCtx, ok := middleware.GetAuthContext(r)
+	if !ok {
+		WriteError(w, r.Context(), Unauthorized("Authentication required"))
+		return
+	}
+	incidentID, err := uuid.Parse(strings.TrimSpace(chi.URLParam(r, "id")))
+	if err != nil {
+		WriteError(w, r.Context(), BadRequest("Invalid incident id"))
+		return
+	}
+	var tenantID *uuid.UUID
+	if !isAllTenantsScopeRequested(r, authCtx) {
+		tenantID = &authCtx.TenantID
+	}
+	scorecard, err := h.agentService.BuildIncidentScorecard(r.Context(), tenantID, incidentID)
+	if err != nil {
+		h.logger.Error("Failed to build SRE agent scorecard", zap.Error(err), zap.String("incident_id", incidentID.String()))
+		WriteError(w, r.Context(), InternalServer("Failed to build agent scorecard").WithCause(err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(getSREAgentScorecardResponse(*scorecard))
 }
 
 func (h *SRESmartBotHandler) GetAgentSuggestedAction(w http.ResponseWriter, r *http.Request) {

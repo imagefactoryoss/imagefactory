@@ -13,6 +13,7 @@ import {
     ProductInfoMetadataConfig,
     ReleaseGovernancePolicyConfig,
     SREAgentDraftResponse,
+    SREAgentIncidentScorecardResponse,
     SREAgentInterpretationResponse,
     SREAgentSeverityResponse,
     SREAgentSuggestedActionResponse,
@@ -343,6 +344,17 @@ export const adminService = {
     async getSREIncidentAgentSeverity(id: string): Promise<SREAgentSeverityResponse> {
         try {
             const response = await api.get(`/admin/sre/incidents/${id}/agent/severity`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentAgentScorecard(id: string): Promise<SREAgentIncidentScorecardResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/agent/scorecard`, {
                 headers: getTenantHeader(),
             })
             return response.data
