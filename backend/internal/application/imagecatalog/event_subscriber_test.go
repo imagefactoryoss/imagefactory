@@ -123,7 +123,7 @@ func makeSuccessfulKanikoBuild(t *testing.T) *build.Build {
 			SecretManagerType: build.SecretManagerAWSSM,
 			Dockerfile:        "Dockerfile",
 			BuildContext:      ".",
-			RegistryRepo:      "registry.gitlab.com/imagefactoryoss/imagefactory/image-factory-backend:v1.0.0",
+			RegistryRepo:      "registry.gitlab.com/s4cna/image-factory:v1.0.0",
 		},
 	}
 	b, err := build.NewBuild(tenantID, projectID, manifest, &creator)

@@ -1,5 +1,6 @@
 import type { SREActionAttempt, SREApproval, SREEvidence, SREFinding } from '@/types'
 import React, { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { EmptyState, formatDateTime, relativeTime } from './sreSmartBotIncidentPageShared'
 
@@ -51,9 +52,11 @@ type SREIncidentTimelineProps = {
     actions: SREActionAttempt[]
     approvals: SREApproval[]
     actionsById: Record<string, SREActionAttempt>
+    maxEntries?: number
+    fullTimelineHref?: string
 }
 
-export const SREIncidentTimeline: React.FC<SREIncidentTimelineProps> = ({ findings, evidence, actions, approvals, actionsById }) => {
+export const SREIncidentTimeline: React.FC<SREIncidentTimelineProps> = ({ findings, evidence, actions, approvals, actionsById, maxEntries, fullTimelineHref }) => {
     const [timelineActorFilter, setTimelineActorFilter] = useState<TimelineActorFilter>('all')
     const [timelineEventFilter, setTimelineEventFilter] = useState<TimelineEventFilter>('all')
 
@@ -160,6 +163,13 @@ export const SREIncidentTimeline: React.FC<SREIncidentTimelineProps> = ({ findin
         })
     }, [entries, timelineActorFilter, timelineEventFilter])
 
+    const visibleEntries = useMemo(() => {
+        if (!maxEntries || maxEntries <= 0) return filteredEntries
+        return filteredEntries.slice(0, maxEntries)
+    }, [filteredEntries, maxEntries])
+
+    const isTruncated = !!maxEntries && maxEntries > 0 && filteredEntries.length > maxEntries
+
     return (
         <>
             <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -217,7 +227,22 @@ export const SREIncidentTimeline: React.FC<SREIncidentTimelineProps> = ({ findin
                 <EmptyState title="No activity matches the current filters" description="Broaden the actor or event filters to see the full incident thread again." />
             ) : (
                 <div className="space-y-3">
-                    {filteredEntries.map((entry) => (
+                    {isTruncated ? (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span>Showing latest {maxEntries} of {filteredEntries.length} matching timeline events.</span>
+                                {fullTimelineHref ? (
+                                    <Link
+                                        to={fullTimelineHref}
+                                        className="inline-flex items-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200 dark:hover:bg-sky-950/50"
+                                    >
+                                        View Full Timeline
+                                    </Link>
+                                ) : null}
+                            </div>
+                        </div>
+                    ) : null}
+                    {visibleEntries.map((entry) => (
                         <div key={entry.id} className={`rounded-xl border p-4 ${timelineEntryTone(entry.emphasis)}`}>
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">

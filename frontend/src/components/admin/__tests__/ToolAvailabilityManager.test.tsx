@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import ToolAvailabilityManager from "../ToolAvailabilityManager";
 import { adminService } from "../../../services/adminService";
 import { buildService } from "../../../services/buildService";
+import ToolAvailabilityManager from "../ToolAvailabilityManager";
 
 vi.mock("react-hot-toast", () => ({
   toast: {

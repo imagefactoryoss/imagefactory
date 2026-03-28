@@ -667,6 +667,7 @@ func defaultRobotSREPolicyConfig() RobotSREPolicyConfig {
 				ApprovalRequired: false,
 			},
 		},
+		RemediationPacks: defaultRobotSRERemediationPacks(),
 		AgentRuntime: RobotSREAgentRuntimeConfig{
 			Enabled:                            false,
 			Provider:                           "ollama",
@@ -683,6 +684,54 @@ func defaultRobotSREPolicyConfig() RobotSREPolicyConfig {
 		},
 		DetectorRules: []RobotSREDetectorRule{},
 		OperatorRules: []RobotSREOperatorRule{},
+	}
+}
+
+func defaultRobotSRERemediationPacks() []RobotSRERemediationPack {
+	return []RobotSRERemediationPack{
+		{
+			Key:              "async_backlog_pressure_pack",
+			Version:          "v1",
+			Name:             "Async Backlog Pressure Pack",
+			Summary:          "Checks queue/backlog pressure preconditions and proposes staged throughput remediation.",
+			RiskTier:         "low",
+			ActionClass:      "guided_remediation",
+			RequiresApproval: false,
+			IncidentTypes: []string{
+				"email_queue_backlog_pressure",
+				"messaging_outbox_backlog_pressure",
+				"dispatcher_backlog_pressure",
+				"async_backlog_pressure",
+			},
+		},
+		{
+			Key:              "nats_transport_stability_pack",
+			Version:          "v1",
+			Name:             "NATS Transport Stability Pack",
+			Summary:          "Validates transport health preconditions and guides bounded recovery actions.",
+			RiskTier:         "medium",
+			ActionClass:      "guided_remediation",
+			RequiresApproval: true,
+			IncidentTypes: []string{
+				"nats_transport_disconnect_storm",
+				"nats_transport_reconnect_storm",
+				"nats_consumer_lag_pressure",
+			},
+		},
+		{
+			Key:              "provider_connectivity_drift_pack",
+			Version:          "v1",
+			Name:             "Provider Connectivity Drift Pack",
+			Summary:          "Runs connectivity and configuration drift checks for infrastructure providers.",
+			RiskTier:         "low",
+			ActionClass:      "guided_remediation",
+			RequiresApproval: false,
+			IncidentTypes: []string{
+				"provider_connectivity_degraded",
+				"provider_readiness_drift",
+				"registry_connectivity_degraded",
+			},
+		},
 	}
 }
 
@@ -727,6 +776,9 @@ func applyRobotSREPolicyDefaults(cfg *RobotSREPolicyConfig) {
 	if len(cfg.MCPServers) == 0 {
 		cfg.MCPServers = append([]RobotSREMCPServer(nil), defaultCfg.MCPServers...)
 	}
+	if len(cfg.RemediationPacks) == 0 {
+		cfg.RemediationPacks = append([]RobotSRERemediationPack(nil), defaultCfg.RemediationPacks...)
+	}
 	if strings.TrimSpace(cfg.AgentRuntime.Provider) == "" {
 		cfg.AgentRuntime.Provider = defaultCfg.AgentRuntime.Provider
 	}
@@ -758,9 +810,10 @@ func validateRobotSREPolicyConfig(cfg *RobotSREPolicyConfig) error {
 	applyRobotSREPolicyDefaults(cfg)
 
 	validEnvironmentModes := map[string]struct{}{
-		"demo":       {},
-		"staging":    {},
-		"production": {},
+		"demo":        {},
+		"development": {},
+		"staging":     {},
+		"production":  {},
 	}
 	validDetectorLearningModes := map[string]struct{}{
 		"disabled":             {},
@@ -798,6 +851,11 @@ func validateRobotSREPolicyConfig(cfg *RobotSREPolicyConfig) error {
 		"openai": {},
 		"none":   {},
 	}
+	validRemediationRiskTiers := map[string]struct{}{
+		"low":    {},
+		"medium": {},
+		"high":   {},
+	}
 	validDomains := map[string]struct{}{
 		"infrastructure":        {},
 		"runtime_services":      {},
@@ -814,7 +872,7 @@ func validateRobotSREPolicyConfig(cfg *RobotSREPolicyConfig) error {
 	}
 
 	if _, ok := validEnvironmentModes[strings.TrimSpace(cfg.EnvironmentMode)]; !ok {
-		return fmt.Errorf("environment_mode must be one of: demo, staging, production")
+		return fmt.Errorf("environment_mode must be one of: demo, development, staging, production")
 	}
 	if _, ok := validDetectorLearningModes[strings.TrimSpace(cfg.DetectorLearningMode)]; !ok {
 		return fmt.Errorf("detector_learning_mode must be one of: disabled, suggest_only, training_auto_create")
@@ -832,13 +890,22 @@ func validateRobotSREPolicyConfig(cfg *RobotSREPolicyConfig) error {
 	seenDomains := make(map[string]struct{}, len(cfg.EnabledDomains))
 	for _, domain := range cfg.EnabledDomains {
 		trimmed := strings.TrimSpace(domain)
-		if _, ok := validDomains[trimmed]; !ok {
-			return fmt.Errorf("enabled_domains contains invalid domain %q", domain)
+		if trimmed == "" {
+			return fmt.Errorf("enabled_domains contains an empty domain")
 		}
 		if _, exists := seenDomains[trimmed]; exists {
 			return fmt.Errorf("enabled_domains contains duplicate domain %q", domain)
 		}
 		seenDomains[trimmed] = struct{}{}
+	}
+
+	// allowedDomains is the union of the built-in set and any operator-defined custom domains.
+	allowedDomains := make(map[string]struct{}, len(validDomains)+len(cfg.EnabledDomains))
+	for k := range validDomains {
+		allowedDomains[k] = struct{}{}
+	}
+	for k := range seenDomains {
+		allowedDomains[k] = struct{}{}
 	}
 
 	seenProviderIDs := make(map[string]struct{}, len(cfg.ChannelProviders))
@@ -905,6 +972,56 @@ func validateRobotSREPolicyConfig(cfg *RobotSREPolicyConfig) error {
 		}
 	}
 
+	seenPackKeys := make(map[string]struct{}, len(cfg.RemediationPacks))
+	for idx := range cfg.RemediationPacks {
+		pack := &cfg.RemediationPacks[idx]
+		pack.Key = strings.TrimSpace(pack.Key)
+		pack.Version = strings.TrimSpace(pack.Version)
+		pack.Name = strings.TrimSpace(pack.Name)
+		pack.Summary = strings.TrimSpace(pack.Summary)
+		pack.RiskTier = strings.TrimSpace(pack.RiskTier)
+		pack.ActionClass = strings.TrimSpace(pack.ActionClass)
+
+		if pack.Key == "" {
+			return fmt.Errorf("remediation_packs[%d].key is required", idx)
+		}
+		if _, exists := seenPackKeys[pack.Key]; exists {
+			return fmt.Errorf("remediation_packs contains duplicate key %q", pack.Key)
+		}
+		seenPackKeys[pack.Key] = struct{}{}
+		if pack.Version == "" {
+			return fmt.Errorf("remediation_packs[%d].version is required", idx)
+		}
+		if pack.Name == "" {
+			return fmt.Errorf("remediation_packs[%d].name is required", idx)
+		}
+		if pack.Summary == "" {
+			return fmt.Errorf("remediation_packs[%d].summary is required", idx)
+		}
+		if _, ok := validRemediationRiskTiers[pack.RiskTier]; !ok {
+			return fmt.Errorf("remediation_packs[%d].risk_tier must be one of: low, medium, high", idx)
+		}
+		if pack.ActionClass == "" {
+			return fmt.Errorf("remediation_packs[%d].action_class is required", idx)
+		}
+		if len(pack.IncidentTypes) == 0 {
+			return fmt.Errorf("remediation_packs[%d].incident_types must contain at least one incident type", idx)
+		}
+
+		seenIncidentTypes := make(map[string]struct{}, len(pack.IncidentTypes))
+		for incidentIdx, incidentType := range pack.IncidentTypes {
+			normalized := strings.TrimSpace(incidentType)
+			if normalized == "" {
+				return fmt.Errorf("remediation_packs[%d].incident_types[%d] is required", idx, incidentIdx)
+			}
+			if _, exists := seenIncidentTypes[normalized]; exists {
+				return fmt.Errorf("remediation_packs[%d].incident_types contains duplicate incident type %q", idx, normalized)
+			}
+			seenIncidentTypes[normalized] = struct{}{}
+			pack.IncidentTypes[incidentIdx] = normalized
+		}
+	}
+
 	cfg.AgentRuntime.Provider = strings.TrimSpace(cfg.AgentRuntime.Provider)
 	cfg.AgentRuntime.Model = strings.TrimSpace(cfg.AgentRuntime.Model)
 	cfg.AgentRuntime.BaseURL = strings.TrimRight(strings.TrimSpace(cfg.AgentRuntime.BaseURL), "/")
@@ -948,8 +1065,8 @@ func validateRobotSREPolicyConfig(cfg *RobotSREPolicyConfig) error {
 		if rule.Name == "" {
 			return fmt.Errorf("operator_rules[%d].name is required", idx)
 		}
-		if _, ok := validDomains[rule.Domain]; !ok {
-			return fmt.Errorf("operator_rules[%d].domain is invalid", idx)
+		if _, ok := allowedDomains[rule.Domain]; !ok {
+			return fmt.Errorf("operator_rules[%d].domain must be one of the built-in or enabled domains", idx)
 		}
 		if rule.IncidentType == "" {
 			return fmt.Errorf("operator_rules[%d].incident_type is required", idx)
@@ -999,8 +1116,8 @@ func validateRobotSREPolicyConfig(cfg *RobotSREPolicyConfig) error {
 		if rule.Query == "" {
 			return fmt.Errorf("detector_rules[%d].query is required", idx)
 		}
-		if _, ok := validDomains[rule.Domain]; !ok {
-			return fmt.Errorf("detector_rules[%d].domain is invalid", idx)
+		if rule.Domain == "" {
+			return fmt.Errorf("detector_rules[%d].domain is required", idx)
 		}
 		if rule.IncidentType == "" {
 			return fmt.Errorf("detector_rules[%d].incident_type is required", idx)
@@ -2344,6 +2461,35 @@ func (s *Service) UpdateOperationCapabilitiesConfig(ctx context.Context, tenantI
 	}
 
 	return operationCapabilities, nil
+}
+
+func defaultProductInfoMetadataConfig() ProductInfoMetadataConfig {
+	return ProductInfoMetadataConfig{LastBacklogSync: ""}
+}
+
+// GetProductInfoMetadataConfig retrieves global product-info metadata.
+func (s *Service) GetProductInfoMetadataConfig(ctx context.Context) (*ProductInfoMetadataConfig, error) {
+	config, err := s.repository.FindByKey(ctx, nil, "product_info_metadata")
+	if err != nil {
+		if errors.Is(err, ErrConfigNotFound) || strings.Contains(err.Error(), "no rows in result set") {
+			defaultCfg := defaultProductInfoMetadataConfig()
+			return &defaultCfg, nil
+		}
+		s.logger.Error("Failed to get product info metadata config", zap.Error(err))
+		return nil, err
+	}
+
+	if config.Status() != ConfigStatusActive {
+		return nil, fmt.Errorf("product info metadata configuration is not active")
+	}
+
+	var metadata ProductInfoMetadataConfig
+	if err := json.Unmarshal(config.ConfigValue(), &metadata); err != nil {
+		s.logger.Error("Failed to unmarshal product info metadata config", zap.Error(err))
+		return nil, err
+	}
+
+	return &metadata, nil
 }
 
 // GetQuarantinePolicyConfig retrieves quarantine policy configuration for a tenant.

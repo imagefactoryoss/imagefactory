@@ -1,0 +1,2 @@
+-- Irreversible data cleanup migration: password hashes for LDAP users are intentionally removed.
+-- No-op on rollback.

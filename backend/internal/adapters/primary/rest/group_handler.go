@@ -301,7 +301,7 @@ func (h *GroupHandler) AddGroupMember(w http.ResponseWriter, r *http.Request) {
 			GroupName:    group.Name,
 			TenantName:   tenant.Name,
 			TenantID:     group.TenantID,
-			DashboardURL: "https://app.imagefactory.local/dashboard",
+			DashboardURL: "https://app.imgfactory.com/dashboard",
 		}
 
 		if err := h.notificationService.SendUserAddedToGroupEmail(r.Context(), notificationData); err != nil {

@@ -5,6 +5,11 @@ import { defineConfig } from 'vite'
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [react()],
+    define: {
+        'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.VITE_APP_VERSION || process.env.npm_package_version || 'dev'),
+        'import.meta.env.VITE_APP_BUILD_DATE': JSON.stringify(process.env.VITE_APP_BUILD_DATE || new Date().toISOString().slice(0, 10)),
+        'import.meta.env.VITE_PRODUCT_INFO_LAST_SYNC': JSON.stringify(process.env.VITE_PRODUCT_INFO_LAST_SYNC || process.env.VITE_APP_BUILD_DATE || new Date().toISOString().slice(0, 10)),
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),

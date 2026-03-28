@@ -1,6 +1,5 @@
 import { registryAuthClient } from '@/api/registryAuthClient'
-import { CreateRegistryAuthRequest, RegistryAuthType } from '@/types/registryAuth'
-import { RegistryAuth } from '@/types/registryAuth'
+import { CreateRegistryAuthRequest, RegistryAuth, RegistryAuthType } from '@/types/registryAuth'
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
