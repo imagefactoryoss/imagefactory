@@ -242,6 +242,10 @@ test-e2e: ## Run end-to-end tests
 qa-packer-provider-native-matrix: ## Run Packer provider-native matrix validation (defaults to mock mode; writes docs/qa/artifacts log)
 	@./scripts/qa/packer_provider_native_matrix_validate.sh
 
+.PHONY: qa-sre-smartbot-regression
+qa-sre-smartbot-regression: ## Run SRE Smart Bot focused backend+frontend regression suite (writes docs/qa/artifacts log)
+	@./scripts/qa/sre_smartbot_regression_validate.sh
+
 ##@ Quality
 
 .PHONY: lint
