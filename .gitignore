@@ -324,3 +324,7 @@ dump.rdb
 backend/external-tenant-service
 docs/reference/apphq-api-reference.md
 docs/apphq.txt
+
+# Sensitive Helm values (never commit)
+deploy/helm/image-factory/values.yaml
+deploy/helm/image-factory/values.external.example.yaml
