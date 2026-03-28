@@ -98,6 +98,17 @@ type AgentIncidentScorecardResponse struct {
 	HumanConfirmation         bool                  `json:"human_confirmation_required"`
 }
 
+type AgentIncidentSnapshotResponse struct {
+	IncidentID        uuid.UUID                       `json:"incident_id"`
+	Mode              string                          `json:"mode"`
+	Summary           string                          `json:"summary"`
+	Triage            *AgentTriageResponse            `json:"triage,omitempty"`
+	Severity          *AgentSeverityResponse          `json:"severity,omitempty"`
+	Scorecard         *AgentIncidentScorecardResponse `json:"scorecard,omitempty"`
+	SuggestedAction   *AgentSuggestedActionResponse   `json:"suggested_action,omitempty"`
+	HumanConfirmation bool                            `json:"human_confirmation_required"`
+}
+
 type AgentService struct {
 	workspaceService *WorkspaceService
 	mcpService       *MCPService
@@ -196,6 +207,14 @@ func (s *AgentService) BuildIncidentScorecard(ctx context.Context, tenantID *uui
 		return nil, err
 	}
 	return buildIncidentScorecardFromDraft(draft), nil
+}
+
+func (s *AgentService) BuildIncidentSnapshot(ctx context.Context, tenantID *uuid.UUID, incidentID uuid.UUID) (*AgentIncidentSnapshotResponse, error) {
+	draft, err := s.BuildDraft(ctx, tenantID, incidentID)
+	if err != nil {
+		return nil, err
+	}
+	return buildIncidentSnapshotFromDraft(draft), nil
 }
 
 func buildTriageFromDraft(draft *AgentDraftResponse) *AgentTriageResponse {
@@ -457,6 +476,29 @@ func buildIncidentScorecardFromDraft(draft *AgentDraftResponse) *AgentIncidentSc
 		BlastRadius:               suggestion.BlastRadius,
 		ExecutionRequiresApproval: suggestion.ExecutionRequiresApproval,
 		HumanConfirmation:         draft.HumanConfirmation,
+	}
+}
+
+func buildIncidentSnapshotFromDraft(draft *AgentDraftResponse) *AgentIncidentSnapshotResponse {
+	if draft == nil {
+		return nil
+	}
+	triage := buildTriageFromDraft(draft)
+	severity := buildSeverityFromDraft(draft)
+	scorecard := buildIncidentScorecardFromDraft(draft)
+	suggested := buildSuggestedActionFromDraft(draft)
+	if triage == nil || severity == nil || scorecard == nil || suggested == nil {
+		return nil
+	}
+	return &AgentIncidentSnapshotResponse{
+		IncidentID:        draft.IncidentID,
+		Mode:              "deterministic_incident_snapshot",
+		Summary:           severity.Summary,
+		Triage:            triage,
+		Severity:          severity,
+		Scorecard:         scorecard,
+		SuggestedAction:   suggested,
+		HumanConfirmation: draft.HumanConfirmation,
 	}
 }
 

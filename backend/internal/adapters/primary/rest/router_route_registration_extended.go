@@ -234,6 +234,7 @@ func registerIdentitySystemAdminRoutes(
 		router.Get("/api/v1/admin/sre/incidents/{id}/agent/triage", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentTriage)).ServeHTTP)
 		router.Get("/api/v1/admin/sre/incidents/{id}/agent/severity", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentSeverity)).ServeHTTP)
 		router.Get("/api/v1/admin/sre/incidents/{id}/agent/scorecard", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentScorecard)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/incidents/{id}/agent/snapshot", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentSnapshot)).ServeHTTP)
 		router.Get("/api/v1/admin/sre/incidents/{id}/agent/suggested-action", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentSuggestedAction)).ServeHTTP)
 		router.Get("/api/v1/admin/sre/incidents/{id}/agent/interpretation", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentInterpretation)).ServeHTTP)
 		router.Get("/api/v1/admin/sre/approvals", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ListApprovals)).ServeHTTP)

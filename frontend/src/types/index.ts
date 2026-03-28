@@ -976,6 +976,17 @@ export interface SREAgentIncidentScorecardResponse {
     human_confirmation_required: boolean
 }
 
+export interface SREAgentIncidentSnapshotResponse {
+    incident_id: string
+    mode: string
+    summary: string
+    triage?: SREAgentTriageResponse
+    severity?: SREAgentSeverityResponse
+    scorecard?: SREAgentIncidentScorecardResponse
+    suggested_action?: SREAgentSuggestedActionResponse
+    human_confirmation_required: boolean
+}
+
 export interface SREAgentSuggestedActionResponse {
     incident_id: string
     mode: string
