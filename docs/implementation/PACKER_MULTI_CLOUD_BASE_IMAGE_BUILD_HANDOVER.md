@@ -70,6 +70,9 @@ Branch: `feature/packer-builds`
 - PR8 lifecycle audit mode-depth completed:
   - lifecycle history metadata now includes per-transition `transition_mode`.
   - VM catalog lifecycle history UI now renders each transition's mode for clearer audit context.
+- PR8 lifecycle provider audit-depth expansion completed:
+  - lifecycle metadata/history now records provider-native execution details (`provider_action`, `provider_identifier`, `provider_outcome`).
+  - VM catalog payloads now include latest provider execution audit fields to reduce provider-side debugging latency.
 - PR8 lifecycle action response contract hardening completed:
   - idempotent lifecycle transitions now return VM catalog `data` payload plus message (not message-only).
   - backend now uses a shared VM catalog item builder across list/detail/action responses for payload consistency.

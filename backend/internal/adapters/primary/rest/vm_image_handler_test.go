@@ -839,7 +839,12 @@ func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 		input,
 		"deprecated",
 		"stale image",
-		"provider_native",
+		vmLifecycleTransitionResult{
+			TransitionMode:     "provider_native",
+			ProviderAction:     "aws.enable_image_deprecation",
+			ProviderIdentifier: "ami-0a1b2c3d4e5f67890",
+			ProviderOutcome:    "success",
+		},
 		uuid.MustParse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
 		time.Date(2026, 3, 27, 20, 0, 0, 0, time.UTC),
 	)
@@ -858,6 +863,24 @@ func TestUpdatePackerLifecycleMetadata(t *testing.T) {
 	}
 	if lifecycle.History[0].TransitionMode != "provider_native" {
 		t.Fatalf("expected lifecycle history mode provider_native, got %q", lifecycle.History[0].TransitionMode)
+	}
+	if lifecycle.LastProviderAction != "aws.enable_image_deprecation" {
+		t.Fatalf("expected lifecycle provider action set, got %q", lifecycle.LastProviderAction)
+	}
+	if lifecycle.LastProviderID != "ami-0a1b2c3d4e5f67890" {
+		t.Fatalf("expected lifecycle provider identifier set, got %q", lifecycle.LastProviderID)
+	}
+	if lifecycle.LastProviderResult != "success" {
+		t.Fatalf("expected lifecycle provider outcome set, got %q", lifecycle.LastProviderResult)
+	}
+	if lifecycle.History[0].ProviderAction != "aws.enable_image_deprecation" {
+		t.Fatalf("expected lifecycle history provider action set, got %q", lifecycle.History[0].ProviderAction)
+	}
+	if lifecycle.History[0].ProviderID != "ami-0a1b2c3d4e5f67890" {
+		t.Fatalf("expected lifecycle history provider identifier set, got %q", lifecycle.History[0].ProviderID)
+	}
+	if lifecycle.History[0].ProviderResult != "success" {
+		t.Fatalf("expected lifecycle history provider outcome set, got %q", lifecycle.History[0].ProviderResult)
 	}
 }
 

@@ -146,6 +146,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 GCP provider-native lifecycle execution completed on `feature/packer-builds`:
     - GCP `released` / `deprecated` / `deleted` lifecycle transitions now support provider-native execution through Compute API when execution mode enables provider-native transitions.
     - GCP native lifecycle supports identifier fallback from both provider metadata and execution artifacts; invalid/missing GCP identifiers fail with `400`.
+  - PR8 provider-native lifecycle audit-depth expansion completed on `feature/packer-builds`:
+    - lifecycle metadata/history now persists provider execution audit fields (`provider_action`, `provider_identifier`, `provider_outcome`) for provider-native transitions.
+    - VM catalog payloads now expose latest provider execution audit fields for faster operator diagnostics.
 
 ## Backlog Review Summary (2026-03-16)
 
