@@ -152,6 +152,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 provider-native lifecycle smoke tooling completed on `feature/packer-builds`:
     - added provider-native smoke runner script `scripts/packer-lifecycle-provider-native-smoke.sh` with destructive-guard and provider-native assertions.
     - added operator runbook `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_SMOKE_RUNBOOK.md` for env setup, execution order, and rollback guidance.
+  - PR8 provider-native lifecycle matrix validation tooling completed on `feature/packer-builds`:
+    - added matrix runner script `scripts/packer-lifecycle-provider-native-matrix.sh` to orchestrate per-provider smoke runs with consolidated evidence logging.
+    - added matrix runbook `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_MATRIX_RUNBOOK.md` for provider execution-ID mapping, safety guards, and pass/fail criteria.
 
 ## Backlog Review Summary (2026-03-16)
 

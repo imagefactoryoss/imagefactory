@@ -9,6 +9,9 @@ Validate provider-native VM lifecycle transitions (`promote`, `deprecate`, `dele
 ## Script
 
 - `scripts/packer-lifecycle-provider-native-smoke.sh`
+- For multi-provider orchestration and consolidated evidence logging, use:
+  - `scripts/packer-lifecycle-provider-native-matrix.sh`
+  - `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_MATRIX_RUNBOOK.md`
 
 ## Required Environment
 

@@ -898,6 +898,9 @@ Progress update (2026-03-27):
 - provider-native lifecycle smoke tooling now exists:
   - scripted validation entrypoint: `scripts/packer-lifecycle-provider-native-smoke.sh`.
   - operator runbook: `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_SMOKE_RUNBOOK.md`.
+- provider-native lifecycle matrix tooling now exists:
+  - multi-provider orchestration script: `scripts/packer-lifecycle-provider-native-matrix.sh`.
+  - matrix validation runbook: `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_MATRIX_RUNBOOK.md`.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

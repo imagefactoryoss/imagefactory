@@ -100,6 +100,10 @@ Branch: `feature/packer-builds`
 - PR8 provider-native lifecycle smoke tooling completed:
   - executable smoke runner: `scripts/packer-lifecycle-provider-native-smoke.sh`.
   - operational runbook: `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_SMOKE_RUNBOOK.md`.
+- PR8 provider-native lifecycle matrix validation tooling completed:
+  - executable matrix runner: `scripts/packer-lifecycle-provider-native-matrix.sh`.
+  - matrix validation runbook: `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_MATRIX_RUNBOOK.md`.
+  - smoke runbook now links single-provider and matrix workflows.
 - PR8 provider-native lifecycle initial execution completed:
   - AWS `delete` lifecycle action now supports provider-native execution via EC2 `DeregisterImage` when execution mode allows.
   - successful AWS native delete transitions now persist `provider_native`; invalid/missing AWS image metadata now returns `400`.
@@ -299,4 +303,4 @@ Frontend:
 
 ## Known Gap For Next PR
 
-- provider-native lifecycle actions are now implemented across AWS, VMware, Azure, and GCP; next gap is end-to-end provider API validation coverage in staging and production-like environments.
+- provider-native lifecycle actions are implemented across AWS, VMware, Azure, and GCP; next gap is executing the matrix runbook against staging/prod-like environments and attaching evidence artifacts for each provider.
