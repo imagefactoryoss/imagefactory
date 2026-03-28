@@ -210,3 +210,75 @@ func TestBuildSeverityFromDraft_UsesFallbackForSparseEvidence(t *testing.T) {
 		t.Fatalf("expected no factors for sparse evidence, got %d", len(severity.Factors))
 	}
 }
+
+func TestBuildSuggestedActionFromDraft_IsAdvisoryAndApprovalBound(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.MustParse("55555555-5555-5555-5555-555555555555"),
+		Summary:    "Messaging transport and backlog pressure are rising.",
+		Hypotheses: []AgentDraftHypothesis{
+			{
+				Title:      "Messaging transport instability may be contributing to backlog growth",
+				Confidence: "high",
+				SignalsUsed: []string{
+					"messaging_transport.recent",
+					"async_backlog.recent",
+				},
+			},
+		},
+		ToolRuns: []MCPToolInvocationResult{
+			{ToolName: "messaging_transport.recent", ServerName: "Observability", Payload: map[string]any{"reconnects": int64(4), "disconnects": int64(2), "reconnect_threshold": int64(3)}},
+			{ToolName: "async_backlog.recent", ServerName: "Observability", Payload: map[string]any{"build_queue_depth": int64(9), "email_queue_depth": int64(4), "messaging_outbox_pending": int64(7)}},
+		},
+	}
+
+	suggestion := buildSuggestedActionFromDraft(draft)
+	if suggestion == nil {
+		t.Fatal("expected suggested action response")
+	}
+	if suggestion.Mode != "deterministic_advisory_suggested_action" {
+		t.Fatalf("unexpected mode: %q", suggestion.Mode)
+	}
+	if suggestion.ActionKey != "review_messaging_transport_health" {
+		t.Fatalf("expected transport advisory action, got %q", suggestion.ActionKey)
+	}
+	if !suggestion.AdvisoryOnly {
+		t.Fatal("expected advisory-only suggestion")
+	}
+	if !suggestion.ExecutionRequiresApproval {
+		t.Fatal("expected approval-required execution guard")
+	}
+	guard := strings.ToLower(suggestion.ExecutionGuardrail)
+	if !strings.Contains(guard, "advisory-only") || !strings.Contains(guard, "approval") {
+		t.Fatalf("expected guardrail text to enforce approval, got %q", suggestion.ExecutionGuardrail)
+	}
+}
+
+func TestBuildSuggestedActionFromDraft_CategorizesBlastRadius(t *testing.T) {
+	draft := &AgentDraftResponse{
+		IncidentID: uuid.MustParse("66666666-6666-6666-6666-666666666666"),
+		Summary:    "Release drift detected with cross-service impact.",
+		Hypotheses: []AgentDraftHypothesis{
+			{
+				Title:      "Release drift or partial rollout is the primary cause",
+				Confidence: "high",
+				SignalsUsed: []string{
+					"release_drift.summary",
+				},
+			},
+		},
+		ToolRuns: []MCPToolInvocationResult{
+			{ToolName: "release_drift.summary", ServerName: "Release", Payload: map[string]any{"active_drift_count": int64(3)}},
+		},
+	}
+
+	suggestion := buildSuggestedActionFromDraft(draft)
+	if suggestion == nil {
+		t.Fatal("expected suggested action response")
+	}
+	if suggestion.BlastRadius != "high" {
+		t.Fatalf("expected high blast radius for release drift, got %q", suggestion.BlastRadius)
+	}
+	if suggestion.ActionKey != "review_release_drift" {
+		t.Fatalf("expected release drift advisory action, got %q", suggestion.ActionKey)
+	}
+}

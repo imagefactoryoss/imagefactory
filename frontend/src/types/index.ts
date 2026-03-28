@@ -960,6 +960,20 @@ export interface SREAgentSeverityResponse {
     human_confirmation_required: boolean
 }
 
+export interface SREAgentSuggestedActionResponse {
+    incident_id: string
+    mode: string
+    action_key: string
+    action_summary: string
+    justification: string
+    blast_radius: 'low' | 'medium' | 'high' | string
+    advisory_only: boolean
+    execution_requires_approval: boolean
+    execution_guardrail: string
+    evidence_refs?: SREAgentDraftEvidenceRef[]
+    human_confirmation_required: boolean
+}
+
 export interface SREAgentInterpretationResponse {
     draft?: SREAgentDraftResponse
     provider: string
