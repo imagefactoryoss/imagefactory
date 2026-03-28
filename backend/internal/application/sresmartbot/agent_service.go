@@ -106,6 +106,8 @@ type AgentIncidentSnapshotResponse struct {
 	Severity          *AgentSeverityResponse          `json:"severity,omitempty"`
 	Scorecard         *AgentIncidentScorecardResponse `json:"scorecard,omitempty"`
 	SuggestedAction   *AgentSuggestedActionResponse   `json:"suggested_action,omitempty"`
+	OperatorHandoff   string                          `json:"operator_handoff_note"`
+	PolicyGuardrails  []string                        `json:"policy_guardrails,omitempty"`
 	HumanConfirmation bool                            `json:"human_confirmation_required"`
 }
 
@@ -490,6 +492,15 @@ func buildIncidentSnapshotFromDraft(draft *AgentDraftResponse) *AgentIncidentSna
 	if triage == nil || severity == nil || scorecard == nil || suggested == nil {
 		return nil
 	}
+	operatorHandoff := buildSnapshotOperatorHandoff(triage, scorecard, suggested)
+	policyGuardrails := []string{
+		"AI output is advisory-only and cannot execute actions directly.",
+		"Execution must go through deterministic action + approval workflow.",
+		"Approval gate remains mandatory before any disruptive remediation.",
+	}
+	if draft.HumanConfirmation {
+		policyGuardrails = append(policyGuardrails, "Human confirmation is required before operator-facing messages are sent.")
+	}
 	return &AgentIncidentSnapshotResponse{
 		IncidentID:        draft.IncidentID,
 		Mode:              "deterministic_incident_snapshot",
@@ -498,8 +509,34 @@ func buildIncidentSnapshotFromDraft(draft *AgentDraftResponse) *AgentIncidentSna
 		Severity:          severity,
 		Scorecard:         scorecard,
 		SuggestedAction:   suggested,
+		OperatorHandoff:   operatorHandoff,
+		PolicyGuardrails:  policyGuardrails,
 		HumanConfirmation: draft.HumanConfirmation,
 	}
+}
+
+func buildSnapshotOperatorHandoff(
+	triage *AgentTriageResponse,
+	scorecard *AgentIncidentScorecardResponse,
+	suggested *AgentSuggestedActionResponse,
+) string {
+	if triage == nil || scorecard == nil || suggested == nil {
+		return ""
+	}
+	checks := triage.NextChecks
+	if len(checks) > 2 {
+		checks = checks[:2]
+	}
+	return fmt.Sprintf(
+		"Probable cause: %s (confidence: %s). Severity: %d (%s). Next checks: %s. Advisory action: %s (%s blast radius). Execution remains approval-bound.",
+		strings.TrimSpace(triage.ProbableCause),
+		strings.TrimSpace(triage.Confidence),
+		scorecard.SeverityScore,
+		strings.TrimSpace(scorecard.SeverityLevel),
+		strings.Join(checks, " | "),
+		strings.TrimSpace(suggested.ActionKey),
+		strings.TrimSpace(suggested.BlastRadius),
+	)
 }
 
 func selectDraftTools(workspace *IncidentWorkspace, tools []MCPToolDescriptor) []MCPToolDescriptor {

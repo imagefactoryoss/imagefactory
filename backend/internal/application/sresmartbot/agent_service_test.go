@@ -392,6 +392,12 @@ func TestBuildIncidentSnapshotFromDraft_ComposesDeterministicViews(t *testing.T)
 	if snapshot.Scorecard.ActionKey != snapshot.SuggestedAction.ActionKey {
 		t.Fatalf("expected scorecard/suggested-action keys to align, got %q and %q", snapshot.Scorecard.ActionKey, snapshot.SuggestedAction.ActionKey)
 	}
+	if snapshot.OperatorHandoff == "" {
+		t.Fatal("expected snapshot operator handoff note")
+	}
+	if len(snapshot.PolicyGuardrails) == 0 {
+		t.Fatal("expected snapshot policy guardrails")
+	}
 }
 
 func TestBuildIncidentSnapshotFromDraft_RemainsApprovalBound(t *testing.T) {
@@ -418,5 +424,12 @@ func TestBuildIncidentSnapshotFromDraft_RemainsApprovalBound(t *testing.T) {
 	}
 	if !snapshot.Scorecard.ExecutionRequiresApproval || !snapshot.SuggestedAction.ExecutionRequiresApproval {
 		t.Fatal("expected incident snapshot actions to remain approval-bound")
+	}
+	if !strings.Contains(strings.ToLower(snapshot.OperatorHandoff), "approval-bound") {
+		t.Fatalf("expected operator handoff to preserve approval-bound language, got %q", snapshot.OperatorHandoff)
+	}
+	guardrails := strings.ToLower(strings.Join(snapshot.PolicyGuardrails, " "))
+	if !strings.Contains(guardrails, "advisory") || !strings.Contains(guardrails, "approval") {
+		t.Fatalf("expected guardrails to include advisory+approval language, got %q", strings.Join(snapshot.PolicyGuardrails, " | "))
 	}
 }
