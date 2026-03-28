@@ -486,6 +486,18 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - added `GET /api/v1/admin/sre/incidents/{id}/agent/snapshot`.
   - incidents AI page now includes `Generate AI Snapshot` and dedicated snapshot cards in both layout variants.
 
+9. `AIOPS-09` Snapshot operator handoff + policy guardrail bundle
+- Status: `done`
+- Scope:
+  - include deterministic operator handoff note and policy guardrails in snapshot contract.
+  - surface guardrail language directly in snapshot UI cards.
+- Validation:
+  - backend snapshot tests enforce approval-bound handoff/guardrail language.
+  - full SRE regression + AIOPS eval harness remain green.
+- Completion note:
+  - `AgentIncidentSnapshotResponse` now includes `operator_handoff_note` and `policy_guardrails[]`.
+  - AI snapshot cards now render explicit handoff guidance and advisory/approval guardrails.
+
 0. Deployment guardrails: strict Helm configuration (no silent fallbacks) + Supabase pooler stability
 - Status: `done`
 - Priority: `P0`
