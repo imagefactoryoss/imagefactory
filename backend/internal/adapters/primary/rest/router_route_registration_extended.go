@@ -231,6 +231,7 @@ func registerIdentitySystemAdminRoutes(
 		router.Post("/api/v1/admin/sre/incidents/{id}/mcp/invoke", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.InvokeMCPTool)).ServeHTTP)
 		router.Post("/api/v1/admin/sre/agent/probe", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ProbeAgentRuntime)).ServeHTTP)
 		router.Get("/api/v1/admin/sre/incidents/{id}/agent/draft", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentDraft)).ServeHTTP)
+		router.Get("/api/v1/admin/sre/incidents/{id}/agent/triage", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentTriage)).ServeHTTP)
 		router.Get("/api/v1/admin/sre/incidents/{id}/agent/interpretation", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.GetAgentInterpretation)).ServeHTTP)
 		router.Get("/api/v1/admin/sre/approvals", authMiddleware.RequirePermission(permissionService, "system", "read")(http.HandlerFunc(sreSmartBotHandler.ListApprovals)).ServeHTTP)
 		router.Post("/api/v1/admin/sre/incidents/{id}/email-summary", authMiddleware.RequirePermission(permissionService, "system", "write")(http.HandlerFunc(sreSmartBotHandler.EmailIncidentSummary)).ServeHTTP)

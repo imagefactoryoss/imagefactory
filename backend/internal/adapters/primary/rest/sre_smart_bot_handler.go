@@ -100,6 +100,7 @@ type invokeSREMCPToolRequest struct {
 }
 
 type getSREAgentDraftResponse = appsresmartbot.AgentDraftResponse
+type getSREAgentTriageResponse = appsresmartbot.AgentTriageResponse
 type getSREAgentInterpretationResponse = appsresmartbot.AgentInterpretationResponse
 type probeSREAgentRuntimeResponse = appsresmartbot.AgentRuntimeProbeResponse
 
@@ -595,6 +596,40 @@ func (h *SRESmartBotHandler) GetAgentDraft(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(getSREAgentDraftResponse(*draft))
+}
+
+func (h *SRESmartBotHandler) GetAgentTriage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		WriteError(w, r.Context(), MethodNotAllowed("Method not allowed"))
+		return
+	}
+	if h.agentService == nil {
+		WriteError(w, r.Context(), InternalServer("Agent service is not configured"))
+		return
+	}
+	authCtx, ok := middleware.GetAuthContext(r)
+	if !ok {
+		WriteError(w, r.Context(), Unauthorized("Authentication required"))
+		return
+	}
+	incidentID, err := uuid.Parse(strings.TrimSpace(chi.URLParam(r, "id")))
+	if err != nil {
+		WriteError(w, r.Context(), BadRequest("Invalid incident id"))
+		return
+	}
+	var tenantID *uuid.UUID
+	if !isAllTenantsScopeRequested(r, authCtx) {
+		tenantID = &authCtx.TenantID
+	}
+	triage, err := h.agentService.BuildTriage(r.Context(), tenantID, incidentID)
+	if err != nil {
+		h.logger.Error("Failed to build SRE agent triage", zap.Error(err), zap.String("incident_id", incidentID.String()))
+		WriteError(w, r.Context(), InternalServer("Failed to build agent triage").WithCause(err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(getSREAgentTriageResponse(*triage))
 }
 
 func (h *SRESmartBotHandler) GetAgentInterpretation(w http.ResponseWriter, r *http.Request) {

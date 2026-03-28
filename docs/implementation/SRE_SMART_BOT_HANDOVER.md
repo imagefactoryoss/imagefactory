@@ -168,6 +168,8 @@ Known test-harness noise:
 - No external model calls are happening yet.
 - The first agent workflow now exists via:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/draft`
+- A deterministic triage workflow now exists via:
+  - `GET /api/v1/admin/sre/incidents/{id}/agent/triage`
 - An optional local-model interpretation layer now exists via:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/interpretation`
 - That draft flow:
