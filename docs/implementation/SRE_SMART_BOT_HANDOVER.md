@@ -87,7 +87,7 @@ That objective is now materially achieved:
 
 ## Recommended Next Steps
 
-0. Execute `AIOps Assistant v1` PR track in order (`AIOPS-05` through `AIOPS-06`)
+0. Execute `AIOps Assistant v1` PR track in order (`AIOPS-06`)
 - backlog tracker: `docs/implementation/ENGINEERING_BACKLOG.md` (`AIOps Assistant v1 PR Track`)
 - keep each slice deterministic and approval-safe, with one validation artifact per slice.
 
@@ -175,6 +175,8 @@ Known test-harness noise:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/triage`
 - A deterministic severity correlation workflow now exists via:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/severity`
+- A deterministic advisory suggested-action workflow now exists via:
+  - `GET /api/v1/admin/sre/incidents/{id}/agent/suggested-action`
 - An optional local-model interpretation layer now exists via:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/interpretation`
 - The interpretation endpoint now includes bounded small-LLM outputs:
@@ -196,6 +198,10 @@ Known test-harness noise:
   - currently supports `provider=ollama`
   - uses `agent_runtime.base_url` plus the configured local model name
   - does not add any action authority
+- Suggested-action reasoning remains advisory:
+  - suggestion output includes action + justification + blast-radius category
+  - response explicitly marks advisory-only and approval-required execution guardrails
+  - execution still requires the existing deterministic action + approval workflow
   - current default local model recommendation: `llama3.2:3b`
   - recommended local profile: Ollama at `http://127.0.0.1:11434` with `provider=ollama`
 - The settings page now includes a local model probe:

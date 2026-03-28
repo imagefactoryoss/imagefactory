@@ -437,13 +437,17 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - citation validation gate now rejects interpretation output lacking runbook/evidence citations or referencing non-allowlisted runbook sources.
 
 5. `AIOPS-05` Approval-safe suggested action reasoning
-- Status: `planned`
+- Status: `done`
 - Scope:
   - AI suggestion envelope includes action, justification, and blast-radius category.
   - execution continues to require existing deterministic approval gates.
 - Validation:
   - policy tests prove suggestions never bypass approval workflow.
   - UI clearly labels advisory suggestion vs executable action.
+- Completion note:
+  - added deterministic suggested action endpoint `GET /api/v1/admin/sre/incidents/{id}/agent/suggested-action`.
+  - suggestion contract now includes `action_key`, `action_summary`, `justification`, `blast_radius`, and explicit guardrail fields (`advisory_only`, `execution_requires_approval`, `execution_guardrail`).
+  - AI workspace and operator control center now render advisory-only suggested-action cards with clear non-executable labeling.
 
 6. `AIOPS-06` Evaluation harness (replay + safety)
 - Status: `planned`
