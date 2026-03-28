@@ -107,6 +107,12 @@ Branch: `feature/packer-builds`
 - PR8 provider-native lifecycle no-cloud mock validation mode completed:
   - smoke and matrix runners now support `SMOKE_MODE=mock_success` for deterministic validation without cloud/API credentials.
   - mock mode validates payload shape, lifecycle transition assertions, and report generation paths while skipping provider API calls.
+- PR8 provider-native staging evidence closure tooling completed:
+  - QA runner script: `scripts/qa/packer_provider_native_matrix_validate.sh`.
+  - make target: `make qa-packer-provider-native-matrix`.
+  - QA runbook + validation template:
+    - `docs/qa/PACKER_PROVIDER_NATIVE_MATRIX_STAGING_RUNBOOK.md`
+    - `docs/qa/PACKER_PROVIDER_NATIVE_MATRIX_VALIDATION_LOG.md`
 - PR8 provider-native lifecycle initial execution completed:
   - AWS `delete` lifecycle action now supports provider-native execution via EC2 `DeregisterImage` when execution mode allows.
   - successful AWS native delete transitions now persist `provider_native`; invalid/missing AWS image metadata now returns `400`.
@@ -307,3 +313,7 @@ Frontend:
 ## Known Gap For Next PR
 
 - provider-native lifecycle actions are implemented across AWS, VMware, Azure, and GCP; next gap is executing the matrix runbook against staging/prod-like environments and attaching evidence artifacts for each provider.
+- closure criteria for marking Packer track done:
+  - execute `SMOKE_MODE=api ... make qa-packer-provider-native-matrix` in staging/prod-like env.
+  - collect and attach runner artifacts under `docs/qa/artifacts/`.
+  - complete `docs/qa/PACKER_PROVIDER_NATIVE_MATRIX_VALIDATION_LOG.md` with Platform/Ops + QA signoff.
