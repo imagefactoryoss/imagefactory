@@ -39,6 +39,18 @@ type AgentDraftResponse struct {
 	HumanConfirmation bool                      `json:"human_confirmation_required"`
 }
 
+type AgentTriageResponse struct {
+	IncidentID        uuid.UUID               `json:"incident_id"`
+	Mode              string                  `json:"mode"`
+	Summary           string                  `json:"summary"`
+	ProbableCause     string                  `json:"probable_cause"`
+	Confidence        string                  `json:"confidence"`
+	NextChecks        []string                `json:"next_checks"`
+	RecommendedAction string                  `json:"recommended_action"`
+	EvidenceRefs      []AgentDraftEvidenceRef `json:"evidence_refs,omitempty"`
+	HumanConfirmation bool                    `json:"human_confirmation_required"`
+}
+
 type AgentService struct {
 	workspaceService *WorkspaceService
 	mcpService       *MCPService
@@ -105,6 +117,53 @@ func (s *AgentService) BuildDraft(ctx context.Context, tenantID *uuid.UUID, inci
 		ToolRuns:          toolRuns,
 		HumanConfirmation: workspace.AgentRuntime.RequireHumanConfirmationForMessage,
 	}, nil
+}
+
+func (s *AgentService) BuildTriage(ctx context.Context, tenantID *uuid.UUID, incidentID uuid.UUID) (*AgentTriageResponse, error) {
+	draft, err := s.BuildDraft(ctx, tenantID, incidentID)
+	if err != nil {
+		return nil, err
+	}
+	return buildTriageFromDraft(draft), nil
+}
+
+func buildTriageFromDraft(draft *AgentDraftResponse) *AgentTriageResponse {
+	if draft == nil {
+		return nil
+	}
+	probableCause := strings.TrimSpace(draft.Summary)
+	confidence := "medium"
+	evidenceRefs := make([]AgentDraftEvidenceRef, 0)
+	if len(draft.Hypotheses) > 0 {
+		top := draft.Hypotheses[0]
+		if title := strings.TrimSpace(top.Title); title != "" {
+			probableCause = title
+		}
+		if value := normalizeTriageConfidence(top.Confidence); value != "" {
+			confidence = value
+		}
+		if len(top.EvidenceRefs) > 0 {
+			evidenceRefs = append(evidenceRefs, top.EvidenceRefs...)
+		}
+	}
+	if probableCause == "" {
+		probableCause = "Most recent stored findings and evidence require additional confirmation."
+	}
+	if len(evidenceRefs) == 0 {
+		evidenceRefs = evidenceRefsForSignals([]string{"findings.list", "evidence.list"}, draft.ToolRuns)
+	}
+
+	return &AgentTriageResponse{
+		IncidentID:        draft.IncidentID,
+		Mode:              "deterministic_triage",
+		Summary:           draft.Summary,
+		ProbableCause:     probableCause,
+		Confidence:        confidence,
+		NextChecks:        buildTriageNextChecks(draft),
+		RecommendedAction: deriveTriageRecommendedAction(draft),
+		EvidenceRefs:      evidenceRefs,
+		HumanConfirmation: draft.HumanConfirmation,
+	}
 }
 
 func selectDraftTools(workspace *IncidentWorkspace, tools []MCPToolDescriptor) []MCPToolDescriptor {
@@ -445,6 +504,87 @@ func summarizeToolRun(run MCPToolInvocationResult) string {
 		return fmt.Sprintf("%.0f recent log matches returned.", count)
 	}
 	return "Structured tool output captured for this draft."
+}
+
+func buildTriageNextChecks(draft *AgentDraftResponse) []string {
+	if draft == nil {
+		return nil
+	}
+	checks := make([]string, 0, 3)
+	for _, step := range draft.InvestigationPlan {
+		if len(checks) >= 3 {
+			break
+		}
+		title := strings.TrimSpace(step.Title)
+		description := strings.TrimSpace(step.Description)
+		switch {
+		case title != "" && description != "":
+			checks = append(checks, fmt.Sprintf("%s: %s", title, description))
+		case title != "":
+			checks = append(checks, title)
+		case description != "":
+			checks = append(checks, description)
+		}
+	}
+	if len(checks) == 0 {
+		if summary := strings.TrimSpace(draft.Summary); summary != "" {
+			checks = append(checks, fmt.Sprintf("Confirm incident summary against stored evidence: %s", summary))
+		}
+	}
+	for len(checks) < 3 {
+		switch len(checks) {
+		case 0:
+			checks = append(checks, "Review the latest findings and evidence rows for this incident.")
+		case 1:
+			checks = append(checks, "Run bounded read-only MCP tools from the default workspace bundle.")
+		default:
+			checks = append(checks, "Request approval before any disruptive remediation path.")
+		}
+	}
+	return checks
+}
+
+func deriveTriageRecommendedAction(draft *AgentDraftResponse) string {
+	if draft == nil {
+		return "Collect more evidence before selecting a remediation path."
+	}
+	topSignals := make([]string, 0)
+	if len(draft.Hypotheses) > 0 {
+		topSignals = draft.Hypotheses[0].SignalsUsed
+	}
+	if containsSignal(topSignals, "messaging_transport.recent") {
+		return "Prefer recommendation-only review_messaging_transport_health first, then re-check backlog pressure before scaling workers."
+	}
+	if containsSignal(topSignals, "async_backlog.recent") {
+		return "Prefer recommendation-only review_async_worker_capacity or review_dispatcher_backlog_pressure before any disruptive intervention."
+	}
+	if containsSignal(topSignals, "release_drift.summary") {
+		return "Validate release drift and rollout state first; avoid runtime restarts until drift direction is confirmed."
+	}
+	if containsSignal(topSignals, "cluster_overview.get") || containsSignal(topSignals, "runtime_health.get") {
+		return "Review cluster and dependency health before config mutations; keep remediation approval-bound."
+	}
+	return "Follow the top bounded investigation step and keep execution in deterministic approval-gated action flows."
+}
+
+func containsSignal(signals []string, wanted string) bool {
+	for _, signal := range signals {
+		if strings.TrimSpace(signal) == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeTriageConfidence(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "high":
+		return "high"
+	case "low":
+		return "low"
+	default:
+		return "medium"
+	}
 }
 
 func metricFromPayload(payload map[string]any, key string) int64 {
