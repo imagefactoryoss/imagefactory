@@ -360,6 +360,7 @@ Track implementation work that is agreed but not yet completed, with clear owner
     - cluster overview and nodes
     - release drift summary
     - recent HTTP golden-signal windows
+  - deterministic triage contract now exists via `GET /api/v1/admin/sre/incidents/{id}/agent/triage`, projecting probable cause, confidence, next checks, and approval-safe recommended action from the grounded draft.
   - the incidents workspace can now render specialized output for HTTP golden signals instead of raw JSON blobs.
 - Source: `docs/implementation/ROBOT_SRE_OPS_PERSONA_REQUIREMENTS_AND_DESIGN.md`
 

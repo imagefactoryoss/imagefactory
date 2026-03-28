@@ -1,12 +1,40 @@
+import { NIL_TENANT_ID } from '@/constants/tenant'
+import { useTenantStore } from '@/store/tenant'
 import {
     BulkOperation,
     CreateSystemConfigRequest,
+    DispatcherMetrics,
+    DispatcherStatus,
+    ExecutionPipelineHealthResponse,
     InvitationFilters,
     LoginHistory,
     PaginatedResponse,
     Permission,
+    ProductInfoMetadataConfig,
+    ReleaseGovernancePolicyConfig,
+    SREAgentDraftResponse,
+    SREAgentInterpretationResponse,
+    SREAgentTriageResponse,
+    SREAgentRuntimeProbeResponse,
+    SREApprovalListResponse,
+    SREDemoScenarioListResponse,
+    SREDetectorRuleSuggestion,
+    SREDetectorRuleSuggestionListResponse,
+    SREIncidentDetailResponse,
+    SREIncidentListResponse,
+    SREIncidentWorkspaceResponse,
+    SREMCPToolInvocationRequest,
+    SREMCPToolInvocationResponse,
+    SREMCPToolListResponse,
+    SRERemediationPackListResponse,
+    SRERemediationPackRunListResponse,
+    SRERemediationPackRunResponse,
+    SRESmartBotMutationResponse,
+    SRESmartBotPolicyConfig,
+    SystemComponentsStatusResponse,
     SystemConfig,
     SystemStats,
+    TektonTaskImagesConfig,
     Tenant,
     TenantManagementFilters,
     UpdateSystemConfigRequest,
@@ -17,30 +45,7 @@ import {
     UserRoleWithPermissions,
     UserSession,
     UserWithRoles,
-    DispatcherMetrics,
-    DispatcherStatus,
-    ExecutionPipelineHealthResponse,
-    SystemComponentsStatusResponse,
-    TektonTaskImagesConfig,
-    ReleaseGovernancePolicyConfig,
-    SREIncidentDetailResponse,
-    SREIncidentListResponse,
-    SREIncidentWorkspaceResponse,
-    SREAgentDraftResponse,
-    SREAgentInterpretationResponse,
-    SREAgentRuntimeProbeResponse,
-    SREMCPToolInvocationRequest,
-    SREMCPToolInvocationResponse,
-    SREMCPToolListResponse,
-    SREApprovalListResponse,
-    SREDetectorRuleSuggestion,
-    SREDetectorRuleSuggestionListResponse,
-    SREDemoScenarioListResponse,
-    SRESmartBotMutationResponse,
-    SRESmartBotPolicyConfig,
 } from '@/types'
-import { useTenantStore } from '@/store/tenant'
-import { NIL_TENANT_ID } from '@/constants/tenant'
 import api from './api'
 
 const getTenantHeader = () => {
@@ -110,6 +115,17 @@ export const adminService = {
     async getReleaseGovernancePolicy(): Promise<ReleaseGovernancePolicyConfig> {
         try {
             const response = await api.get('/admin/settings/release-governance-policy', {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getProductInfoMetadata(): Promise<ProductInfoMetadataConfig> {
+        try {
+            const response = await api.get('/admin/settings/product-info-metadata', {
                 headers: getTenantHeader(),
             })
             return response.data
@@ -201,6 +217,50 @@ export const adminService = {
         }
     },
 
+    async getSREIncidentRemediationPacks(id: string): Promise<SRERemediationPackListResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/remediation-packs`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentRemediationPackRuns(id: string): Promise<SRERemediationPackRunListResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/remediation-packs/runs`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async dryRunSREIncidentRemediationPack(incidentId: string, packKey: string): Promise<SRERemediationPackRunResponse> {
+        try {
+            const response = await api.post(`/admin/sre/incidents/${incidentId}/remediation-packs/${encodeURIComponent(packKey)}/dry-run`, {}, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async executeSREIncidentRemediationPack(incidentId: string, packKey: string, payload?: { approval_id?: string; request_id?: string }): Promise<SRERemediationPackRunResponse> {
+        try {
+            const response = await api.post(`/admin/sre/incidents/${incidentId}/remediation-packs/${encodeURIComponent(packKey)}/execute`, payload || {}, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
     async getSREIncidentMCPTools(id: string): Promise<SREMCPToolListResponse> {
         try {
             const response = await api.get(`/admin/sre/incidents/${id}/mcp/tools`, {
@@ -259,6 +319,17 @@ export const adminService = {
     async getSREIncidentAgentInterpretation(id: string): Promise<SREAgentInterpretationResponse> {
         try {
             const response = await api.get(`/admin/sre/incidents/${id}/agent/interpretation`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentAgentTriage(id: string): Promise<SREAgentTriageResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/agent/triage`, {
                 headers: getTenantHeader(),
             })
             return response.data

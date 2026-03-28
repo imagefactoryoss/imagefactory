@@ -931,6 +931,18 @@ export interface SREAgentDraftResponse {
     human_confirmation_required: boolean
 }
 
+export interface SREAgentTriageResponse {
+    incident_id: string
+    mode: string
+    summary: string
+    probable_cause: string
+    confidence: string
+    next_checks: string[]
+    recommended_action: string
+    evidence_refs?: SREAgentDraftEvidenceRef[]
+    human_confirmation_required: boolean
+}
+
 export interface SREAgentInterpretationResponse {
     draft?: SREAgentDraftResponse
     provider: string
