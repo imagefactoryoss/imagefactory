@@ -6,6 +6,14 @@ Last updated: 2026-03-28
 
 Track implementation work that is agreed but not yet completed, with clear ownership of next steps.
 
+## Mandatory Workflow (All Future Slices)
+
+- implement each slice on a private feature branch first.
+- run slice validation locally (`go test`, frontend build, `qa-sre-smartbot-aiops-eval`, `qa-sre-smartbot-regression`) before sync.
+- sync only the changed slice files to OSS (avoid broad repo copy) on a matching OSS feature branch.
+- rerun OSS validation, then `PR -> merge` in OSS immediately after private push.
+- record private commit SHA + OSS PR number in handoff updates for traceability.
+
 ## New Backlog Entries (2026-03-27)
 
 1. Multi-cloud Packer base OS image builds (VMware, Azure, AWS, GCP)
@@ -390,13 +398,6 @@ Track implementation work that is agreed but not yet completed, with clear owner
 - Source: `docs/implementation/ROBOT_SRE_OPS_PERSONA_REQUIREMENTS_AND_DESIGN.md`
 
 ### AIOps Assistant v1 PR Track
-
-Workflow note (team convention):
-- implement each slice on a private feature branch first.
-- run slice validation locally (`go test`, frontend build, `qa-sre-smartbot-aiops-eval`, `qa-sre-smartbot-regression`) before sync.
-- sync only the changed slice files to OSS (avoid broad repo copy) on a matching OSS feature branch.
-- rerun OSS validation, then `PR -> merge` in OSS immediately after private push.
-- record private commit SHA + OSS PR number in handoff updates for traceability.
 
 1. `AIOPS-01` Deterministic Incident Triage Copilot
 - Status: `done`
