@@ -1052,7 +1052,7 @@ Sequencing decision:
   - frontend: `cd frontend && npm test -- --run src/pages/admin/__tests__/sreSmartBotAsyncSummary.test.ts`
 
 40. SRE Smart Bot NATS consumer lag and pressure signals
-- Status: `planned`
+- Status: `done`
 - Priority: `P1`
 - Owner: `Backend + Frontend + Platform/Ops`
 - Plan doc: `docs/implementation/SRE_SMART_BOT_NATS_CONSUMER_LAG_PRESSURE_EPIC.md`
@@ -1063,21 +1063,26 @@ Sequencing decision:
   - surface consumer lag and stalled progress directly in the incident summary UX and AI workspace.
   - correlate consumer lag with transport instability and async backlog growth in the deterministic draft.
   - prepare the same model for deeper stream-level delivery telemetry later.
-- Next step:
-  - start `A-01`, `A-02`, `B-01`, and `C-01` from `docs/implementation/SRE_SMART_BOT_NATS_CONSUMER_LAG_PRESSURE_EPIC.md`.
+- Outcome:
+  - consumer lag and stalled-progress signals now normalize into incident ledger findings/evidence with deterministic correlation keys.
+  - workspace and deterministic draft outputs now include consumer-pressure context and tool summaries (`messaging_consumers.recent`).
+  - consumer pressure is now correlated with transport instability and async backlog context in SRE incident interpretation flows.
+- Validation:
+  - backend: `cd backend && go test ./internal/application/sresmartbot -run 'TestObserveNATSConsumerLagSignals_|TestBuildIncidentWorkspace_IncludesMessagingConsumerSummaryAndBundle|TestBuildDraftSummary_ExplainsConsumerLagWithoutTransportInstability|TestBuildDraftHypotheses_DistinguishesConsumerPressureFromTransport'`
+  - frontend: `cd frontend && npm test -- --run src/pages/admin/__tests__/SRESmartBotIncidentsPage.test.tsx src/pages/admin/__tests__/sreSmartBotAsyncSummary.test.ts`
 
 ### SRE Smart Bot Handoff Checkpoint
 
-- Date: `2026-03-14`
-- Branch: `feature/sre-smart-bot`
+- Date: `2026-03-28`
+- Branch: `feature/sre-smartbot-phase1-loki`
 - Status:
   - policy foundation is complete.
-  - incident ledger is in progress.
+  - incident ledger and core watcher/detector wiring are complete for current product scope.
   - startup/watcher modularization checkpoint is complete.
-  - first admin incidents page is now available.
+  - admin incidents, approvals, settings, detector-rule suggestions, and remediation-pack flows are available.
 - Immediate next product step:
-  - enrich incident creation from provider readiness, tenant asset drift, and quarantine release compliance watchers.
-  - follow with evidence capture and first stored action-attempt flow.
+  - continue observability/intelligence plumbing (Loki ingestion parity, detector contract hardening, MCP seams).
+  - improve operator-readable evidence/action summaries and add the next low-risk allowlisted executable action.
 
 37. Quarantine telemetry expansion (runtime mode + scope analytics)
 - Status: `done`
