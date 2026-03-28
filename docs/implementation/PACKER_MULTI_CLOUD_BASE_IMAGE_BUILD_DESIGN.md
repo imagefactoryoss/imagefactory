@@ -901,6 +901,7 @@ Progress update (2026-03-27):
 - provider-native lifecycle matrix tooling now exists:
   - multi-provider orchestration script: `scripts/packer-lifecycle-provider-native-matrix.sh`.
   - matrix validation runbook: `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_MATRIX_RUNBOOK.md`.
+  - no-cloud deterministic mode is supported via `SMOKE_MODE=mock_success` for smoke/matrix workflow validation without provider API access.
 
 ### 16.10 Cross-cutting quality gates for every PR
 

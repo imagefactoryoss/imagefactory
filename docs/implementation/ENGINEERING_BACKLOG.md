@@ -155,6 +155,9 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - PR8 provider-native lifecycle matrix validation tooling completed on `feature/packer-builds`:
     - added matrix runner script `scripts/packer-lifecycle-provider-native-matrix.sh` to orchestrate per-provider smoke runs with consolidated evidence logging.
     - added matrix runbook `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_MATRIX_RUNBOOK.md` for provider execution-ID mapping, safety guards, and pass/fail criteria.
+  - PR8 provider-native lifecycle no-cloud mock validation mode completed on `feature/packer-builds`:
+    - smoke/matrix tooling now supports `SMOKE_MODE=mock_success` for deterministic no-cloud workflow validation.
+    - mock mode keeps transition assertion and report contracts intact while skipping provider API calls and external credentials.
 
 ## Backlog Review Summary (2026-03-16)
 

@@ -104,6 +104,9 @@ Branch: `feature/packer-builds`
   - executable matrix runner: `scripts/packer-lifecycle-provider-native-matrix.sh`.
   - matrix validation runbook: `docs/implementation/PACKER_VM_LIFECYCLE_PROVIDER_NATIVE_MATRIX_RUNBOOK.md`.
   - smoke runbook now links single-provider and matrix workflows.
+- PR8 provider-native lifecycle no-cloud mock validation mode completed:
+  - smoke and matrix runners now support `SMOKE_MODE=mock_success` for deterministic validation without cloud/API credentials.
+  - mock mode validates payload shape, lifecycle transition assertions, and report generation paths while skipping provider API calls.
 - PR8 provider-native lifecycle initial execution completed:
   - AWS `delete` lifecycle action now supports provider-native execution via EC2 `DeregisterImage` when execution mode allows.
   - successful AWS native delete transitions now persist `provider_native`; invalid/missing AWS image metadata now returns `400`.

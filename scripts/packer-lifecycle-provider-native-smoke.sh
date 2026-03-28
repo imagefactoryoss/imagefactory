@@ -12,9 +12,16 @@ REQUIRE_PROVIDER_NATIVE="${REQUIRE_PROVIDER_NATIVE:-true}"
 CONFIRM_DESTRUCTIVE="${CONFIRM_DESTRUCTIVE:-false}"
 REQUEST_TIMEOUT_SECONDS="${REQUEST_TIMEOUT_SECONDS:-30}"
 REASON_PREFIX="${REASON_PREFIX:-provider-native smoke}"
+SMOKE_MODE="${SMOKE_MODE:-api}"
+MOCK_INITIAL_STATE="${MOCK_INITIAL_STATE:-released}"
+MOCK_TRANSITION_MODE="${MOCK_TRANSITION_MODE:-provider_native}"
+MOCK_PROVIDER_OUTCOME="${MOCK_PROVIDER_OUTCOME:-success}"
+MOCK_PROVIDER_DEFAULT="${MOCK_PROVIDER_DEFAULT:-aws}"
 
 API_BODY=""
 API_STATUS=""
+CURRENT_PROVIDER=""
+CURRENT_STATE=""
 
 log() {
   printf '[vm-lifecycle-smoke] %s\n' "$*"
@@ -45,11 +52,96 @@ normalize_bool() {
   esac
 }
 
+normalize_smoke_mode() {
+  local raw
+  raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | xargs)"
+  case "$raw" in
+    api|mock_success) echo "$raw" ;;
+    *) fail "unsupported SMOKE_MODE: $1 (expected api|mock_success)" ;;
+  esac
+}
+
+normalize_transition_mode() {
+  local raw
+  raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | xargs)"
+  case "$raw" in
+    metadata_only|provider_native|hybrid) echo "$raw" ;;
+    *) fail "unsupported MOCK_TRANSITION_MODE: $1" ;;
+  esac
+}
+
 trim() {
   local value="$1"
   value="${value#${value%%[![:space:]]*}}"
   value="${value%${value##*[![:space:]]}}"
   printf '%s' "$value"
+}
+
+mock_set_payload() {
+  local execution_id="$1"
+  local provider="$2"
+  local state="$3"
+  local message="$4"
+
+  local mode provider_action provider_identifier provider_outcome
+  mode="$(normalize_transition_mode "$MOCK_TRANSITION_MODE")"
+  provider_action=""
+  provider_identifier=""
+  provider_outcome=""
+
+  if [[ "$mode" == "provider_native" || "$mode" == "hybrid" ]]; then
+    provider_action="mock_${state}"
+    provider_identifier="mock://${provider}/${execution_id}"
+    provider_outcome="$MOCK_PROVIDER_OUTCOME"
+  fi
+
+  API_BODY="$(jq -cn \
+    --arg execution_id "$execution_id" \
+    --arg provider "$provider" \
+    --arg state "$state" \
+    --arg mode "$mode" \
+    --arg provider_action "$provider_action" \
+    --arg provider_identifier "$provider_identifier" \
+    --arg provider_outcome "$provider_outcome" \
+    --arg message "$message" \
+    '{
+      message: $message,
+      data: {
+        execution_id: $execution_id,
+        target_provider: $provider,
+        lifecycle_state: $state,
+        lifecycle_transition_mode: $mode,
+        lifecycle_last_provider_action: (if ($provider_action | length) > 0 then $provider_action else null end),
+        lifecycle_last_provider_identifier: (if ($provider_identifier | length) > 0 then $provider_identifier else null end),
+        lifecycle_last_provider_outcome: (if ($provider_outcome | length) > 0 then $provider_outcome else null end)
+      }
+    }')"
+  API_STATUS="200"
+}
+
+mock_fetch_item() {
+  local execution_id="$1"
+  local provider
+
+  provider="$(printf '%s' "${EXPECTED_PROVIDER:-$MOCK_PROVIDER_DEFAULT}" | tr '[:upper:]' '[:lower:]')"
+  [[ -n "$provider" ]] || fail "mock mode could not resolve provider"
+  CURRENT_PROVIDER="$provider"
+  CURRENT_STATE="$(printf '%s' "$MOCK_INITIAL_STATE" | tr '[:upper:]' '[:lower:]')"
+  mock_set_payload "$execution_id" "$CURRENT_PROVIDER" "$CURRENT_STATE" "mock fetch lifecycle state"
+}
+
+mock_apply_action() {
+  local execution_id="$1"
+  local action="$2"
+
+  case "$action" in
+    promote) CURRENT_STATE="released" ;;
+    deprecate) CURRENT_STATE="deprecated" ;;
+    delete) CURRENT_STATE="deleted" ;;
+    *) fail "unsupported action in ACTION_SEQUENCE: $action" ;;
+  esac
+
+  mock_set_payload "$execution_id" "$CURRENT_PROVIDER" "$CURRENT_STATE" "mock ${action} applied"
 }
 
 api_call() {
@@ -105,6 +197,12 @@ validate_item_shape() {
 
 fetch_item() {
   local execution_id="$1"
+  if [[ "$SMOKE_MODE" == "mock_success" ]]; then
+    mock_fetch_item "$execution_id"
+    validate_item_shape "$API_BODY"
+    return
+  fi
+
   api_call "GET" "/api/v1/images/vm/${execution_id}"
   expect_status "200"
   validate_item_shape "$API_BODY"
@@ -114,6 +212,12 @@ apply_action() {
   local execution_id="$1"
   local action="$2"
   local reason="$3"
+
+  if [[ "$SMOKE_MODE" == "mock_success" ]]; then
+    mock_apply_action "$execution_id" "$action"
+    validate_item_shape "$API_BODY"
+    return
+  fi
 
   case "$action" in
     promote)
@@ -203,11 +307,15 @@ run_for_execution() {
 }
 
 main() {
-  need_cmd curl
   need_cmd jq
-  need_env AUTH_TOKEN
-  need_env TENANT_ID
   need_env EXECUTION_IDS
+  SMOKE_MODE="$(normalize_smoke_mode "$SMOKE_MODE")"
+
+  if [[ "$SMOKE_MODE" == "api" ]]; then
+    need_cmd curl
+    need_env AUTH_TOKEN
+    need_env TENANT_ID
+  fi
 
   local confirm
   confirm="$(normalize_bool "$CONFIRM_DESTRUCTIVE")"
@@ -223,7 +331,7 @@ main() {
     run_for_execution "$execution_id"
   done
 
-  log "✅ provider-native lifecycle smoke finished"
+  log "✅ provider-native lifecycle smoke finished (mode=${SMOKE_MODE})"
 }
 
 main "$@"

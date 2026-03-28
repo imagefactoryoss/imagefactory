@@ -31,6 +31,7 @@ Behavior:
 
 - `CONFIRM_DESTRUCTIVE=true` (required for delete path)
 - `ACTION_SEQUENCE` (default: `promote,deprecate,delete`)
+- `SMOKE_MODE` (default: `api`; set `mock_success` for no-cloud deterministic validation)
 - `REQUIRE_PROVIDER_NATIVE` (default: `true`)
 - `REQUEST_TIMEOUT_SECONDS` (default: `30`)
 - `REASON_PREFIX` (default: `provider-native matrix`)
@@ -56,6 +57,20 @@ AZURE_EXECUTION_IDS='<azure-execution-uuid>' \
 GCP_EXECUTION_IDS='<gcp-execution-uuid>' \
 CONFIRM_DESTRUCTIVE=true \
 REQUIRE_PROVIDER_NATIVE=true \
+./scripts/packer-lifecycle-provider-native-matrix.sh
+```
+
+No-cloud mock example:
+
+```bash
+TARGET_PROVIDERS=aws,vmware,azure,gcp \
+AWS_EXECUTION_IDS='mock-aws-1' \
+VMWARE_EXECUTION_IDS='mock-vmware-1' \
+AZURE_EXECUTION_IDS='mock-azure-1' \
+GCP_EXECUTION_IDS='mock-gcp-1' \
+CONFIRM_DESTRUCTIVE=true \
+REQUIRE_PROVIDER_NATIVE=true \
+SMOKE_MODE=mock_success \
 ./scripts/packer-lifecycle-provider-native-matrix.sh
 ```
 
