@@ -174,6 +174,8 @@ Known test-harness noise:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/draft`
 - A deterministic triage workflow now exists via:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/triage`
+- A deterministic severity correlation workflow now exists via:
+  - `GET /api/v1/admin/sre/incidents/{id}/agent/severity`
 - An optional local-model interpretation layer now exists via:
   - `GET /api/v1/admin/sre/incidents/{id}/agent/interpretation`
 - That draft flow:

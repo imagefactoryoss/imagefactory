@@ -399,13 +399,16 @@ Track implementation work that is agreed but not yet completed, with clear owner
   - preserves deterministic/approval-safe action authority.
 
 2. `AIOPS-02` Signal Correlation Severity Layer + UI cards
-- Status: `planned`
+- Status: `done`
 - Scope:
   - correlate `logs + http_signals + async_backlog + messaging_transport` into one severity score contract.
   - add operator-facing "Why This Is Severe" cards in incident summary/AI workspace.
 - Validation:
   - deterministic score tests for stable, mixed-cause, and transport-driven pressure cases.
   - frontend card rendering tests for low/medium/high/critical severity explanations.
+- Completion note:
+  - added deterministic severity endpoint `GET /api/v1/admin/sre/incidents/{id}/agent/severity`.
+  - AI workspace/operator control center now render correlated severity score + factor cards.
 
 3. `AIOPS-03` Small-LLM usefulness pack (bounded)
 - Status: `planned`

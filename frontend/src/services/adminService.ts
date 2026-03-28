@@ -14,6 +14,7 @@ import {
     ReleaseGovernancePolicyConfig,
     SREAgentDraftResponse,
     SREAgentInterpretationResponse,
+    SREAgentSeverityResponse,
     SREAgentTriageResponse,
     SREAgentRuntimeProbeResponse,
     SREApprovalListResponse,
@@ -330,6 +331,17 @@ export const adminService = {
     async getSREIncidentAgentTriage(id: string): Promise<SREAgentTriageResponse> {
         try {
             const response = await api.get(`/admin/sre/incidents/${id}/agent/triage`, {
+                headers: getTenantHeader(),
+            })
+            return response.data
+        } catch (error: any) {
+            throw new Error(getErrorMessage(error))
+        }
+    },
+
+    async getSREIncidentAgentSeverity(id: string): Promise<SREAgentSeverityResponse> {
+        try {
+            const response = await api.get(`/admin/sre/incidents/${id}/agent/severity`, {
                 headers: getTenantHeader(),
             })
             return response.data
