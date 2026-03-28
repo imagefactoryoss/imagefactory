@@ -192,6 +192,26 @@ func TestUser_ClearPasswordHash(t *testing.T) {
 	assert.False(t, user.VerifyPassword("password123"))
 }
 
+func TestUser_EnsureLDAPCredentials(t *testing.T) {
+	user, err := NewUser("test@example.com", "John", "Doe", "password123")
+	require.NoError(t, err)
+	user.MarkPasswordChangeRequired()
+
+	initialVersion := user.Version()
+	changed := user.EnsureLDAPCredentials()
+	require.True(t, changed)
+
+	assert.Equal(t, AuthMethodLDAP, user.AuthMethod())
+	assert.Empty(t, user.PasswordHash())
+	assert.False(t, user.MustChangePassword())
+	assert.Equal(t, initialVersion+1, user.Version())
+
+	versionAfterFirstNormalize := user.Version()
+	changed = user.EnsureLDAPCredentials()
+	assert.False(t, changed)
+	assert.Equal(t, versionAfterFirstNormalize, user.Version())
+}
+
 func TestUser_RecordLogin(t *testing.T) {
 	user, err := NewUser("test@example.com", "John", "Doe", "password123")
 	require.NoError(t, err)

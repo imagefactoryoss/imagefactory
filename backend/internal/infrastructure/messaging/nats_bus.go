@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,21 @@ type NATSTransportStatus struct {
 	Disconnects      int64
 	Status           string
 	ConnectedURL     string
+}
+
+type NATSConsumerLagSnapshot struct {
+	Stream               string    `json:"stream"`
+	Consumer             string    `json:"consumer"`
+	PendingCount         uint64    `json:"pending_count"`
+	AckPendingCount      int       `json:"ack_pending_count"`
+	WaitingCount         int       `json:"waiting_count"`
+	RedeliveredCount     int       `json:"redelivered_count"`
+	DeliveredConsumerSeq uint64    `json:"delivered_consumer_seq"`
+	DeliveredStreamSeq   uint64    `json:"delivered_stream_seq"`
+	AckFloorConsumerSeq  uint64    `json:"ack_floor_consumer_seq"`
+	AckFloorStreamSeq    uint64    `json:"ack_floor_stream_seq"`
+	PushBound            bool      `json:"push_bound"`
+	LastActive           time.Time `json:"last_active,omitempty"`
 }
 
 func NewNATSBus(config config.NATSConfig, logger *zap.Logger) (*NATSBus, error) {
@@ -145,6 +161,63 @@ func (b *NATSBus) TransportStatus() NATSTransportStatus {
 	b.statusMu.RLock()
 	defer b.statusMu.RUnlock()
 	return b.status
+}
+
+func (b *NATSBus) ConsumerLagSnapshots(ctx context.Context) ([]NATSConsumerLagSnapshot, error) {
+	if b == nil || b.conn == nil {
+		return nil, fmt.Errorf("nats consumer lag is unavailable because the NATS connection is not configured")
+	}
+	js, err := b.conn.JetStream()
+	if err != nil {
+		return nil, fmt.Errorf("nats consumer lag is unavailable because JetStream is not enabled: %w", err)
+	}
+
+	snapshots := make([]NATSConsumerLagSnapshot, 0)
+	for stream := range js.StreamNames(nats.Context(ctx)) {
+		for consumer := range js.ConsumerNames(stream, nats.Context(ctx)) {
+			info, infoErr := js.ConsumerInfo(stream, consumer, nats.Context(ctx))
+			if infoErr != nil {
+				if b.logger != nil {
+					b.logger.Warn("Failed to inspect NATS consumer lag",
+						zap.String("stream", stream),
+						zap.String("consumer", consumer),
+						zap.Error(infoErr),
+					)
+				}
+				continue
+			}
+			lastActive := time.Time{}
+			if info.Delivered.Last != nil {
+				lastActive = *info.Delivered.Last
+			}
+			snapshots = append(snapshots, NATSConsumerLagSnapshot{
+				Stream:               stream,
+				Consumer:             consumer,
+				PendingCount:         info.NumPending,
+				AckPendingCount:      info.NumAckPending,
+				WaitingCount:         info.NumWaiting,
+				RedeliveredCount:     info.NumRedelivered,
+				DeliveredConsumerSeq: info.Delivered.Consumer,
+				DeliveredStreamSeq:   info.Delivered.Stream,
+				AckFloorConsumerSeq:  info.AckFloor.Consumer,
+				AckFloorStreamSeq:    info.AckFloor.Stream,
+				PushBound:            info.PushBound,
+				LastActive:           lastActive,
+			})
+		}
+	}
+
+	sort.SliceStable(snapshots, func(i, j int) bool {
+		if snapshots[i].PendingCount == snapshots[j].PendingCount {
+			if snapshots[i].Stream == snapshots[j].Stream {
+				return snapshots[i].Consumer < snapshots[j].Consumer
+			}
+			return snapshots[i].Stream < snapshots[j].Stream
+		}
+		return snapshots[i].PendingCount > snapshots[j].PendingCount
+	})
+
+	return snapshots, nil
 }
 
 func (b *NATSBus) updateStatus(update func(status *NATSTransportStatus)) {
